@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,33 +10,59 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+   Animated,
+   Linking,
 } from 'react-native';
 import { Alert } from 'react-native';
-import { router } from 'expo-router';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { useToastStore } from '@/stores/toastStore'; // Ensure this is before Toast
-import Toast from '@/components/Toast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from '@/components/Toast';
+import { useToastStore } from '@/stores/toastStore';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
+import MapView, { Marker } from 'react-native-maps';
 import { API_BASE_URL } from '@/config';
+
+type Hospital = {
+  id: string;
+  name: string | null;
+  image: string | null;
+  country: string | null;
+  service_summary: string | null;
+  admission_process: string | null;
+  partner_insurances: string | null;
+  partner_pharmacies: string | null;
+  contact_details: string | null;
+  locations: string | null;
+  available_services: string | null;
+  available_blood_types: string | null;
+  medical_equipment: string | null;
+
+};
+
+const formatPrice = (value: string) => {
+  const rawValue = value.replace(/,/g, "");
+  if (/^\d+$/.test(rawValue)) {
+    return rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  return value;
+};
+
+const getCurrencyForCountry = (country: string | null) => {
+  const c = (country || "").toLowerCase();
+  if (c.includes("rwanda")) return "RWF";
+  if (c.includes("burundi")) return "BIF";
+  if (c.includes("kenya")) return "KES";
+  if (c.includes("uganda")) return "UGX";
+  if (c.includes("tanzania")) return "TZS";
+  if (c.includes("congo") || c.includes("drc")) return "CDF";
+  return "USD";
+};
 
 export default function HospitalDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
-
-  type Hospital = {
-    id: string;
-    name: string;
-    image?: string;
-    location: string[];
-    specialties: string[];
-    insurances: string[];
-    bloodTypes: string[];
-  };
-
   const [hospital, setHospital] = useState<Hospital | null>(null);
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
@@ -49,21 +75,38 @@ export default function HospitalDetailScreen() {
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const VIEW_FEE = 500;
-
   const [pinCode, setPinCode] = useState('');
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!showDetails) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [showDetails]);
+
   useEffect(() => {
     if (!id) return;
 
-    const parseArrayField = (field: any) => {
-      if (Array.isArray(field)) return field;
-      if (typeof field === 'string') return field.replace(/[{}"]/g, '').split(',').map(s => s.trim());
-      return [];
-    };
 
     const fetchHospital = async () => {
       const { data, error } = await supabase
-        .from('hospitals')
-        .select('id, name, image, location, specialties, insurances, blood_types')
+        .from('hospital_applications')
+        .select('id, name, image, country, service_summary, admission_process, partner_insurances, partner_pharmacies, contact_details, locations, available_services, available_blood_types, medical_equipment')
         .eq('id', id)
         .single();
 
@@ -71,15 +114,7 @@ export default function HospitalDetailScreen() {
         console.error('Error fetching hospital details:', error.message);
         setHospital(null);
       } else if (data) {
-        setHospital({
-          id: data.id,
-          name: data.name,
-          image: data.image,
-          location: parseArrayField(data.location),
-          specialties: parseArrayField(data.specialties),
-          insurances: parseArrayField(data.insurances),
-          bloodTypes: parseArrayField(data.blood_types),
-        });
+        setHospital(data);
       }
       setLoading(false);
     };
@@ -90,7 +125,7 @@ export default function HospitalDetailScreen() {
 
     const channel = supabase
       .channel(`hospital-details-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hospitals', filter: `id=eq.${id}` }, fetchHospital)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hospital_applications', filter: `id=eq.${id}` }, fetchHospital)
       .subscribe();
 
     return () => {
@@ -133,6 +168,7 @@ export default function HospitalDetailScreen() {
 
   // Handle payment to view
   const handleConfirmViewPayment = async () => {
+    console.log("Starting payment process...");
     if (walletBalance === null || walletBalance < VIEW_FEE) {
       showToast("Insufficient wallet balance.");
       return;
@@ -143,6 +179,7 @@ export default function HospitalDetailScreen() {
     }
 
     setIsPaying(true);
+    console.log(`Attempting to pay ${VIEW_FEE} with PIN: ${pinCode}`);
     try {
       const token = await SecureStore.getItemAsync("token");
       if (!token) {
@@ -152,13 +189,14 @@ export default function HospitalDetailScreen() {
       }
 
       // Step 1: Verify the PIN first
+      console.log("Step 1: Verifying PIN...");
       const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ pin: pinCode }),
+        body: JSON.stringify({ pin_code: pinCode }),
       });
 
       if (!verifyRes.ok) {
@@ -166,23 +204,30 @@ export default function HospitalDetailScreen() {
         throw new Error(errorData.error || "Incorrect PIN.");
       }
 
+      console.log("PIN verification successful.");
+
       // Step 2: If PIN is correct, proceed with deduction
+      const deductionPayload = { amount: VIEW_FEE, reason: `View doctor ${id} details`, pin: pinCode };
+      console.log("Step 2: Proceeding with deduction. Payload:", JSON.stringify(deductionPayload));
       const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: VIEW_FEE, reason: `View hospital ${id} details` }),
+        body: JSON.stringify(deductionPayload),
       });
 
       if (!deductRes.ok) {
+        console.error("Deduction failed. Status:", deductRes.status);
         const errorData = await deductRes.json();
+        console.error("Deduction error response:", errorData);
         throw new Error(errorData.error || "Payment failed after PIN verification.");
       }
 
       // Success!
       setShowDetails(true);
+      console.log("Payment successful! Unlocking details.");
       showToast("Payment successful!");
       handleModalClose();
     } catch (error: unknown) {
@@ -190,6 +235,7 @@ export default function HospitalDetailScreen() {
       if (error instanceof Error) {
         errorMessage = error.message;
       }
+      console.error("An error occurred during payment:", errorMessage);
       Alert.alert("Payment Failed", errorMessage);
     } finally {
       setIsPaying(false);
@@ -202,17 +248,83 @@ export default function HospitalDetailScreen() {
     setPinCode(''); // Clear PIN on modal close
   };
 
-  if (loading) return (
-    <View style={styles.container}>
-      <Text style={{ textAlign: 'center', marginTop: 50 }}>Loading...</Text>
-    </View>
-  );
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ textAlign: 'center', marginTop: 50 }}>Loading...</Text>
+      </View>
+    );
+  }
 
-  if (!hospital) return (
-    <View style={styles.container}>
-      <Text style={{ textAlign: 'center', marginTop: 50 }}>Hospital not found.</Text>
-    </View>
-  );
+  if (!hospital) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ textAlign: 'center', marginTop: 50 }}>Hospital not found.</Text>
+      </View>
+    );
+  }
+
+  // Parse JSON data for display
+  let parsedContact: { email?: string; phone?: string; office?: string; website?: string } = {};
+  let parsedInsurances: string[] = [];
+  let parsedPharmacies: string[] = [];
+  let parsedLocations: { type: string; city: string; address: string; phone: string; latitude: string; longitude: string }[] = [];
+  let parsedServices: { name: string; description: string }[] = [];
+  let parsedBloodTypes: string[] = [];
+  let parsedEquipment: { name: string; status: string }[] = [];
+
+  if (hospital) {
+    
+    try {
+      if (hospital.contact_details && hospital.contact_details.trim().startsWith('{')) {
+        parsedContact = JSON.parse(hospital.contact_details);
+      } else if (hospital.contact_details) {
+        parsedContact = { office: hospital.contact_details };
+      }
+    } catch (e) { console.error("Error parsing contact", e); }
+
+    try {
+      if (hospital.partner_insurances && hospital.partner_insurances.trim().startsWith('[')) {
+        parsedInsurances = JSON.parse(hospital.partner_insurances);
+      } else if (hospital.partner_insurances) {
+        // Fallback for legacy text
+        parsedInsurances = hospital.partner_insurances.split('\n').map(s => s.replace(/^➢\s*/, '').trim()).filter(Boolean);
+      }
+    } catch (e) { parsedInsurances = []; }
+
+    try {
+      if (hospital.partner_pharmacies && hospital.partner_pharmacies.trim().startsWith('[')) {
+        parsedPharmacies = JSON.parse(hospital.partner_pharmacies);
+      } else if (hospital.partner_pharmacies) {
+        // Fallback for legacy text
+        parsedPharmacies = hospital.partner_pharmacies.split('\n').map(s => s.replace(/^➢\s*/, '').trim()).filter(Boolean);
+      }
+    } catch (e) { parsedPharmacies = []; }
+
+    try {
+      if (hospital.locations) {
+        parsedLocations = JSON.parse(hospital.locations);
+      }
+    } catch (e) { parsedLocations = []; }
+
+    try {
+      if (hospital.available_services) {
+        parsedServices = JSON.parse(hospital.available_services);
+      }
+    } catch (e) { parsedServices = []; }
+
+    try {
+      if (hospital.available_blood_types) {
+        parsedBloodTypes = JSON.parse(hospital.available_blood_types);
+      }
+    } catch (e) { parsedBloodTypes = []; }
+
+    try {
+      if (hospital.medical_equipment) {
+        parsedEquipment = JSON.parse(hospital.medical_equipment);
+      }
+    } catch (e) { parsedEquipment = []; }
+  }
 
   return (
     <View style={styles.container}>
@@ -223,9 +335,10 @@ export default function HospitalDetailScreen() {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>Hospital Details</Text>
+
+        {/* Placeholder for right icon to balance layout */}
         <View style={styles.headerRightPlaceholder} />
       </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {hospital.image ? (
           <Image source={{ uri: hospital.image }} style={styles.hospitalImage} resizeMode="cover" />
@@ -234,63 +347,195 @@ export default function HospitalDetailScreen() {
             <Text style={styles.placeholderText}>No Image Available</Text>
           </View>
         )}
-
         <View style={styles.detailsContainer}>
-          {/* Hospital Name */}
-          <View style={styles.titleContainer}>
-            <MaterialIcons name="local-hospital" size={20} color="red" style={styles.icon} />
+          {showDetails && (
             <Text style={styles.hospitalName}>{hospital.name || 'Unknown Hospital'}</Text>
-          </View>
-
+          )}
           {/* Locked Section */}
           <View style={styles.section}>
             <View style={styles.lockHeader}>
-              <Text style={styles.sectionTitle}>Hospital Details</Text>
               {!showDetails && (
-                <TouchableOpacity onPress={handleLockPress}>
-                  <Icon name="lock" size={24} color="#4CAF50" />
+                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Icon name="visibility" size={40} color="#4CAF50" />
+                  </Animated.View>
+                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
+                    Click here to pay and view the doctor's details
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {showDetails && (
-              <>
-                {/* Locations */}
-                <View style={styles.titleContainer}>
-                  <MaterialIcons name="location-on" size={20} color="red" style={styles.icon} />
-                  <Text style={styles.subSectionTitle}>Locations</Text>
-                </View>
-                {hospital.location.length > 0 ? hospital.location.map((loc, i) => (
-                  <Text key={i} style={styles.listItem}>• {loc}</Text>
-                )) : <Text style={styles.noData}>No locations listed</Text>}
+              <View>
 
-                {/* Specialties */}
-                <View style={styles.titleContainer}>
-                  <MaterialIcons name="medical-services" size={20} color="red" style={styles.icon} />
-                  <Text style={styles.subSectionTitle}>Specialties</Text>
+                {/* Service Summary */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>📋 Service Summary</Text>
+                  <Text style={styles.infoText}>{hospital.service_summary || 'N/A'}</Text>
                 </View>
-                {hospital.specialties.length > 0 ? hospital.specialties.map((item, i) => (
-                  <Text key={i} style={styles.listItem}>• {item}</Text>
-                )) : <Text style={styles.noData}>No specialties listed</Text>}
 
-                {/* Insurances */}
-                <View style={styles.titleContainer}>
-                  <MaterialIcons name="payment" size={20} color="red" style={styles.icon} />
-                  <Text style={styles.subSectionTitle}>Accepted Insurances</Text>
+                {/* Admission Process */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>📄 Admission Process</Text>
+                  <Text style={styles.infoText}>{hospital.admission_process || 'N/A'}</Text>
                 </View>
-                {hospital.insurances.length > 0 ? hospital.insurances.map((item, i) => (
-                  <Text key={i} style={styles.listItem}>• {item}</Text>
-                )) : <Text style={styles.noData}>No insurances listed</Text>}
 
-                {/* Blood Types */}
-                <View style={styles.titleContainer}>
-                  <MaterialIcons name="bloodtype" size={20} color="red" style={styles.icon} />
-                  <Text style={styles.subSectionTitle}>Available Blood Types</Text>
+                {/* Available Services */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🛠️ Available Services</Text>
+                  {parsedServices.length > 0 ? (
+                    parsedServices.map((service, idx) => (
+                      <View key={idx} style={{ marginBottom: 8 }}>
+                        <Text style={[styles.infoText, { fontFamily: 'Roboto-Bold' }]}>• {service.name}</Text>
+                        {service.description ? <Text style={[styles.infoText, { fontSize: 13, color: '#666', marginLeft: 10 }]}>{service.description}</Text> : null}
+                      </View>
+                    ))
+                  ) : <Text style={styles.infoText}>N/A</Text>}
                 </View>
-                {hospital.bloodTypes.length > 0 ? hospital.bloodTypes.map((item, i) => (
-                  <Text key={i} style={styles.listItem}>• {item}</Text>
-                )) : <Text style={styles.noData}>No blood types listed</Text>}
-              </>
+
+                {/* Available Blood Types */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🩸 Available Blood Types</Text>
+                  {parsedBloodTypes.length > 0 ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {parsedBloodTypes.map((bt, idx) => (
+                        <View key={idx} style={{ backgroundColor: '#FFEBEE', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#FFCDD2' }}>
+                          <Text style={{ color: '#C62828', fontFamily: 'Roboto-Medium', fontSize: 12 }}>{bt}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : <Text style={styles.infoText}>N/A</Text>}
+                </View>
+
+                {/* Medical Equipment */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🩺 Medical Equipment</Text>
+                  {parsedEquipment.length > 0 ? (
+                    parsedEquipment.map((eq, idx) => (
+                      <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: '#eee' }}>
+                        <Text style={[styles.infoText, { flex: 1 }]}>{eq.name}</Text>
+                        <View style={{ backgroundColor: eq.status === 'Operational' ? '#E8F5E9' : '#FFF3E0', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: eq.status === 'Operational' ? '#C8E6C9' : '#FFE0B2' }}>
+                          <Text style={{ fontSize: 10, color: eq.status === 'Operational' ? '#2E7D32' : '#EF6C00', fontFamily: 'Roboto-Medium' }}>{eq.status}</Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : <Text style={styles.infoText}>N/A</Text>}
+                </View>
+
+                {/* Partner Insurances */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🏥 Insurances</Text>
+                  {parsedInsurances.length > 0 ? (
+                    parsedInsurances.map((item, idx) => (
+                      <Text key={idx} style={styles.infoText}>➢ {item}</Text>
+                    ))
+                  ) : <Text style={styles.infoText}>N/A</Text>}
+                </View>
+
+                {/* Partner Pharmacies */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>💊 Partner Pharmacies</Text>
+                  {parsedPharmacies.length > 0 ? (
+                    parsedPharmacies.map((item, idx) => (
+                      <Text key={idx} style={styles.infoText}>➢ {item}</Text>
+                    ))
+                  ) : <Text style={styles.infoText}>N/A</Text>}
+                </View>
+
+                {/* Office Locations & Map */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🏢 Locations</Text>
+                  {parsedLocations.length > 0 ? (
+                    <View>
+                      {parsedLocations.map((loc, i) => (
+                        <View key={i} style={styles.locationItem}>
+                          {loc.latitude && loc.longitude && !isNaN(parseFloat(loc.latitude)) && !isNaN(parseFloat(loc.longitude)) && (
+                            <View style={styles.mapContainer}>
+                              <MapView
+                                style={styles.map}
+                                initialRegion={{
+                                  latitude: parseFloat(loc.latitude),
+                                  longitude: parseFloat(loc.longitude),
+                                  latitudeDelta: 0.01,
+                                  longitudeDelta: 0.01,
+                                }}
+                              >
+                                <Marker
+                                  coordinate={{ latitude: parseFloat(loc.latitude), longitude: parseFloat(loc.longitude) }}
+                                  title={loc.type}
+                                  description={`${loc.city} - ${loc.address}`}
+                                />
+                              </MapView>
+                            </View>
+                          )}
+                          <Text style={styles.locationType}>{loc.type} - {loc.city}</Text>
+                          <Text style={styles.locationAddress}>{loc.address}</Text>
+                          {loc.phone ? <Text style={styles.locationPhone}>📞 {loc.phone}</Text> : null}
+                        </View>
+                      ))}
+                    </View>
+                  ) : <Text style={styles.infoText}>No locations available.</Text>}
+                </View>
+
+                {/* Contact Details */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>📞 Contact Details</Text>
+                  <View style={styles.contactContainer}>
+                    {parsedContact.email && (
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert(
+                          "Leave App",
+                          "You may quit the app to send an email. Do you want to continue?",
+                          [
+                            { text: "No", style: "cancel" },
+                            { text: "Yes", onPress: () => Linking.openURL(`mailto:${parsedContact.email}`) }
+                          ]
+                        );
+                      }}>
+                        <Text style={styles.contactText}>
+                          <Text style={styles.contactLabel}>Email: </Text>
+                          <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.email}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {parsedContact.phone && (
+                      <TouchableOpacity onPress={() => Linking.openURL(`tel:${parsedContact.phone}`)}>
+                        <Text style={styles.contactText}>
+                          <Text style={styles.contactLabel}>Phone: </Text>
+                          <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.phone}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {parsedContact.office && (
+                      <Text style={styles.contactText}><Text style={styles.contactLabel}>Office: </Text>{parsedContact.office}</Text>
+                    )}
+                    {parsedContact.website && (
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert(
+                          "Leave App",
+                          "You may quit the app to visit this website. Do you want to continue?",
+                          [
+                            { text: "No", style: "cancel" },
+                            { text: "Yes", onPress: () => {
+                              const url = parsedContact.website || '';
+                              Linking.openURL(url.startsWith('http') ? url : `https://${url}`);
+                            }}
+                          ]
+                        );
+                      }}>
+                        <Text style={styles.contactText}>
+                          <Text style={styles.contactLabel}>Web: </Text>
+                          <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.website}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {!parsedContact.email && !parsedContact.phone && !parsedContact.office && !parsedContact.website && (
+                      <Text style={styles.infoText}>No contact details available.</Text>
+                    )}
+                  </View>
+                </View>
+              </View>
             )}
           </View>
           <Pressable
@@ -355,39 +600,167 @@ export default function HospitalDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E0F7FA' },
-  headerRightPlaceholder: { width: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E0F7FA', paddingHorizontal: 16, zIndex: 1 },
-  headerTitle: { flex: 1, fontSize: 20, fontFamily: 'Roboto-Bold', color: '#212121', textAlign: 'center' },
-  scrollContent: { paddingBottom: 20 },
-  hospitalImage: { width: '95%', alignSelf: 'center', height: 250, borderRadius: 20, marginVertical: 16 },
-  placeholderImage: { width: '95%', alignSelf: 'center', height: 250, justifyContent: 'center', alignItems: 'center', backgroundColor: '#e0e0e0', borderRadius: 20, marginVertical: 16 },
-  placeholderText: { marginTop: 10, color: '#666' },
-  detailsContainer: { backgroundColor: 'white', padding: 16, marginTop: 8, borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, marginBottom: 50 },
-  titleContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  hospitalName: { fontSize: 20, fontFamily: 'Roboto-Bold', color: '#212121' },
+  container: {
+    flex: 1,
+    backgroundColor: '#E0F7FA'
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#E0F7FA',
+    paddingHorizontal: 16,
+    zIndex: 1,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+    textAlign: 'center'
+  },
+  headerRightPlaceholder: {
+    width: 40, // Same width as backButton for balance
+  },
+  scrollContent: {
+    paddingBottom: 60
+  },
+  hospitalImage: {
+    width: '95%',
+    alignSelf: 'center',
+    height: 250,
+    borderRadius: 20,
+    marginVertical: 16,
+  },
+  placeholderImage: {
+    width: '95%',
+    alignSelf: 'center',
+    height: 250,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'Roboto-Regular'
+  },
+  detailsContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  hospitalName: {
+    fontSize: 20,
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+    marginBottom: 12
+  },
   section: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   lockHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+  },
+  infoBlock: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#555',
+    lineHeight: 20,
+  },
+  planItem: {
+    marginBottom: 10,
+    backgroundColor: '#f9f9f9',
+    padding: 10,
+    borderRadius: 8,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  planTitle: {
+    fontSize: 15,
+    fontFamily: 'Roboto-Medium',
+    color: '#212121',
+  },
+  planPrice: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Bold',
+    color: '#4CAF50',
+  },
+  contactContainer: {
+    marginTop: 4,
+  },
+  contactText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#555',
+    marginBottom: 4,
+  },
+  contactLabel: {
+    fontFamily: 'Roboto-Medium',
     color: '#333',
   },
-  subSectionTitle: {
-    fontSize: 16, fontWeight: 'bold', marginLeft: 8, color: '#333'
+  mapContainer: {
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
-  listItem: { fontSize: 17, fontFamily: 'Roboto-italic', color: 'green', marginBottom: 4, marginLeft: 30 },
-  noData: { fontSize: 14, fontFamily: 'Roboto-Regular', color: '#666', fontStyle: 'italic', marginLeft: 30 },
-  backButton: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  icon: { marginRight: 8, fontSize: 25 },
-
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  locationItem: {
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  locationType: { fontFamily: 'Roboto-Bold', color: '#212121', fontSize: 14 },
+  locationAddress: { fontFamily: 'Roboto-Regular', color: '#555', fontSize: 13 },
+  locationPhone: { fontFamily: 'Roboto-Regular', color: '#388E3C', fontSize: 13, marginTop: 2 },
   carButton: {
     marginTop: 16,
     flex: 1,

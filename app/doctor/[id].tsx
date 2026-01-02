@@ -85,6 +85,7 @@ export default function DoctorDetailScreen() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const checkmarkScale = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -105,6 +106,35 @@ export default function DoctorDetailScreen() {
       checkmarkScale.setValue(0);
     }
   }, [paymentSuccess]);
+
+  useEffect(() => {
+    if (!showDetails) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [showDetails]);
+
+  useEffect(() => {
+    if (id) {
+      supabase.rpc('increment_doctor_views', { row_id: id }).then(({ error }) => {
+        if (error) console.error('Error incrementing views:', error);
+      });
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -521,10 +551,14 @@ export default function DoctorDetailScreen() {
           {/* Locked Section */}
           <View style={styles.section}>
             <View style={styles.lockHeader}>
-              <Text style={styles.sectionTitle}>Doctor Details</Text>
               {!showDetails && (
-                <TouchableOpacity onPress={handleLockPress}>
-                  <Icon name="lock" size={24} color="#4CAF50" />
+                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Icon name="visibility" size={40} color="#4CAF50" />
+                  </Animated.View>
+                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
+                    Click here to pay and view the doctor's details
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>

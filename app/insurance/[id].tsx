@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+   Animated,
+   Linking,
 } from 'react-native';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
@@ -19,25 +21,40 @@ import Toast from '@/components/Toast';
 import { useToastStore } from '@/stores/toastStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
+import MapView, { Marker } from 'react-native-maps';
 import { API_BASE_URL } from '@/config';
-
-type InsurancePlan = {
-  type: string;
-  price: number;
-  description: string;
-  coverage?: string[];
-};
-
-type InsuranceLocation = {
-  location: string;
-  plans: InsurancePlan[];
-};
 
 type Insurance = {
   id: string;
   name: string | null;
   image: string | null;
-  locations: InsuranceLocation[] | null;
+  country: string | null;
+  insurance_plans: string | null;
+  coverage_summary: string | null;
+  claim_process: string | null;
+  partner_hospitals: string | null;
+  partner_pharmacies: string | null;
+  contact_details: string | null;
+  office_locations: string | null;
+};
+
+const formatPrice = (value: string) => {
+  const rawValue = value.replace(/,/g, "");
+  if (/^\d+$/.test(rawValue)) {
+    return rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  return value;
+};
+
+const getCurrencyForCountry = (country: string | null) => {
+  const c = (country || "").toLowerCase();
+  if (c.includes("rwanda")) return "RWF";
+  if (c.includes("burundi")) return "BIF";
+  if (c.includes("kenya")) return "KES";
+  if (c.includes("uganda")) return "UGX";
+  if (c.includes("tanzania")) return "TZS";
+  if (c.includes("congo") || c.includes("drc")) return "CDF";
+  return "USD";
 };
 
 export default function InsuranceDetailScreen() {
@@ -56,14 +73,37 @@ export default function InsuranceDetailScreen() {
   const [isPaying, setIsPaying] = useState(false);
   const VIEW_FEE = 500;
   const [pinCode, setPinCode] = useState('');
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!showDetails) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [showDetails]);
 
   useEffect(() => {
     if (!id) return;
 
+
     const fetchInsurance = async () => {
       const { data, error } = await supabase
-        .from('insurances')
-        .select('id, name, image, locations')
+        .from('insurance_applications')
+        .select('id, name, image, country, insurance_plans, coverage_summary, claim_process, partner_hospitals, partner_pharmacies, contact_details, office_locations')
         .eq('id', id)
         .single();
 
@@ -82,7 +122,7 @@ export default function InsuranceDetailScreen() {
 
     const channel = supabase
       .channel(`insurance-details-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'insurances', filter: `id=eq.${id}` }, fetchInsurance)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'insurance_applications', filter: `id=eq.${id}` }, fetchInsurance)
       .subscribe();
 
     return () => {
@@ -125,6 +165,7 @@ export default function InsuranceDetailScreen() {
 
   // Handle payment to view
   const handleConfirmViewPayment = async () => {
+    console.log("Starting payment process...");
     if (walletBalance === null || walletBalance < VIEW_FEE) {
       showToast("Insufficient wallet balance.");
       return;
@@ -134,8 +175,8 @@ export default function InsuranceDetailScreen() {
       return;
     }
 
-
     setIsPaying(true);
+    console.log(`Attempting to pay ${VIEW_FEE} with PIN: ${pinCode}`);
     try {
       const token = await SecureStore.getItemAsync("token");
       if (!token) {
@@ -145,13 +186,14 @@ export default function InsuranceDetailScreen() {
       }
 
       // Step 1: Verify the PIN first
+      console.log("Step 1: Verifying PIN...");
       const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ pin: pinCode }),
+        body: JSON.stringify({ pin_code: pinCode }),
       });
 
       if (!verifyRes.ok) {
@@ -159,23 +201,30 @@ export default function InsuranceDetailScreen() {
         throw new Error(errorData.error || "Incorrect PIN.");
       }
 
+      console.log("PIN verification successful.");
+
       // Step 2: If PIN is correct, proceed with deduction
+      const deductionPayload = { amount: VIEW_FEE, reason: `View doctor ${id} details`, pin: pinCode };
+      console.log("Step 2: Proceeding with deduction. Payload:", JSON.stringify(deductionPayload));
       const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: VIEW_FEE, reason: `View insurance ${id} details` }),
+        body: JSON.stringify(deductionPayload),
       });
 
       if (!deductRes.ok) {
+        console.error("Deduction failed. Status:", deductRes.status);
         const errorData = await deductRes.json();
+        console.error("Deduction error response:", errorData);
         throw new Error(errorData.error || "Payment failed after PIN verification.");
       }
 
       // Success!
       setShowDetails(true);
+      console.log("Payment successful! Unlocking details.");
       showToast("Payment successful!");
       handleModalClose();
     } catch (error: unknown) {
@@ -183,6 +232,7 @@ export default function InsuranceDetailScreen() {
       if (error instanceof Error) {
         errorMessage = error.message;
       }
+      console.error("An error occurred during payment:", errorMessage);
       Alert.alert("Payment Failed", errorMessage);
     } finally {
       setIsPaying(false);
@@ -211,6 +261,55 @@ export default function InsuranceDetailScreen() {
     );
   }
 
+  // Parse JSON data for display
+  let parsedPlans: { title: string; description: string; price?: string; currency?: string }[] = [];
+  let parsedContact: { email?: string; phone?: string; office?: string; website?: string } = {};
+  let parsedHospitals: string[] = [];
+  let parsedPharmacies: string[] = [];
+  let parsedLocations: { type: string; city: string; address: string; phone: string; latitude: string; longitude: string }[] = [];
+
+  if (insurance) {
+    try {
+      if (insurance.insurance_plans && insurance.insurance_plans.trim().startsWith('[')) {
+        parsedPlans = JSON.parse(insurance.insurance_plans);
+      } else if (insurance.insurance_plans) {
+        parsedPlans = [{ title: 'Standard Plan', description: insurance.insurance_plans, price: '' }];
+      }
+    } catch (e) { console.error("Error parsing plans", e); }
+
+    try {
+      if (insurance.contact_details && insurance.contact_details.trim().startsWith('{')) {
+        parsedContact = JSON.parse(insurance.contact_details);
+      } else if (insurance.contact_details) {
+        parsedContact = { office: insurance.contact_details };
+      }
+    } catch (e) { console.error("Error parsing contact", e); }
+
+    try {
+      if (insurance.partner_hospitals && insurance.partner_hospitals.trim().startsWith('[')) {
+        parsedHospitals = JSON.parse(insurance.partner_hospitals);
+      } else if (insurance.partner_hospitals) {
+        // Fallback for legacy text
+        parsedHospitals = insurance.partner_hospitals.split('\n').map(s => s.replace(/^➢\s*/, '').trim()).filter(Boolean);
+      }
+    } catch (e) { parsedHospitals = []; }
+
+    try {
+      if (insurance.partner_pharmacies && insurance.partner_pharmacies.trim().startsWith('[')) {
+        parsedPharmacies = JSON.parse(insurance.partner_pharmacies);
+      } else if (insurance.partner_pharmacies) {
+        // Fallback for legacy text
+        parsedPharmacies = insurance.partner_pharmacies.split('\n').map(s => s.replace(/^➢\s*/, '').trim()).filter(Boolean);
+      }
+    } catch (e) { parsedPharmacies = []; }
+
+    try {
+      if (insurance.office_locations) {
+        parsedLocations = JSON.parse(insurance.office_locations);
+      }
+    } catch (e) { parsedLocations = []; }
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -233,34 +332,169 @@ export default function InsuranceDetailScreen() {
           </View>
         )}
         <View style={styles.detailsContainer}>
-          <Text style={styles.insuranceName}>{insurance.name || 'Unknown Insurance'}</Text>
+          {showDetails && (
+            <Text style={styles.insuranceName}>{insurance.name || 'Unknown Insurance'}</Text>
+          )}
           {/* Locked Section */}
           <View style={styles.section}>
             <View style={styles.lockHeader}>
-              <Text style={styles.sectionTitle}>Locations and Plans</Text>
               {!showDetails && (
-                <TouchableOpacity onPress={handleLockPress}>
-                  <Icon name="lock" size={24} color="#4CAF50" />
+                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Icon name="visibility" size={40} color="#4CAF50" />
+                  </Animated.View>
+                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
+                    Click here to pay and view the doctor's details
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
+
             {showDetails && (
-              insurance.locations && insurance.locations.length > 0 ? (
-                insurance.locations.map((location, index) => (
-                  <View key={index} style={styles.locationContainer}>
-                    <Text style={styles.locationTitle}>{location.location}</Text>
-                    {location.plans.map((plan, planIndex) => (
-                      <View key={planIndex} style={styles.planContainer}>
-                        <Text style={styles.planType}>
-                          {plan.type ? plan.type.charAt(0).toUpperCase() + plan.type.slice(1) : ''} Plan
-                        </Text>
-                        <Text style={styles.planPrice}>BIF {plan.price?.toLocaleString()}/month</Text>
-                        <Text style={styles.planDescription}>{plan.description}</Text>
+              <View>
+                {/* Insurance Plans */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🛡️ Insurance Type</Text>
+                  {parsedPlans.length > 0 ? (
+                    parsedPlans.map((plan, idx) => (
+                      <View key={idx} style={styles.planItem}>
+                        <View style={styles.planHeader}>
+                          <Text style={styles.planTitle}>{plan.title}</Text>
+                          {plan.price ? <Text style={styles.planPrice}>{formatPrice(plan.price)} {plan.currency || getCurrencyForCountry(insurance.country)}</Text> : null}
+                        </View>
+                        <Text style={styles.infoText}>{plan.description}</Text>
                       </View>
-                    ))}
+                    ))
+                  ) : (
+                    <Text style={styles.infoText}>No plan details available.</Text>
+                  )}
+                </View>
+
+                {/* Coverage Summary */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>📋 Coverage Summary</Text>
+                  <Text style={styles.infoText}>{insurance.coverage_summary || 'N/A'}</Text>
+                </View>
+
+                {/* Claim Process */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>📄 Claim Process</Text>
+                  <Text style={styles.infoText}>{insurance.claim_process || 'N/A'}</Text>
+                </View>
+
+                {/* Partner Hospitals */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🏥 Partner Hospitals</Text>
+                  {parsedHospitals.length > 0 ? (
+                    parsedHospitals.map((item, idx) => (
+                      <Text key={idx} style={styles.infoText}>➢ {item}</Text>
+                    ))
+                  ) : <Text style={styles.infoText}>N/A</Text>}
+                </View>
+
+                {/* Partner Pharmacies */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>💊 Partner Pharmacies</Text>
+                  {parsedPharmacies.length > 0 ? (
+                    parsedPharmacies.map((item, idx) => (
+                      <Text key={idx} style={styles.infoText}>➢ {item}</Text>
+                    ))
+                  ) : <Text style={styles.infoText}>N/A</Text>}
+                </View>
+
+                {/* Office Locations & Map */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>🏢 Office Locations</Text>
+                  {parsedLocations.length > 0 ? (
+                    <View>
+                      {parsedLocations.map((loc, i) => (
+                        <View key={i} style={styles.locationItem}>
+                          {loc.latitude && loc.longitude && !isNaN(parseFloat(loc.latitude)) && !isNaN(parseFloat(loc.longitude)) && (
+                            <View style={styles.mapContainer}>
+                              <MapView
+                                style={styles.map}
+                                initialRegion={{
+                                  latitude: parseFloat(loc.latitude),
+                                  longitude: parseFloat(loc.longitude),
+                                  latitudeDelta: 0.01,
+                                  longitudeDelta: 0.01,
+                                }}
+                              >
+                                <Marker
+                                  coordinate={{ latitude: parseFloat(loc.latitude), longitude: parseFloat(loc.longitude) }}
+                                  title={loc.type}
+                                  description={`${loc.city} - ${loc.address}`}
+                                />
+                              </MapView>
+                            </View>
+                          )}
+                          <Text style={styles.locationType}>{loc.type} - {loc.city}</Text>
+                          <Text style={styles.locationAddress}>{loc.address}</Text>
+                          {loc.phone ? <Text style={styles.locationPhone}>📞 {loc.phone}</Text> : null}
+                        </View>
+                      ))}
+                    </View>
+                  ) : <Text style={styles.infoText}>No office locations available.</Text>}
+                </View>
+
+                {/* Contact Details */}
+                <View style={styles.infoBlock}>
+                  <Text style={styles.infoTitle}>📞 Contact Details</Text>
+                  <View style={styles.contactContainer}>
+                    {parsedContact.email && (
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert(
+                          "Leave App",
+                          "You may quit the app to send an email. Do you want to continue?",
+                          [
+                            { text: "No", style: "cancel" },
+                            { text: "Yes", onPress: () => Linking.openURL(`mailto:${parsedContact.email}`) }
+                          ]
+                        );
+                      }}>
+                        <Text style={styles.contactText}>
+                          <Text style={styles.contactLabel}>Email: </Text>
+                          <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.email}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {parsedContact.phone && (
+                      <TouchableOpacity onPress={() => Linking.openURL(`tel:${parsedContact.phone}`)}>
+                        <Text style={styles.contactText}>
+                          <Text style={styles.contactLabel}>Phone: </Text>
+                          <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.phone}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {parsedContact.office && (
+                      <Text style={styles.contactText}><Text style={styles.contactLabel}>Office: </Text>{parsedContact.office}</Text>
+                    )}
+                    {parsedContact.website && (
+                      <TouchableOpacity onPress={() => {
+                        Alert.alert(
+                          "Leave App",
+                          "You may quit the app to visit this website. Do you want to continue?",
+                          [
+                            { text: "No", style: "cancel" },
+                            { text: "Yes", onPress: () => {
+                              const url = parsedContact.website || '';
+                              Linking.openURL(url.startsWith('http') ? url : `https://${url}`);
+                            }}
+                          ]
+                        );
+                      }}>
+                        <Text style={styles.contactText}>
+                          <Text style={styles.contactLabel}>Web: </Text>
+                          <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.website}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    {!parsedContact.email && !parsedContact.phone && !parsedContact.office && !parsedContact.website && (
+                      <Text style={styles.infoText}>No contact details available.</Text>
+                    )}
                   </View>
-                ))
-              ) : <Text style={styles.noData}>No locations or plans listed</Text>
+                </View>
+              </View>
             )}
           </View>
           <Pressable
@@ -412,42 +646,80 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Bold',
     color: '#212121',
   },
-  locationContainer: {
-    marginBottom: 12
+  infoBlock: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  locationTitle: {
+  infoTitle: {
     fontSize: 16,
-    fontFamily: 'Roboto-Medium',
-    color: '#388E3C',
-    marginBottom: 8
+    fontFamily: 'Roboto-Bold',
+    color: '#333',
+    marginBottom: 8,
   },
-  planContainer: {
-    marginLeft: 16,
-    marginBottom: 8
-  },
-  planType: {
+  infoText: {
     fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#555',
+    lineHeight: 20,
+  },
+  planItem: {
+    marginBottom: 10,
+    backgroundColor: '#f9f9f9',
+    padding: 10,
+    borderRadius: 8,
+  },
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  planTitle: {
+    fontSize: 15,
     fontFamily: 'Roboto-Medium',
-    color: '#212121'
+    color: '#212121',
   },
   planPrice: {
     fontSize: 14,
-    fontFamily: 'Roboto-Regular',
-    color: '#2e7d32',
-    marginTop: 2
+    fontFamily: 'Roboto-Bold',
+    color: '#4CAF50',
   },
-  planDescription: {
-    fontSize: 12,
-    fontFamily: 'Roboto-Regular',
-    color: '#666',
-    marginTop: 2
+  contactContainer: {
+    marginTop: 4,
   },
-  noData: {
+  contactText: {
     fontSize: 14,
     fontFamily: 'Roboto-Regular',
-    color: '#666',
-    fontStyle: 'italic'
+    color: '#555',
+    marginBottom: 4,
   },
+  contactLabel: {
+    fontFamily: 'Roboto-Medium',
+    color: '#333',
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  locationItem: {
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  locationType: { fontFamily: 'Roboto-Bold', color: '#212121', fontSize: 14 },
+  locationAddress: { fontFamily: 'Roboto-Regular', color: '#555', fontSize: 13 },
+  locationPhone: { fontFamily: 'Roboto-Regular', color: '#388E3C', fontSize: 13, marginTop: 2 },
   carButton: {
     marginTop: 16,
     flex: 1,

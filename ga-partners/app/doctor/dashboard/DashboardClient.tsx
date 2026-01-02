@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
 import { updateBookingStatus } from "./actions"
+// @ts-ignore
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 type DoctorApplication = {
   id: string;
@@ -14,6 +16,7 @@ type DoctorApplication = {
   created_at: string;
   rejection_reason: string | null;
   image?: string | null;
+  views?: number;
 };
 
 type Availability = {
@@ -92,9 +95,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     todayBookings: 0,
     totalRevenue: 0,
     completedBookings: 0,
+    totalViews: 0,
   });
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [revenueChartData, setRevenueChartData] = useState<{ date: string; revenue: number }[]>([]);
+  const [scannedBooking, setScannedBooking] = useState<Booking | null>(null);
 
   const statusColorMap = {
     pending: "text-yellow-500",
@@ -158,31 +163,25 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
       if (activeTab === "bookings" && app.id) {
         setIsBookingsLoading(true);
+
         const { data, error } = await supabase
           .from("bookings")
-          .select(`
-          *,
-          users:users!bookings_user_id_fkey (
-          id,
-          fullname,
-          whatsapp_number
-          )
-          `)
+          .select('*, users(*)')
           .eq("doctor_id", app.id)
           .order("created_at", { ascending: false });
 
         if (error) {
-          console.error("Failed to load bookings", error.message || error);
+          console.error("Failed to load bookings:", error);
         } else {
-          console.log("Raw Bookings Data:", data); // Debug: See the full structure
           const mappedBookings = (data || []).map((b: any) => {
-            const user = b.users;
+            const user = Array.isArray(b.users) ? b.users[0] : b.users;
 
             return {
               id: b.id,
               patient_name:
                 b.patient_name ||
                 user?.fullname ||
+                user?.name ||
                 user?.whatsapp_number ||
                 (b.user_id
                   ? `User ${b.user_id.slice(0, 6)}`
@@ -205,19 +204,27 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
       if (activeTab === "dashboard" && app.id) {
         setIsDashboardLoading(true);
-        Promise.all([
-          supabase
-            .from('bookings')
-            .select('*, users(*)')
-            .eq('doctor_id', app.id)
-            .then(({ data }) => data || []),
-          fetch(`/api/doctor-applications/${app.id}`).then((res) => (res.ok ? res.json() : null)),
-        ])
-          .then(([bookingsData, doctorData]) => {
-            console.log("Dashboard Raw Bookings:", bookingsData); // Debug
-            const bookingsList = (bookingsData as any[]).map((b) => {
+        const loadDashboardData = async () => {
+          try {
+            const [bookingsResult, doctorRes] = await Promise.all([
+              supabase
+                .from('bookings')
+                .select('*, users(*)')
+                .eq('doctor_id', app.id)
+                .order("created_at", { ascending: false }),
+              fetch(`/api/doctor-applications/${app.id}`)
+            ]);
+
+            const { data: bookingsData, error: bookingsError } = bookingsResult;
+            if (bookingsError) throw bookingsError;
+
+            if (!doctorRes.ok) {
+              throw new Error(`Failed to fetch doctor data: ${doctorRes.statusText}`);
+            }
+            const doctorData = await doctorRes.json();
+
+            const bookingsList = (bookingsData || []).map((b: any) => {
               const user = Array.isArray(b.users) ? b.users[0] : b.users;
-              console.log(`Dashboard Booking ${b.id} User:`, user); // Debug
               return {
                 id: b.id,
                 patient_name: b.patient_name || user?.fullname || user?.name || user?.whatsapp_number || (b.user_id ? `User ${b.user_id.slice(0, 6)}` : 'Unknown'),
@@ -233,27 +240,25 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             }) as Booking[];
 
             setBookings(bookingsList);
-            const doctor = doctorData || {};
 
             const uniquePatients = new Set(bookingsList.map((b: Booking) => b.patient_name)).size;
 
-            const today = new Date().toISOString().split("T")[0];
-            const todayBookingsCount = bookingsList.filter((b: Booking) => b.appointment_date === today).length;
+            // Use local date to ensure "today" matches the user's timezone
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+            const pendingBookingsCount = bookingsList.filter((b: Booking) => b.status === 'pending').length;
             const completed = bookingsList.filter((b: Booking) => b.status === "completed").length;
 
             let revenue = 0;
-            const onlineFee = parseFloat((doctor.consultation_fee_online || "0").toString().replace(/[^0-9.]/g, "")) || 0;
-            const offlineFee = parseFloat((doctor.consultation_fee_offline || "0").toString().replace(/[^0-9.]/g, "")) || 0;
-
+            const onlineFee = parseFloat(((doctorData || {}).consultation_fee_online || "0").toString().replace(/[^0-9.]/g, "")) || 0;
+            const offlineFee = parseFloat(((doctorData || {}).consultation_fee_offline || "0").toString().replace(/[^0-9.]/g, "")) || 0;
             const revenueMap: Record<string, number> = {};
 
             bookingsList.forEach((b: Booking) => {
               if (b.payment_status === "paid") {
-                let fee = 0;
-                if (b.type === "online") fee = onlineFee;
-                else fee = offlineFee;
-
+                // Use the actual booking amount if available, otherwise fallback to current fee
+                const fee = b.amount ? Number(b.amount) : (b.type === "online" ? onlineFee : offlineFee);
                 revenue += fee;
                 revenueMap[b.appointment_date] = (revenueMap[b.appointment_date] || 0) + fee;
               }
@@ -263,20 +268,59 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               .map(([date, amount]) => ({ date, revenue: amount }))
               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
             setRevenueChartData(chartData);
-
             setDashboardStats({
               totalPatients: uniquePatients,
-              todayBookings: todayBookingsCount,
+              todayBookings: pendingBookingsCount,
               totalRevenue: revenue,
               completedBookings: completed,
+              totalViews: doctorData.views || 0,
             });
-          })
-          .catch((err) => console.error("Failed to load dashboard stats", err))
-          .finally(() => setIsDashboardLoading(false));
+          } catch (err) {
+            console.error("Failed to load dashboard stats", err);
+          } finally {
+            setIsDashboardLoading(false);
+          }
+        };
+        loadDashboardData();
       }
     };
     loadData();
   }, [activeTab, app.id, app.status]);
+
+  useEffect(() => {
+    if (activeTab === "scan" && !scannedBooking) {
+      const scannerId = "reader";
+      let scanner: Html5QrcodeScanner | null = null;
+
+      // Small delay to ensure DOM element exists
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scannerId);
+        if (element) {
+          scanner = new Html5QrcodeScanner(
+            scannerId,
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            /* verbose= */ false
+          );
+
+          scanner.render(
+            (decodedText) => {
+              handleScanResult({ text: decodedText }, null);
+            },
+            (errorMessage) => {
+              // parse error, ignore
+            }
+          );
+        }
+      }, 100);
+
+      return () => {
+        clearTimeout(timer);
+        if (scanner) {
+          scanner.clear().catch((error) => console.error("Failed to clear html5-qrcode scanner. ", error));
+        }
+      };
+    }
+  }, [activeTab, scannedBooking]);
 
   // Helper functions for the availability form
   function handleAddLocation() {
@@ -494,6 +538,37 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
   }
 
+  async function handleScanResult(result: any, error: any) {
+    if (!!result && !scannedBooking) {
+      const bookingId = result?.text;
+      if (!bookingId) return;
+
+      // Fetch the booking details from Supabase
+      const { data, error } = await supabase
+        .from("bookings")
+        .select('*, users(*)')
+        .eq('id', bookingId)
+        .single();
+
+      if (data) {
+        const user = Array.isArray(data.users) ? data.users[0] : data.users;
+        const b: Booking = {
+          id: data.id,
+          patient_name: data.patient_name || user?.fullname || user?.name || user?.whatsapp_number || (data.user_id ? `User ${data.user_id.slice(0, 6)}` : 'Unknown'),
+          appointment_date: data.date,
+          appointment_time: data.time,
+          type: data.type,
+          status: data.status,
+          payment_status: data.payment_status || (data.amount > 0 ? 'paid' : 'unpaid'),
+          ticket_number: data.ticket_number,
+          amount: data.amount,
+          user_id: data.user_id,
+        };
+        setScannedBooking(b);
+      }
+    }
+  }
+
   async function handleLogout() {
     setIsLoggingOut(true);
     try {
@@ -515,6 +590,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       if (tab === "status") setShowStatus(true);
       if (tab === "availability") setIsEditingAvailability(false);
       if (tab === "profile") setIsEditingProfile(false);
+      if (tab === "scan") setScannedBooking(null);
       setLoadingTab("");
     }, 500);
   };
@@ -522,9 +598,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg p-6 flex flex-col space-y-4 border-r border-gray-200 overflow-y-auto">
+      <div className="w-20 md:w-64 bg-white shadow-lg p-4 md:p-6 flex flex-col space-y-4 border-r border-gray-200 overflow-y-auto transition-all duration-300">
         <div className="mb-6 flex flex-col items-center justify-center">
-          <div className="h-20 w-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm mb-3 overflow-hidden">
+          <div className="h-10 w-10 md:h-20 md:w-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm mb-3 overflow-hidden transition-all duration-300">
             {app.image ? (
               <img src={app.image} alt={app.name} className="h-full w-full object-cover" />
             ) : (
@@ -533,13 +609,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </svg>
             )}
           </div>
-          <div className="text-sm text-gray-500 font-medium break-all text-center px-2">{app.email}</div>
+          <div className="text-sm text-gray-500 font-medium break-all text-center px-2 hidden md:block transition-opacity duration-300">{app.email}</div>
         </div>
         <div className="relative">
           <button
             onClick={() => handleNavClick("dashboard")}
             disabled={loadingTab === "dashboard"}
-            className="relative w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400"
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400"
           >
             {loadingTab === "dashboard" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -548,10 +624,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </svg>
             ) : (
               <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                Dashboard
+                <span className="hidden md:block">Dashboard</span>
               </>
             )}
           </button>
@@ -562,7 +638,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("availability")}
             disabled={loadingTab === "availability"}
-            className="relative w-full flex items-center justify-center px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400"
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400"
           >
             {loadingTab === "availability" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -571,10 +647,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </svg>
             ) : (
               <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Availability
+                <span className="hidden md:block">Availability</span>
               </>
             )}
           </button>
@@ -585,7 +661,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("bookings")}
             disabled={loadingTab === "bookings"}
-            className="relative w-full flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400"
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400"
           >
             {loadingTab === "bookings" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -594,10 +670,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </svg>
             ) : (
               <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Bookings
+                <span className="hidden md:block">Bookings</span>
               </>
             )}
           </button>
@@ -606,9 +682,29 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <div className="relative">
           <button
+            onClick={() => handleNavClick("scan")}
+            disabled={loadingTab === "scan"}
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400"
+          >
+            {loadingTab === "scan" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                </svg>
+                <span className="hidden md:block">Scan Ticket</span>
+              </>
+            )}
+          </button>
+          {activeTab === "scan" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-teal-600 rounded-full"></div>}
+        </div>
+
+        <div className="relative">
+          <button
             onClick={() => handleNavClick("profile")}
             disabled={loadingTab === "profile"}
-            className="relative w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400"
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400"
           >
             {loadingTab === "profile" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -617,10 +713,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </svg>
             ) : (
               <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                My profile
+                <span className="hidden md:block">My profile</span>
               </>
             )}
           </button>
@@ -630,7 +726,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("status")}
-            className="relative w-full flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
             disabled={loadingTab === "status"}
           >
             {loadingTab === "status" ? (
@@ -640,10 +736,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </svg>
             ) : (
               <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Status
+                <span className="hidden md:block">Status</span>
               </>
             )}
           </button>
@@ -652,24 +748,24 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          className="relative w-full flex items-center justify-center px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition"
+          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-4 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          Logout
+          <span className="hidden md:block">Logout</span>
         </button>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="bg-white shadow-sm border-b border-gray-200 px-8 py-5">
+        <div className="bg-white shadow-sm border-b border-gray-200 px-4 md:px-8 py-5">
           <h2 className="text-center text-xl font-semibold text-gray-800">
-            Hi and welcome dear {app.name} on Dr. Gahungu Platform
+          Greetings and welcome dear {app.name} on Dr. Gahungu Platform.
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8">
+          <div className="p-4 md:p-8">
 
             {activeTab === "dashboard" && (
               <div>
@@ -677,22 +773,35 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 {isDashboardLoading ? (
                   <div className="text-center py-10">Loading stats...</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2 truncate">Total Patients</h4>
-                      <div className="text-3xl font-bold text-gray-800">{dashboardStats.totalPatients}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Patients</h4>
+                      <div className="text-lg font-bold text-center text-gray-800">{dashboardStats.totalPatients}</div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2 truncate">Today's Bookings</h4>
-                      <div className="text-3xl font-bold text-blue-600">{dashboardStats.todayBookings}</div>
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Pending Bookings</h4>
+                      <div className="text-lg font-bold text-center text-blue-600">{dashboardStats.todayBookings}</div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2 truncate">Total Revenue</h4>
-                      <div className="text-3xl font-bold text-green-600">{dashboardStats.totalRevenue.toLocaleString()} BIF</div>
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Revenue</h4>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="text-lg font-bold text-center text-green-600">{dashboardStats.totalRevenue.toLocaleString()} BIF</div>
+                        <button
+                          onClick={() => alert("Withdrawal feature coming soon!")}
+                          disabled={dashboardStats.totalRevenue === 0}
+                          className="px-2 py-0.5 text-[10px] font-medium text-white bg-green-600 rounded hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          Withdraw
+                        </button>
+                      </div>
                     </div>
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-2 truncate">Completed Bookings</h4>
-                      <div className="text-3xl font-bold text-purple-600">{dashboardStats.completedBookings}</div>
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Completed Bookings</h4>
+                      <div className="text-lg font-bold text-center text-purple-600">{dashboardStats.completedBookings}</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Profile Views</h4>
+                      <div className="text-lg font-bold text-center text-indigo-600">{dashboardStats.totalViews}</div>
                     </div>
                   </div>
                 )}
@@ -1124,6 +1233,76 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </div>
             )}
 
+            {activeTab === "scan" && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="text-xl font-bold mb-6 text-gray-800">Scan Patient Ticket</h3>
+                {!scannedBooking ? (
+                  <div className="max-w-md mx-auto flex flex-col items-center">
+                    <div className="w-full bg-white rounded-lg overflow-hidden relative">
+                      <div id="reader" className="w-full"></div>
+                    </div>
+                    <p className="text-center mt-4 text-gray-500">Point your camera at the patient's ticket QR code.</p>
+                  </div>
+                ) : (
+                  <div className="max-w-2xl mx-auto">
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-bold text-gray-900">Ticket Found!</h4>
+                          <p className="text-green-700">Booking details retrieved successfully.</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-4 rounded-lg border border-gray-100">
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase font-semibold">Patient Name</p>
+                          <p className="text-lg font-medium text-gray-900">{scannedBooking.patient_name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase font-semibold">Ticket Number</p>
+                          <p className="text-lg font-medium text-gray-900">{scannedBooking.ticket_number || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase font-semibold">Date & Time</p>
+                          <p className="text-gray-900">{scannedBooking.appointment_date} at {scannedBooking.appointment_time}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase font-semibold">Status</p>
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs capitalize mt-1 ${
+                            scannedBooking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                            scannedBooking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
+                            scannedBooking.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>{scannedBooking.status}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex gap-3">
+                        {scannedBooking.status === 'confirmed' && (
+                          <button
+                            onClick={() => handleUpdateStatus(scannedBooking.id, 'completed')}
+                            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium"
+                          >
+                            Mark as Completed
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setScannedBooking(null)}
+                          className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition font-medium"
+                        >
+                          Scan Another
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "availability" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-xl font-bold mb-6 text-gray-800">Manage Availability & Fees</h3>
@@ -1138,26 +1317,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex flex-col md:flex-row gap-6 items-start">
                     <div className="flex-1 w-full">
                       <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Booking Type</h4>
-                            <p className="text-gray-900 font-medium capitalize bg-white px-3 py-2 rounded border border-gray-200 inline-block">
-                              {availabilityForm.booking_type}
-                            </p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Consultation Fees</h4>
-                            <div className="space-y-1">
-                              {(availabilityForm.booking_type === "online" || availabilityForm.booking_type === "both") && (
-                                <p className="text-gray-700"><span className="font-medium">Online:</span> {availabilityForm.consultation_fee_online || "Not set"}</p>
-                              )}
-                              {(availabilityForm.booking_type === "in-office" || availabilityForm.booking_type === "both") && (
-                                <p className="text-gray-700"><span className="font-medium">In-Office:</span> {availabilityForm.consultation_fee_offline || "Not set"}</p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
                         <div>
                           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Locations</h4>
                           {availabilityForm.location.length > 0 ? (

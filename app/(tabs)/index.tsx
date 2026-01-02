@@ -74,9 +74,9 @@ export default function MainScreen() {
         await Promise.all([
           supabase.from('medicines').select('*').eq('country', country).ilike('name', searchTerm),
           supabase.from('pharmacies').select('*').eq('country', country).ilike('name', searchTerm),
-          supabase.from('hospitals').select('*').eq('country', country).ilike('name', searchTerm),
+          supabase.from('hospital_applications').select('*').eq('country', country).ilike('name', searchTerm),
           supabase.from('doctor_applications').select('*').eq('country', country).or(`name.ilike.${searchTerm},specialty.ilike.${searchTerm}`),
-          supabase.from('insurances').select('*').eq('country', country).ilike('name', searchTerm),
+          supabase.from('insurance_applications').select('*').eq('country', country).ilike('name', searchTerm),
         ]);
 
       const results = {
@@ -104,8 +104,8 @@ export default function MainScreen() {
     };
 
     const tablesToWatch = [
-      'medicines', 'doctor_applications', 'pharmacies', 'hospitals', 
-      'insurances', 'deals', 'banners', 'categories'
+      'medicines', 'doctor_applications', 'pharmacies', 'hospital_applications', 
+      'insurance_applications', 'deals', 'banners', 'categories'
     ];
 
     const channels = tablesToWatch.map(table => 
@@ -251,9 +251,6 @@ const styles = StyleSheet.create({
     borderRadius: 30, 
     paddingHorizontal: 15, 
     paddingVertical: 10,
-    outlineColor: "black",
-    outlineStyle: "solid",
-    outlineWidth: 1,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,

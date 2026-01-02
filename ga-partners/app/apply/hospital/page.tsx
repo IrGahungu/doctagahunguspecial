@@ -1,80 +1,60 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-type Specialty = {
-  name: string;
-  openingHours: string;
-};
+import { useRouter, useSearchParams } from "next/navigation";
+import toast, { Toaster } from "react-hot-toast";
 
 type Hospital = {
   id: string;
   name: string;
-  email: string;
   image?: string;
-  location?: string[];
-  specialties?: Specialty[];
-  departments?: string[];
-  insurances?: string[];
-  blood_types?: string[];
   country: string;
+  origin_country?: string;
+  email?: string;
+  status?: string;
+  rejection_reason?: string;
   whatsapp_number: string;
-  emergency_contact_number: string;
   password?: string;
   payment_id?: string;
+  agreement_image?: string;
 };
 
 type HospitalForm = {
   id?: string;
   name: string;
-  email: string;
   image: string;
-  location: string[];
-  specialties: Specialty[];
-  departments: string[];
-  insurances: string[];
-  blood_types: string[];
   country: string;
+  origin_country: string;
+  email: string;
   whatsapp_number: string;
-  emergency_contact_number: string;
   password?: string;
   agreementImage: string;
   payment_id: string;
 };
 
-type FormErrors = Partial<Record<keyof Omit<HospitalForm, 'id'> | 'confirmPassword', string>>;
-
-type HospitalListField = "location" | "departments" | "insurances" | "blood_types";
-
-type HospitalPageProps = {
-  editingHospital: Hospital | null;
-};
+type FormErrors = Partial<Record<keyof Omit<HospitalForm, 'id'> | 'confirmPassword', string>>
 
 const supportedCountries = [
   "Burundi",
-  "Rwanda",
-  "Tanzania",
-  "Kenya",
-  "Sudan",
-  "Congo",
-  "Somalia",
+  //"Rwanda",
+  //"Tanzania",
+  //"Kenya",
+  //"Sudan",
+  //"Congo",
+  //"Somalia",
 ];
 
-export default function HospitalPage({
-  editingHospital,
-}: HospitalPageProps) {
+export default function HospitalPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
   const [hospitalForm, setHospitalForm] = useState<HospitalForm>({
     name: "",
-    email: "",
     image: "",
-    location: [],
-    specialties: [],
-    departments: [],
-    insurances: [],
-    blood_types: [],
     country: "Burundi",
+    origin_country: "",
+    email: "",
     whatsapp_number: "",
-    emergency_contact_number: "",
     password: "",
     agreementImage: "",
     payment_id: "",
@@ -88,91 +68,68 @@ export default function HospitalPage({
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isViewMode, setIsViewMode] = useState(false);
+
+  const applicationStatus = editingHospital?.status;
+  const rejectionReason = editingHospital?.rejection_reason;
+
+  useEffect(() => {
+      const id = searchParams.get("id");
+      if (id) {
+        fetch(`/api/hospital/apply?id=${id}`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && !data.error) {
+              setEditingHospital(data);
+              if (data.status === 'rejected') {
+                setIsViewMode(false);
+              } else {
+                setIsViewMode(true);
+              }
+            }
+          })
+          .catch((err) => console.error("Failed to fetch application:", err));
+      }
+    }, [searchParams]);
 
   useEffect(() => {
     if (editingHospital) {
       setHospitalForm({
         name: editingHospital.name || "",
-        email: editingHospital.email || "",
         image: editingHospital.image || "",
-        location: editingHospital.location || [],
-        specialties: editingHospital.specialties || [],
-        departments: editingHospital.departments || [],
-        insurances: editingHospital.insurances || [],
-        blood_types: editingHospital.blood_types || [],
         country: editingHospital.country || "Burundi",
+        origin_country: editingHospital.origin_country || "",
+        email: editingHospital.email || "",
         whatsapp_number: editingHospital.whatsapp_number || "",
-        emergency_contact_number: editingHospital.emergency_contact_number || "",
-        password: "", // Don't populate password for edits
-        agreementImage: (editingHospital as any).agreementImage || "",
+        password: "", // Always clear password on load
+        agreementImage: editingHospital.agreement_image || (editingHospital as any).agreementImage || "",
         payment_id: editingHospital.payment_id || "",
       });
     } else {
       setHospitalForm({
-        name: "",
-        email: "",
-        image: "",
-        location: [],
-        specialties: [],
-        departments: [],
-        insurances: [],
-        blood_types: [],
-        country: "Burundi",
-        whatsapp_number: "",
-        emergency_contact_number: "",
-        password: "",
-        agreementImage: "",
-        payment_id: "",
-      });
+        name: "", 
+        image: "", 
+        country: "Burundi", 
+        origin_country: "", 
+        email: "", 
+        whatsapp_number: "", 
+        password: "", 
+        agreementImage: "", 
+        payment_id: ""
+    });
     }
     setConfirmPassword("");
     setFormError(null);
-    setErrors({});
   }, [editingHospital]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target;
     setHospitalForm((prev) => ({ ...prev, [name]: value }));
-    // Clear error for the field being edited
     if (name in errors) {
       const newErrors = { ...errors } as FormErrors;
       delete newErrors[name as keyof FormErrors];
       setErrors(newErrors);
     }
-  }
-
-  function handleListChange(field: HospitalListField, index: number, value: string) {
-    const updatedList = [...hospitalForm[field]];
-    updatedList[index] = value;
-    setHospitalForm((prev) => ({ ...prev, [field]: updatedList }));
-  }
-
-  function handleSpecialtyChange(index: number, field: 'name' | 'openingHours', value: string) {
-    const updatedList = [...hospitalForm.specialties];
-    updatedList[index][field] = value;
-    setHospitalForm((prev) => ({ ...prev, specialties: updatedList }));
-  }
-
-  function addListItem(field: HospitalListField) {
-    setHospitalForm((prev) => ({ ...prev, [field]: [...prev[field], ""] }));
-  }
-
-  function removeListItem(field: HospitalListField, index: number) {
-    setHospitalForm((prev) => ({
-      ...prev,
-      [field]: (prev[field] as string[]).filter((_, i) => i !== index),
-    }));
-  }
-
-  function addSpecialty() {
-    setHospitalForm((prev) => ({ ...prev, specialties: [...prev.specialties, { name: "", openingHours: "" }] }));
-  }
-
-  function removeSpecialty(index: number) {
-    setHospitalForm((prev) => ({
-      ...prev,
-      specialties: prev.specialties.filter((_, i) => i !== index),
-    }));
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -184,7 +141,7 @@ export default function HospitalPage({
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("bucket", "hospital-images");
+    formData.append("bucket", "hospital-images"); // Specify the target bucket
 
     try {
       const res = await fetch("/api/upload", {
@@ -192,8 +149,17 @@ export default function HospitalPage({
         body: formData,
       });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
+      const text = await res.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+      }
+
+      if (!res.ok) {
+        throw new Error(result.error || "Upload failed");
+      }
 
       setHospitalForm((prev) => ({ ...prev, image: result.publicUrl }));
       if (errors.image) {
@@ -202,7 +168,8 @@ export default function HospitalPage({
         setErrors(newErrors);
       }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Image upload failed");
+      const message = err instanceof Error ? err.message : "An unknown error occurred during upload.";
+      setFormError(message);
     } finally {
       setIsUploading(false);
     }
@@ -221,7 +188,13 @@ export default function HospitalPage({
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
+      const text = await res.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+      }
       if (!res.ok) throw new Error(result.error || "Upload failed");
 
       setHospitalForm((prev) => ({ ...prev, agreementImage: result.publicUrl }));
@@ -243,20 +216,19 @@ export default function HospitalPage({
       {required && <span className="text-red-500 ml-1">*</span>}
     </label>
   );
-
+  
+  
   function validateForm(): boolean {
     const newErrors: FormErrors = {};
     if (!hospitalForm.name) newErrors.name = "Hospital name is required";
+    if (!hospitalForm.origin_country) newErrors.origin_country = "Origin country is required";
     if (!hospitalForm.email) newErrors.email = "Email is required";
     if (!hospitalForm.whatsapp_number) newErrors.whatsapp_number = "WhatsApp number is required";
-    if (!hospitalForm.emergency_contact_number) newErrors.emergency_contact_number = "Emergency contact number is required";
     if (!hospitalForm.payment_id) newErrors.payment_id = "Payment ID is required";
     if (!editingHospital && !hospitalForm.password) newErrors.password = "Password is required";
     if (!editingHospital && hospitalForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!hospitalForm.image) newErrors.image = "Hospital image is required";
     if (!hospitalForm.agreementImage) newErrors.agreementImage = "Agreement image is required";
-    if (hospitalForm.location.filter(l => l.trim()).length === 0) newErrors.location = "At least one location is required";
-    if (hospitalForm.specialties.filter(s => s.name.trim()).length === 0) newErrors.specialties = "At least one specialty is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -265,30 +237,48 @@ export default function HospitalPage({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
+
     if (!validateForm()) {
-      setFormError("Please fill out all required fields.");
+      setFormError("Please fill out all required fields and correct any errors.");
       return;
     }
 
     setIsSubmitting(true);
+    
     try {
-      const url = "/api/hospitals";
+    const url = "/api/hospital/apply";
       const method = editingHospital ? "PUT" : "POST";
-      const payload = editingHospital
-        ? { ...hospitalForm, id: editingHospital.id }
-        : hospitalForm;
+      const body = editingHospital ? { ...hospitalForm, id: editingHospital.id } : hospitalForm;
+      
+      // If editing and password is empty, remove it so we don't overwrite with empty string
+      if (editingHospital && !body.password) delete (body as any).password;
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          body
+        ),
       });
 
-      if (!res.ok) throw new Error("Failed to save data");
-      // On success, you might want to redirect the user.
-      // e.g., using Next.js's router: router.push('/hospitals');
-    } catch {
-      setFormError("Error saving hospital");
+      const text = await res.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+      }
+      if (!res.ok) throw new Error(result.error || "Failed to save Hospital");
+
+      toast.success(editingHospital 
+        ? "Application resubmitted successfully, please login to check the status" 
+        : "Application Submitted Successfully, please login to check the status");
+      setTimeout(() => {
+        router.push("/login");
+      }, 4000);
+    } catch (err:any) {
+      console.error(err);
+      setFormError(err instanceof Error ? err.message : "Failed to save hospital");
     } finally {
       setIsSubmitting(false);
     }
@@ -296,39 +286,135 @@ export default function HospitalPage({
 
   return (
     <div className="min-h-screen bg-white">
+      <Toaster />
       <div className="w-full max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-center mb-12">
+        <div className="flex items-center justify-center mb-15">
           <h1 className="inline-block text-2xl font-extrabold tracking-tight text-slate-900 border-b-2 border-green-300 pb-2">
-            {editingHospital ? "Edit Hospital" : "Welcome Hospital"}
+            {isViewMode ? "My Hospital Details" : (editingHospital ? "Edit your application" : "Hospital Details")}
           </h1>
         </div>
 
-        <form
-          id="hospital-form"
-          onSubmit={handleSubmit}
-          className="space-y-6"
-        >
+        {applicationStatus === 'rejected' && rejectionReason && (
+          <div className="my-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h3 className="font-bold text-red-800">Your Application Needs Attention</h3>
+            <p className="text-sm text-red-700 mt-1">
+              <span className="font-semibold">Reason for rejection:</span> {rejectionReason}
+            </p>
+            <p className="text-sm text-red-700 mt-2">Please review your information, make the necessary changes, and resubmit your application.</p>
+          </div>
+        )}
+
+        {isViewMode && editingHospital ? (
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
+            <div className="px-4 py-5 sm:px-6 flex justify-between items-center bg-slate-50 border-b border-slate-200">
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-slate-900">Application Information</h3>
+                <p className="mt-1 max-w-2xl text-sm text-slate-500">Personal details and application.</p>
+              </div>
+              <button
+                onClick={() => setIsViewMode(false)}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Update
+              </button>
+            </div>
+            <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+              <dl className="sm:divide-y sm:divide-gray-200">
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Hospital Name</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{editingHospital.name}</dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Image</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {editingHospital.image && (
+                      <img src={editingHospital.image} alt="Hospital" className="h-24 w-24 object-cover rounded-lg border border-gray-200" />
+                    )}
+                  </dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Country</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{editingHospital.country}</dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Origin Country</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{editingHospital.origin_country}</dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Email</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{editingHospital.email}</dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">WhatsApp Number</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{editingHospital.whatsapp_number}</dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Password</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">********</dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Agreement Image</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                    {(editingHospital.agreement_image || (editingHospital as any).agreementImage) && (
+                      <img 
+                        src={editingHospital.agreement_image || (editingHospital as any).agreementImage} 
+                        alt="Agreement" 
+                        className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
+                      />
+                    )}
+                  </dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-gray-500">Payment ID</dt>
+                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{editingHospital.payment_id}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        ) : (
+
+        <form id="hospital-form" onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel required>Hospital Name</FieldLabel>
-              <input
-                type="text"
-                name="name"
-                placeholder="e.g., Central Hospital"
-                value={hospitalForm.name}
-                onChange={handleChange}
-                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.name ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
-              />
+              <input type="text" name="name" placeholder="e.g., Radiant Hospital" value={hospitalForm.name} onChange={handleChange} className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.name ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`} />
+            </div>
+            <div>
+              <FieldLabel required>Origin Country</FieldLabel>
+              <input type="text" name="origin_country" placeholder="e.g., Burundi" value={hospitalForm.origin_country} onChange={handleChange} className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.origin_country ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`} />
             </div>
             <div>
               <FieldLabel required>Email</FieldLabel>
               <input
                 type="email"
                 name="email"
-                placeholder="your@email.com"
+                placeholder="hospital@example.com"
                 value={hospitalForm.email}
                 onChange={handleChange}
-                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.email ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
+                disabled={!!editingHospital}
+                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.email ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition ${editingHospital ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+              />
+            </div>
+            <div>
+              <FieldLabel required>WhatsApp Number</FieldLabel>
+              <input
+                type="text"
+                name="whatsapp_number"
+                placeholder="+1234567890"
+                value={hospitalForm.whatsapp_number}
+                onChange={handleChange}
+                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.whatsapp_number ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
+              />
+            </div>
+            <div>
+              <FieldLabel required>Payment ID</FieldLabel>
+              <input
+                type="text"
+                name="payment_id"
+                placeholder="Your Payment ID"
+                value={hospitalForm.payment_id}
+                onChange={handleChange}
+                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.payment_id ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
               />
             </div>
           </div>
@@ -344,180 +430,58 @@ export default function HospitalPage({
             </select>
           </div>
 
-          {/* Specialties */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <FieldLabel required>Specialties</FieldLabel>
-              <button
-                type="button"
-                onClick={addSpecialty}
-                className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                Add
-              </button>
-            </div>
-            <div className="space-y-2">
-              {hospitalForm.specialties.map((item, index) => (
-                <div key={index} className="flex gap-2 items-center">
+          {!editingHospital && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <FieldLabel required>Password</FieldLabel>
+                <div className="relative">
                   <input
-                    type="text"
-                    placeholder="Specialty Name"
-                    value={item.name}
-                    onChange={(e) => handleSpecialtyChange(index, 'name', e.target.value)}
-                    className="flex-1 rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder="Create a password"
+                    value={hospitalForm.password}
+                    onChange={handleChange}
+                    className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.password ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
+                    autoComplete="new-password"
                   />
-                  <input
-                    type="text"
-                    placeholder="Opening Hours (e.g., 9am-5pm)"
-                    value={item.openingHours}
-                    onChange={(e) => handleSpecialtyChange(index, 'openingHours', e.target.value)}
-                    className="flex-1 rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSpecialty(index)}
-                    className="px-3 py-2 rounded-md bg-red-50 border border-red-200 text-red-700 hover:bg-red-100"
-                    aria-label="Remove Specialty"
-                  >
-                    ×
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                    {showPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    )}
                   </button>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Dynamic List Sections */}
-          {[
-            { field: "location", label: "Locations" },
-            { field: "departments", label: "Departments" },
-            { field: "insurances", label: "Insurances" },
-            { field: "blood_types", label: "Blood Types" },
-          ].map(({ field, label }) => {
-            const typedField = field as HospitalListField;
-            return (
-            <div key={field}>
-              <div className="flex items-center justify-between mb-3">
-                <FieldLabel required={field === 'location'}>{label}</FieldLabel>
-                <button
-                  type="button"
-                  onClick={() => addListItem(typedField)}
-                  className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                  Add
-                </button>
               </div>
-              <div className="space-y-2">
-                {hospitalForm[typedField].map((item, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder={label.slice(0, -1)}
-                      value={item}
-                      onChange={(e) => handleListChange(typedField, index, e.target.value)}
-                      className="flex-1 rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeListItem(typedField, index)}
-                      className="px-3 py-2 rounded-md bg-red-50 border border-red-200 text-red-700 hover:bg-red-100"
-                      aria-label={`Remove ${label.slice(0, -1)}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
+              <div>
+                <FieldLabel required>Confirm Password</FieldLabel>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (errors.confirmPassword) {
+                        const newErrors = { ...errors };
+                        delete newErrors.confirmPassword;
+                        setErrors(newErrors);
+                      }
+                    }}
+                    className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.confirmPassword ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
+                  />
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                    {showConfirmPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-          )})}
-
-          <div>
-              <FieldLabel required>Payment ID</FieldLabel>
-              <input
-                type="text"
-                name="payment_id"
-                placeholder="Your Payment ID"
-                value={hospitalForm.payment_id}
-                onChange={handleChange}
-                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.payment_id ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
-              />
-            </div>
-
-          <div>
-              <FieldLabel required>WhatsApp Number</FieldLabel>
-              <input
-                type="text"
-                name="whatsapp_number"
-                placeholder="+1234567890"
-                value={hospitalForm.whatsapp_number}
-                onChange={handleChange}
-                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.whatsapp_number ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
-              />
-            </div>
-          
-          <div>
-              <FieldLabel required>Emergency Contact Number</FieldLabel>
-              <input
-                type="text"
-                name="emergency_contact_number"
-                placeholder="+1234567890"
-                value={hospitalForm.emergency_contact_number}
-                onChange={handleChange}
-                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.emergency_contact_number ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
-              />
-            </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <FieldLabel required={!editingHospital}>Password</FieldLabel>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Create a password"
-                  value={hospitalForm.password}
-                  onChange={handleChange}
-                  className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.password ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
-                  autoComplete="new-password"
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                </button>
-              </div>
-            </div>
-            <div>
-              <FieldLabel required={!editingHospital}>Confirm Password</FieldLabel>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  name="confirmPassword"
-                  placeholder="Confirm your password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (errors.confirmPassword) {
-                      const newErrors = { ...errors };
-                      delete newErrors.confirmPassword;
-                      setErrors(newErrors);
-                    }
-                  }}
-                  className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.confirmPassword ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
-                />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
-                  {showConfirmPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+          )}
 
           <div>
             <FieldLabel required>Hospital Image</FieldLabel>
@@ -535,7 +499,6 @@ export default function HospitalPage({
             </div>
           </div>
 
-          {/* Agreement Image upload */}
           <div>
             <FieldLabel required>Upload Agreement Image</FieldLabel>
             <div className="flex items-center gap-4">
@@ -546,7 +509,6 @@ export default function HospitalPage({
                 <span>{isUploadingAgreement ? "Uploading..." : "Choose agreement"}</span>
                 <input type="file" accept="image/*" onChange={handleAgreementImageUpload} className="hidden" />
               </label>
-
               {hospitalForm.agreementImage && (
                 <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
                   <img src={hospitalForm.agreementImage} alt="Agreement Preview" className="w-full h-full object-cover" />
@@ -555,7 +517,6 @@ export default function HospitalPage({
             </div>
           </div>
 
-          {/* Terms and Conditions */}
           <div className="flex items-center gap-3">
             <input
               type="checkbox"
@@ -573,7 +534,6 @@ export default function HospitalPage({
             </label>
           </div>
 
-          {/* Footer */}
           <div className="pt-4">
             {formError && <p className="text-red-500 text-sm text-center mb-4">{formError}</p>}
             <div className="flex justify-center gap-3">
@@ -589,6 +549,7 @@ export default function HospitalPage({
             </div>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

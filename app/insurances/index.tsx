@@ -13,7 +13,6 @@ type Insurance = {
   id: string;
   name: string | null;
   image: string | null;
-  locations: any; // JSONB column
 };
 
 const SkeletonCard = () => (
@@ -42,15 +41,19 @@ export default function AllInsurancesScreen() {
   }, []);
 
   useEffect(() => {
-    if (!country) return;
-
     const fetchInsurances = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('insurances')
-        .select('id, name, image, locations')
-        .eq('country', country)
+      let query = supabase
+        .from('insurance_applications')
+        .select('id, name, image')
+        .eq('status', 'approved')
         .order('name', { ascending: true });
+
+      if (country) {
+        query = query.eq('country', country);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching insurances:', error.message);
@@ -61,7 +64,12 @@ export default function AllInsurancesScreen() {
     };
 
     fetchInsurances();
-    const channel = supabase.channel('all-insurances-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'insurances', filter: `country=eq.${country}` }, fetchInsurances).subscribe();
+
+    const filter = country ? `country=eq.${country}` : undefined;
+    const channel = supabase.channel('all-insurances-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'insurance_applications', filter }, fetchInsurances)
+      .subscribe();
+      
     return () => { supabase.removeChannel(channel); };
   }, [country]);
 
@@ -75,7 +83,6 @@ export default function AllInsurancesScreen() {
             id: item.id,
             name: item.name || '',
             image: item.image || '',
-            locations: JSON.stringify(item.locations || []),
           },
         });
       }}

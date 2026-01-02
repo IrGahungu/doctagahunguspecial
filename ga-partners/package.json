@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.86.2",
     "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
+    "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
     "next": "16.0.5",
     "react": "19.2.0",

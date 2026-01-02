@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    let query = supabase.from("insurances").select("*");
+    let query = supabase.from("insurance_applications").select("*");
 
     if (id) {
       query = query.eq("id", id).single() as any;
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
-  const { data, error } = await supabase.from("insurances").insert([{ name, image, locations }]);
+  const { data, error } = await supabase.from("insurance_applications").insert([{ name, image, locations }]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });
@@ -46,7 +46,7 @@ export async function PUT(req: NextRequest) {
 
   if (!id) return NextResponse.json({ error: "ID is required" }, { status: 400 });
 
-  const { data, error } = await supabase.from("insurances").update({ name, image, locations }).eq("id", id);
+  const { data, error } = await supabase.from("insurance_applications").update({ name, image, locations }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });
@@ -58,7 +58,7 @@ export async function DELETE(req: NextRequest) {
 
   if (!id) return NextResponse.json({ error: "ID is required" }, { status: 400 });
 
-  const { data, error } = await supabase.from("insurances").delete().eq("id", id);
+  const { data, error } = await supabase.from("insurance_applications").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });

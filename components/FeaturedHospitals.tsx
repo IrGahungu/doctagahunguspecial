@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, Pressable, Platform } from 'react-native';
 import { router } from 'expo-router';
-// The global `Hospital` type from `@/types` likely defines `image` as `ImageSourcePropType`
-// to support local assets (e.g., require('./image.png')). However, this component
-// only fetches remote image URLs (strings) from Supabase.
-// Defining a local type that accurately reflects the fetched data resolves the type mismatch.
+import { supabase } from '@/lib/supabase';
+import * as SecureStore from 'expo-secure-store';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+
+// Local type for data fetched from Supabase
 type FeaturedHospital = {
   id: string;
   name: string | null;
   image: string | null;
-  location: string | null;
-  specialties: string[] | null;
-  insurances: string[] | null;
-  bloodTypes: string[] | null;
+  status?: string;
+  country?: string;
 };
-import { supabase } from '@/lib/supabase';
-import * as SecureStore from 'expo-secure-store';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const SkeletonCard = () => (
   <View style={styles.card}>
@@ -27,7 +23,7 @@ const SkeletonCard = () => (
   </View>
 );
 
-export default function FeaturedHospitals() {
+export default function FeaturedHospitalss() {
   const [hospitals, setHospitals] = useState<FeaturedHospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
@@ -42,22 +38,36 @@ export default function FeaturedHospitals() {
   }, []);
 
   useEffect(() => {
-    if (!country) return;
-
     const fetchHospitals = async () => {
+      console.log('[FeaturedHospitals] Fetching... | Country Filter:', country);
       setLoading(true);
-      const { data, error } = await supabase
-        .from('hospitals')
-        .select('id, name, image, location, specialties, insurances, blood_types')
-        .eq('country', country)
+      
+      let query = supabase
+        .from('hospital_applications')
+        .select('id, name, image, status, country')
+        
         .order('created_at', { ascending: false })
         .limit(4);
 
+      if (country) {
+        query = query.eq('country', country);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
-        console.error('Error fetching featured hospitals:', error.message);
+        console.error('[FeatureHospitals] Error:', error.message);
       } else if (data) {
-        const formattedData = data.map((h) => ({ ...h, bloodTypes: h.blood_types }));
-        setHospitals(formattedData);
+        console.log(`[FeaturedHospitals] Success. Found ${data.length} records.`);
+        if (data.length === 0) {
+          const { count } = await supabase.from('hospital_applications').select('*', { count: 'exact', head: true });
+          console.log('[FeaturedHospitals] Diagnostic: Total rows in table:', count);
+          const { data: sample } = await supabase.from('hospital_applications').select('name, status, country').limit(5);
+          console.log('[FeaturedHospitals] Diagnostic: Sample rows:', JSON.stringify(sample, null, 2));
+        } else {
+          console.log('[FeaturedHospitals] Data:', JSON.stringify(data, null, 2));
+        }
+        setHospitals(data);
       }
       setLoading(false);
     };
@@ -79,11 +89,7 @@ export default function FeaturedHospitals() {
           params: {
             id: item.id,
             name: item.name || '',
-            image: item.image || '',
-            location: JSON.stringify(item.location || []),
-            specialties: JSON.stringify(item.specialties || []),
-            insurances: JSON.stringify(item.insurances || []),
-            bloodTypes: JSON.stringify(item.bloodTypes || []),
+            image: item.image || ''
           },
         });
       }}
@@ -92,7 +98,7 @@ export default function FeaturedHospitals() {
         <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
       ) : (
         <View style={[styles.image, styles.placeholderImage]}>
-          <Icon name="local-hospital" size={40} color="#ccc" />
+          <Icon name="shield" size={40} color="#ccc" />
         </View>
       )}
       <View style={styles.details}>
@@ -104,7 +110,7 @@ export default function FeaturedHospitals() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.header}>Featured Hospitals</Text>
+        <Text style={styles.header}>Featured Hospitalss</Text>
         <View style={styles.list}>
           <SkeletonCard />
           <SkeletonCard />
@@ -139,7 +145,7 @@ export default function FeaturedHospitals() {
 
 const styles = StyleSheet.create({
   container: { 
-    paddingVertical: 16 
+    paddingVertical: 16 ,
   },
   header: {
     fontSize: 16,
@@ -187,11 +193,6 @@ const styles = StyleSheet.create({
   },
   skeleton: {
     backgroundColor: '#e0e0e0',
-  },
-  location: {
-    fontSize: 12,
-    fontFamily: 'Roboto-Regular',
-    color: '#757575',
   },
   noDataText: {
     textAlign: 'center',

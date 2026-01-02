@@ -10,7 +10,8 @@ type FeaturedInsurance = {
   id: string;
   name: string | null;
   image: string | null;
-  locations: any; // JSONB column
+  status?: string;
+  country?: string;
 };
 
 const SkeletonCard = () => (
@@ -37,20 +38,35 @@ export default function FeaturedInsurances() {
   }, []);
 
   useEffect(() => {
-    if (!country) return;
-
     const fetchInsurances = async () => {
+      console.log('[FeaturedInsurances] Fetching... | Country Filter:', country);
       setLoading(true);
-      const { data, error } = await supabase
-        .from('insurances')
-        .select('id, name, image, locations')
-        .eq('country', country)
+      
+      let query = supabase
+        .from('insurance_applications')
+        .select('id, name, image, status, country')
+        
         .order('created_at', { ascending: false })
         .limit(4);
 
+      if (country) {
+        query = query.eq('country', country);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
-        console.error('Error fetching featured insurances:', error.message);
+        console.error('[FeaturedInsurances] Error:', error.message);
       } else if (data) {
+        console.log(`[FeaturedInsurances] Success. Found ${data.length} records.`);
+        if (data.length === 0) {
+          const { count } = await supabase.from('insurance_applications').select('*', { count: 'exact', head: true });
+          console.log('[FeaturedInsurances] Diagnostic: Total rows in table:', count);
+          const { data: sample } = await supabase.from('insurance_applications').select('name, status, country').limit(5);
+          console.log('[FeaturedInsurances] Diagnostic: Sample rows:', JSON.stringify(sample, null, 2));
+        } else {
+          console.log('[FeaturedInsurances] Data:', JSON.stringify(data, null, 2));
+        }
         setInsurances(data);
       }
       setLoading(false);
@@ -73,8 +89,7 @@ export default function FeaturedInsurances() {
           params: {
             id: item.id,
             name: item.name || '',
-            image: item.image || '',
-            locations: JSON.stringify(item.locations || []),
+            image: item.image || ''
           },
         });
       }}

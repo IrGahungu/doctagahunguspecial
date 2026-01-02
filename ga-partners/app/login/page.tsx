@@ -10,25 +10,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState("doctor");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
 
     try {
-      const res = await fetch("/api/doctor/login", {
+      const endpoint = `/api/${role}/login`;
+      console.log(`Attempting login to ${endpoint} with email: ${email}`);
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
+      console.log("Response status:", res.status);
       const body = await res.json();
+      console.log("Response body:", body);
+
       if (!res.ok) throw new Error(body.error || "Login failed");
 
       toast.success("Logged in");
       // redirect to dashboard
-      router.push("/doctor/dashboard");
+      console.log(`Redirecting to /${role}/dashboard`);
+      router.push(`/${role}/dashboard`);
     } catch (err: any) {
+      console.error("Login error:", err);
       toast.error(err.message || "Login failed");
     } finally {
       setBusy(false);
@@ -39,6 +48,52 @@ export default function LoginPage() {
     <div className="max-w-md mx-auto py-12">
       <h2 className="text-2xl font-bold mb-8 text-center">Dr. Gahungu Welcomes you, Please Login.</h2>
       <form onSubmit={submit} className="space-y-4">
+        <div className="flex flex-wrap justify-center gap-4 mb-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="role"
+              value="doctor"
+              checked={role === "doctor"}
+              onChange={(e) => setRole(e.target.value)}
+              className="accent-green-600 w-4 h-4"
+            />
+            <span className="text-gray-700">Doctor</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="role"
+              value="pharmacy"
+              checked={role === "pharmacy"}
+              onChange={(e) => setRole(e.target.value)}
+              className="accent-green-600 w-4 h-4"
+            />
+            <span className="text-gray-700">Pharmacy</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="role"
+              value="insurance"
+              checked={role === "insurance"}
+              onChange={(e) => setRole(e.target.value)}
+              className="accent-green-600 w-4 h-4"
+            />
+            <span className="text-gray-700">Insurance</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="role"
+              value="hospital"
+              checked={role === "hospital"}
+              onChange={(e) => setRole(e.target.value)}
+              className="accent-green-600 w-4 h-4"
+            />
+            <span className="text-gray-700">Hospital</span>
+          </label>
+        </div>
         <input required type="email" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full p-3 border rounded-lg"/>
         <div className="relative">
           <input required type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full p-3 border rounded-lg"/>

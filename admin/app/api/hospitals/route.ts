@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Server-side Supabase client with service role key
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // server-only key
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function GET(req: NextRequest) {
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
-    let query = supabase.from("hospitals").select("*");
+    let query = supabase.from("hospital_applications").select("*");
 
     if (id) {
       query = query.eq("id", id).single() as any;
@@ -27,18 +28,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-
 export async function POST(req: NextRequest) {
   const body = await req.json();
-
-  // ✅ Debug log
-  console.log("API POST received body:", body);
-
-   const { name, image, location, specialties, insurances, blood_types } = body;
+  const { name, image, locations } = body;
 
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
 
-  const { data, error } = await supabase.from("hospitals").insert([{ name, image ,location, specialties, insurances, blood_types }]);
+  const { data, error } = await supabase.from("hospital_applications").insert([{ name, image, locations }]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });
@@ -46,17 +42,11 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const body = await req.json();
-  
-  // ✅ Debug log
-  console.log("API PUT received body:", body);
-
-   const { name, image, location, specialties, insurances, blood_types } = body;
-  const id = body.id;
-
+  const { id, name, image, locations } = body;
 
   if (!id) return NextResponse.json({ error: "ID is required" }, { status: 400 });
 
-  const { data, error } = await supabase.from("hospitals").update({ name, image ,location, specialties, insurances, blood_types }).eq("id", id);
+  const { data, error } = await supabase.from("hospital_applications").update({ name, image, locations }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });
@@ -68,7 +58,7 @@ export async function DELETE(req: NextRequest) {
 
   if (!id) return NextResponse.json({ error: "ID is required" }, { status: 400 });
 
-  const { data, error } = await supabase.from("hospitals").delete().eq("id", id);
+  const { data, error } = await supabase.from("hospital_applications").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ data });

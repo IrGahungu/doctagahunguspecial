@@ -1,18 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-type Insurance = {
-  id: string;
-  name: string;
-};
-
-type Location = {
-  name: string;
-  openingTime: string;
-  closingTime: string;
-  isOpen: boolean; // Admin sets open/closed
-};
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Pharmacy = {
   id: string;
@@ -20,11 +9,13 @@ type Pharmacy = {
   email: string;
   image?: string;
   country: string;
-  locations?: Location[];
-  accepted_insurances?: string[];
+  origin_country?: string;
   whatsapp_number: string;
   password?: string;
   payment_id?: string;
+  status?: string;
+  rejection_reason?: string;
+  agreement_image?: string;
 };
 
 type PharmacyForm = {
@@ -33,8 +24,7 @@ type PharmacyForm = {
   email: string;
   image: string;
   country: string;
-  locations: Location[];
-  accepted_insurances: string[];
+  originCountry: string;
   whatsapp_number: string;
   password?: string;
   agreementImage: string;
@@ -43,41 +33,26 @@ type PharmacyForm = {
 
 type FormErrors = Partial<Record<keyof Omit<PharmacyForm, 'id'> | 'confirmPassword', string>>;
 
-type PharmacyPageProps = {
-  editingPharmacy: Pharmacy | null;
-  allInsurances: Insurance[];
-};
-
 const supportedCountries = [
   "Burundi",
-  "Rwanda",
-  "Tanzania",
-  "Kenya",
-  "Sudan",
-  "Congo",
-  "Somalia",
+  //"Rwanda",
+  //"Tanzania",
+  //"Kenya",
+  //"Sudan",
+  //"Congo",
+  //"Somalia",
 ];
 
-const sampleInsurances: Insurance[] = [
-  { id: "1", name: "Radiant" },
-  { id: "2", name: "Britam" },
-  { id: "3", name: "UAP" },
-  { id: "4", name: "Sanlam" },
-  { id: "5", name: "Jubilee" },
-  { id: "6", name: "Saham" },
-];
-
-export default function PharmacyPage({
-  editingPharmacy,
-  allInsurances,
-}: PharmacyPageProps) {
+export default function PharmacyPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [editingPharmacy, setEditingPharmacy] = useState<Pharmacy | null>(null);
   const [pharmacyForm, setPharmacyForm] = useState<PharmacyForm>({
     name: "",
     email: "",
     image: "",
     country: "Burundi",
-    locations: [],
-    accepted_insurances: [],
+    originCountry: "",
     whatsapp_number: "",
     password: "",
     agreementImage: "",
@@ -90,10 +65,27 @@ export default function PharmacyPage({
   const [errors, setErrors] = useState<FormErrors>({});
   const [isUploadingAgreement, setIsUploadingAgreement] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [isInsuranceDropdownOpen, setIsInsuranceDropdownOpen] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const applicationStatus = editingPharmacy?.status;
+  const rejectionReason = editingPharmacy?.rejection_reason;
+
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) {
+      fetch(`/api/pharmacy/apply?id=${id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && !data.error) {
+            setEditingPharmacy(data);
+          }
+        })
+        .catch((err) => console.error("Failed to fetch application:", err));
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (editingPharmacy) {
       setPharmacyForm({
@@ -101,10 +93,9 @@ export default function PharmacyPage({
         email: editingPharmacy.email || "",
         image: editingPharmacy.image || "",
         country: editingPharmacy.country || "Burundi",
-        locations: editingPharmacy.locations || [],
-        accepted_insurances: editingPharmacy.accepted_insurances || [],
+        originCountry: editingPharmacy.origin_country || "",
         whatsapp_number: editingPharmacy.whatsapp_number || "",
-        agreementImage: (editingPharmacy as any).agreementImage || "", // Assuming it might exist
+        agreementImage: editingPharmacy.agreement_image || (editingPharmacy as any).agreementImage || "",
         password: "", // Don't populate password for edits
         payment_id: editingPharmacy.payment_id || "",
       });
@@ -114,8 +105,7 @@ export default function PharmacyPage({
         email: "",
         image: "",
         country: "Burundi",
-        locations: [],
-        accepted_insurances: [],
+        originCountry: "",
         whatsapp_number: "",
         password: "",
         agreementImage: "",
@@ -139,24 +129,6 @@ export default function PharmacyPage({
     }
   }
 
-  function handleInsuranceSelectionChange(insuranceName: string, isSelected: boolean) {
-    if (!insuranceName) return;
-    setPharmacyForm((prev) => {
-      const currentInsurances = prev.accepted_insurances || [];
-      if (isSelected) {
-        if (!currentInsurances.includes(insuranceName)) {
-          return { ...prev, accepted_insurances: [...currentInsurances, insuranceName] };
-        }
-      } else {
-        return {
-          ...prev,
-          accepted_insurances: currentInsurances.filter((name) => name !== insuranceName),
-        };
-      }
-      return prev;
-    });
-  }
-
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -174,7 +146,13 @@ export default function PharmacyPage({
         body: formData,
       });
 
-      const result = await res.json();
+      const text = await res.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+      }
 
       if (!res.ok) {
         throw new Error(result.error || "Upload failed");
@@ -208,7 +186,13 @@ export default function PharmacyPage({
 
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
+      const text = await res.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+      }
       if (!res.ok) throw new Error(result.error || "Upload failed");
 
       setPharmacyForm((prev) => ({ ...prev, agreementImage: result.publicUrl }));
@@ -236,9 +220,10 @@ export default function PharmacyPage({
     if (!pharmacyForm.name) newErrors.name = "Name is required";
     if (!pharmacyForm.email) newErrors.email = "Email is required";
     if (!pharmacyForm.whatsapp_number) newErrors.whatsapp_number = "WhatsApp number is required";
+    if (!pharmacyForm.originCountry) newErrors.originCountry = "Origin country is required";
     if (!pharmacyForm.payment_id) newErrors.payment_id = "Payment ID is required";
     if (!editingPharmacy && !pharmacyForm.password) newErrors.password = "Password is required";
-    if (!editingPharmacy && pharmacyForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
+    if (pharmacyForm.password && pharmacyForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!pharmacyForm.image) newErrors.image = "Pharmacy image is required";    if (!pharmacyForm.agreementImage) newErrors.agreementImage = "Agreement image is required";
 
     setErrors(newErrors);
@@ -257,9 +242,12 @@ export default function PharmacyPage({
     setIsSubmitting(true);
 
     try {
-      const url = "/api/pharmacies";
+      const url = "/api/pharmacy/apply";
       const method = editingPharmacy ? "PUT" : "POST";
       const body = editingPharmacy ? { ...pharmacyForm, id: editingPharmacy.id } : pharmacyForm;
+      
+      // If editing and password is empty, remove it so we don't overwrite with empty string
+      if (editingPharmacy && !body.password) delete (body as any).password;
 
       const res = await fetch(url, {
         method,
@@ -269,11 +257,17 @@ export default function PharmacyPage({
         ),
       });
 
-      const result = await res.json();
+      const text = await res.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+      }
       if (!res.ok) throw new Error(result.error || "Failed to save Pharmacy");
 
-      // On success, you might want to redirect the user.
-      // e.g., using Next.js's router: router.push('/pharmacies');
+      alert("Application is submitted successfully, Please login to see the status");
+      router.push("/login");
     } catch (err) {
       console.error(err);
       setFormError(err instanceof Error ? err.message : "Failed to save pharmacy");
@@ -290,6 +284,16 @@ export default function PharmacyPage({
             {editingPharmacy ? "Edit Pharmacy Details" : "Pharmacy Details"}
           </h1>
         </div>
+
+        {applicationStatus === 'rejected' && rejectionReason && (
+          <div className="my-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <h3 className="font-bold text-red-800">Your Application Needs Attention</h3>
+            <p className="text-sm text-red-700 mt-1">
+              <span className="font-semibold">Reason for rejection:</span> {rejectionReason}
+            </p>
+            <p className="text-sm text-red-700 mt-2">Please review your information, make the necessary changes, and resubmit your application.</p>
+          </div>
+        )}
 
         {/* FORM */}
         <form
@@ -322,123 +326,27 @@ export default function PharmacyPage({
             </div>
           </div>
 
-          <div>
-            <FieldLabel required>Country</FieldLabel>
-            <select name="country" value={pharmacyForm.country} onChange={handleChange} className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.country ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}>
-              {supportedCountries.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Locations */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <FieldLabel required>Locations</FieldLabel>
-              <button
-                type="button"
-                onClick={() => setPharmacyForm({ ...pharmacyForm, locations: [...pharmacyForm.locations, { name: "", openingTime: "09:00", closingTime: "17:00", isOpen: true }] })}
-                className="inline-flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                Add
-              </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <FieldLabel required>Country</FieldLabel>
+              <select name="country" value={pharmacyForm.country} onChange={handleChange} className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.country ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}>
+                {supportedCountries.map((country) => (
+                  <option key={country} value={country}>
+                    {country}
+                  </option>
+                ))}
+              </select>
             </div>
-            {pharmacyForm.locations.map((loc, index) => (
-              <div key={index} className="p-4 border rounded-lg space-y-3 mb-2">
-                {/* Location Name */}
-                <input
-                  type="text"
-                  placeholder="Location name"
-                  value={loc.name}
-                  onChange={(e) => {
-                    const newLocs = [...pharmacyForm.locations];
-                    newLocs[index].name = e.target.value;
-                    setPharmacyForm({ ...pharmacyForm, locations: newLocs });
-                  }}
-                  className="w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                />
-
-                {/* Opening / Closing Time + Open/Closed Toggle */}
-                <div className="flex flex-wrap gap-4 items-center">
-                  <div className="flex-1 min-w-[120px]"><FieldLabel>Opening Time</FieldLabel><input type="time" value={loc.openingTime} onChange={(e) => { const newLocs = [...pharmacyForm.locations]; newLocs[index].openingTime = e.target.value; setPharmacyForm({ ...pharmacyForm, locations: newLocs }); }} className="w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" /></div>
-                  <div className="flex-1 min-w-[120px]"><FieldLabel>Closing Time</FieldLabel><input type="time" value={loc.closingTime} onChange={(e) => { const newLocs = [...pharmacyForm.locations]; newLocs[index].closingTime = e.target.value; setPharmacyForm({ ...pharmacyForm, locations: newLocs }); }} className="w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition" /></div>
-                  <div className="flex items-center gap-2 pt-5"><input type="checkbox" checked={loc.isOpen} onChange={(e) => { const newLocs = [...pharmacyForm.locations]; newLocs[index].isOpen = e.target.checked; setPharmacyForm({ ...pharmacyForm, locations: newLocs }); }} className="h-5 w-5 rounded" /><span className={`px-2 py-1 text-xs font-medium rounded text-white ${loc.isOpen ? "bg-green-500" : "bg-red-500"}`}>{loc.isOpen ? "Open" : "Closed"}</span></div>
-                </div>
-
-                {/* Remove button */}
-                <button
-                  type="button"
-                  className="text-sm text-red-600 hover:underline"
-                  onClick={() => {
-                    setPharmacyForm({
-                      ...pharmacyForm,
-                      locations: pharmacyForm.locations.filter((_, i) => i !== index),
-                    });
-                  }}
-                >Remove Location</button>
-              </div>
-            ))}
-          </div>
-
-          {/* Insurances */}
-          <div>
-            <FieldLabel>Accepted Insurances</FieldLabel>
-            <div className="relative">
-              <button
-                type="button"
-                className="w-full flex items-center justify-between text-left rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ring-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                onClick={() => setIsInsuranceDropdownOpen(!isInsuranceDropdownOpen)}
-              >
-                <span>
-                  {pharmacyForm.accepted_insurances.length > 0
-                    ? `${pharmacyForm.accepted_insurances.length} selected`
-                    : "Select insurances"}
-                </span>
-                <svg
-                  className={`w-5 h-5 text-black transition-transform ${
-                    isInsuranceDropdownOpen ? "transform rotate-180" : ""
-                  }`}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-              {isInsuranceDropdownOpen && (
-                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {sampleInsurances.map((insurance) => (
-                    <div
-                      key={insurance.id}
-                      className="flex items-center p-2 hover:bg-slate-50 cursor-pointer"
-                      onClick={() => handleInsuranceSelectionChange(insurance.name, !pharmacyForm.accepted_insurances.includes(insurance.name))}
-                    >
-                      <input
-                        type="checkbox"
-                        id={`insurance-${insurance.id}`}
-                        checked={pharmacyForm.accepted_insurances.includes(insurance.name || "")}
-                        readOnly
-                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        disabled={!insurance.name}
-                      />
-                      <label
-                        htmlFor={`insurance-${insurance.id}`}
-                        className="ml-3 block text-sm text-gray-900"
-                      >
-                        {insurance.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div>
+              <FieldLabel required>Origin Country</FieldLabel>
+              <input
+                type="text"
+                name="originCountry"
+                placeholder="e.g., France"
+                value={pharmacyForm.originCountry}
+                onChange={handleChange}
+                className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.originCountry ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
+              />
             </div>
           </div>
 
@@ -455,7 +363,7 @@ export default function PharmacyPage({
             </div>
 
           <div>
-              <FieldLabel required>WhatsApp Number</FieldLabel>
+              <FieldLabel required> WhatsApp Number</FieldLabel>
               <input
                 type="text"
                 name="whatsapp_number"
@@ -466,56 +374,58 @@ export default function PharmacyPage({
               />
             </div>
 
+          {!editingPharmacy && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <FieldLabel required={!editingPharmacy}>Password</FieldLabel>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder="Create a password"
-                  value={pharmacyForm.password}
-                  onChange={handleChange}
-                  className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.password ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
-                  autoComplete="new-password"
-                />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
-                  {showPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                </button>
+              <div>
+                <FieldLabel required>Password</FieldLabel>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder="Create a password"
+                    value={pharmacyForm.password}
+                    onChange={handleChange}
+                    className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.password ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
+                    autoComplete="new-password"
+                  />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                    {showPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <FieldLabel required>Confirm Password</FieldLabel>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    name="confirmPassword"
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (errors.confirmPassword) {
+                        const newErrors = { ...errors };
+                        delete newErrors.confirmPassword;
+                        setErrors(newErrors);
+                      }
+                    }}
+                    className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.confirmPassword ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
+                  />
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                    {showConfirmPassword ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-            <div>
-              <FieldLabel required={!editingPharmacy}>Confirm Password</FieldLabel>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  name="confirmPassword"
-                  placeholder="Confirm your password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    if (errors.confirmPassword) {
-                      const newErrors = { ...errors };
-                      delete newErrors.confirmPassword;
-                      setErrors(newErrors);
-                    }
-                  }}
-                  className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.confirmPassword ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
-                />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
-                  {showConfirmPassword ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.243 4.243L6.228 6.228" /></svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.43 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.43 0l-4.43-4.43z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+          )}
 
           <div>
             <FieldLabel required>Pharmacy Image</FieldLabel>
