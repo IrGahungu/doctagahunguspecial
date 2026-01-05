@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Bold',
     fontSize: 16,
     color: '#212121',
-    alignItems: 'center',
+    textAlign: 'center',
   },
   placeholderImage: {
     backgroundColor: '#f0f0f0',

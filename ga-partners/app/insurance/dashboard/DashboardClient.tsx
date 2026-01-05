@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast, Toaster } from "react-hot-toast";
 
 type InsuranceApplication = {
   id: string;
@@ -47,6 +48,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingUpdates, setIsEditingUpdates] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({ totalViews: 0 });
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
       name: "",
@@ -98,7 +101,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const handleNavClick = (tab: string) => {
     if (app.status !== "approved" && tab !== "status") {
-      alert("You have to get approved first");
+      toast.error("You need to be approved first");
       return;
     }
     setActiveTab(tab);
@@ -106,6 +109,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   };
 
   useEffect(() => {
+    if (activeTab === "dashboard" && app.id) {
+      setIsDashboardLoading(true);
+      fetch(`/api/insurance/apply?id=${app.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setDashboardStats({ totalViews: data.views || 0 });
+        })
+        .catch((err) => console.error("Failed to load dashboard stats", err))
+        .finally(() => setIsDashboardLoading(false));
+    }
+
     if ((activeTab === "profile" || activeTab === "updates") && app.id) {
         setIsProfileLoading(true);
         fetch(`/api/insurance/apply?id=${app.id}`)
@@ -422,6 +436,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
       {/* Sidebar */}
       <div className="w-20 md:w-64 bg-white shadow-lg p-4 md:p-6 flex flex-col space-y-4 border-r border-gray-200 overflow-y-auto transition-all duration-300">
         <div className="mb-6 flex flex-col items-center justify-center">
@@ -516,6 +531,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-8">
+
+            {activeTab === "dashboard" && (
+              <div>
+                <h3 className="text-xl font-bold mb-6 text-gray-800">Dashboard Overview</h3>
+                {isDashboardLoading ? (
+                  <div className="text-center py-10">Loading stats...</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                      <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
+                      <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {activeTab === "status" && showStatus && (
               <div className="flex flex-col items-center">

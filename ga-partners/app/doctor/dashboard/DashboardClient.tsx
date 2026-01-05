@@ -79,12 +79,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
 
   const [availabilityForm, setAvailabilityForm] = useState({
-    location: [] as string[],
     availability: [] as Availability[],
     booking_type: "online",
     consultation_fee_online: "",
     consultation_fee_offline: "",
   });
+  const [Locations, setLocations] = useState<{ type: string; city: string; address: string; phone: string; latitude: string; longitude: string }[]>([]);
   const [isAvailabilityLoading, setIsAvailabilityLoading] = useState(false);
   const [isSavingAvailability, setIsSavingAvailability] = useState(false);
 
@@ -120,8 +120,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             return res.json();
           })
           .then((data) => {
+            let parsedLocations: any[] = [];
+            try {
+              if (data.location) {
+                parsedLocations = typeof data.location === "string" ? JSON.parse(data.location) : data.location;
+                // Handle legacy string array if necessary
+                if (Array.isArray(parsedLocations) && typeof parsedLocations[0] === 'string') {
+                   parsedLocations = parsedLocations.map(l => ({ type: "Main Location", city: "", address: l, phone: "", latitude: "", longitude: "" }));
+                }
+              }
+            } catch { parsedLocations = []; }
+            setLocations(parsedLocations);
             setAvailabilityForm({
-              location: data.location || [],
               availability: data.availability || [],
               booking_type: data.booking_type || "online",
               consultation_fee_online: data.consultation_fee_online || "",
@@ -323,21 +333,54 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   }, [activeTab, scannedBooking]);
 
   // Helper functions for the availability form
-  function handleAddLocation() {
-    setAvailabilityForm((prev) => ({ ...prev, location: [...prev.location, ""] }));
+  function addLocation() { setLocations([...Locations, { type: "Main Location", city: "", address: "", phone: "", latitude: "", longitude: "" }]); }
+  function removeLocation(index: number) { setLocations(Locations.filter((_, i) => i !== index)); }
+  function updateLocation(index: number, field: string, value: string) {
+    const list = [...Locations];
+    const updatedItem = { ...list[index] };
+    if (field === "city" || field === "address") {
+      (updatedItem as any)[field] = value.toUpperCase();
+    } else {
+      (updatedItem as any)[field] = value;
+    }
+    list[index] = updatedItem;
+    setLocations(list);
   }
 
-  function handleRemoveLocation(index: number) {
-    setAvailabilityForm((prev) => ({
-      ...prev,
-      location: prev.location.filter((_, i) => i !== index),
-    }));
+  function handleUseCurrentLocation(index: number) {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition((position) => {
+      const list = [...Locations];
+      list[index] = {
+        ...list[index],
+        latitude: position.coords.latitude.toFixed(6),
+        longitude: position.coords.longitude.toFixed(6)
+      };
+      setLocations(list);
+    }, (err) => alert("Could not retrieve location: " + err.message));
   }
 
-  function handleLocationChange(index: number, value: string) {
-    const updated = [...availabilityForm.location];
-    updated[index] = value;
-    setAvailabilityForm((prev) => ({ ...prev, location: updated }));
+  async function handlePasteCoordinates(index: number) {
+    try {
+      const text = await navigator.clipboard.readText();
+      const matches = text.match(/-?\d+(\.\d+)?/g);
+      if (matches && matches.length >= 2) {
+        const list = [...Locations];
+        list[index] = {
+          ...list[index],
+          latitude: matches[0],
+          longitude: matches[1]
+        };
+        setLocations(list);
+      } else {
+        alert("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+      }
+    } catch (err) {
+      alert("Failed to read clipboard.");
+    }
   }
 
   function handleAddAvailability() {
@@ -380,7 +423,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     try {
       const payload = {
         ...availabilityForm,
-        location: availabilityForm.location.filter((l) => l.trim() !== ""),
+        location: JSON.stringify(Locations),
         availability: availabilityForm.availability.map((a) => ({
           ...a,
           times: a.times.filter((t) => t.trim() !== ""),
@@ -1319,12 +1362,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6">
                         <div>
                           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Locations</h4>
-                          {availabilityForm.location.length > 0 ? (
-                            <ul className="list-disc list-inside text-gray-700 bg-white p-4 rounded border border-gray-200">
-                              {availabilityForm.location.map((loc, idx) => (
-                                <li key={idx}>{loc}</li>
+                          {Locations.length > 0 ? (
+                            <div className="space-y-3">
+                              {Locations.map((loc, i) => (
+                                <div key={i} className="text-sm text-gray-600 bg-white p-3 rounded border border-gray-100">
+                                  <p className="font-bold text-gray-800">{loc.type} - {loc.city}</p>
+                                  <p>{loc.address}</p>
+                                  {loc.phone && <p>📞 {loc.phone}</p>}
+                                </div>
                               ))}
-                            </ul>
+                            </div>
                           ) : (
                             <p className="text-gray-500 italic">No locations added.</p>
                           )}
@@ -1362,21 +1409,103 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     {/* Locations */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <label className="font-semibold text-gray-700">Locations</label>
-                        <button onClick={handleAddLocation} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Location</button>
+                        <label className="block font-semibold text-gray-700">Locations</label>
+                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Location</button>
                       </div>
-                      {availabilityForm.location.map((loc, idx) => (
-                        <div key={idx} className="flex gap-2 mb-2">
-                          <input
-                            type="text"
-                            value={loc}
-                            onChange={(e) => handleLocationChange(idx, e.target.value)}
-                            className="flex-1 border rounded px-3 py-2"
-                            placeholder="Enter location"
-                          />
-                          <button onClick={() => handleRemoveLocation(idx)} className="text-red-600 px-2 hover:bg-red-50 rounded">×</button>
-                        </div>
-                      ))}
+                      <div className="space-y-4">
+                        {Locations.map((loc, index) => (
+                          <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 relative">
+                            <button onClick={() => removeLocation(index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            </button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                              <select
+                                value={loc.type}
+                                onChange={(e) => updateLocation(index, "type", e.target.value)}
+                                className="border rounded px-3 py-2 text-sm"
+                              >
+                                <option value="Main Location">Main Location</option>
+                                <option value="Branch Location">Branch Location</option>
+                              </select>
+                              <input
+                                type="text"
+                                value={loc.city}
+                                onChange={(e) => updateLocation(index, "city", e.target.value)}
+                                className="border rounded px-3 py-2 text-sm"
+                                placeholder="City"
+                              />
+                            </div>
+                            <div className="mb-3">
+                              <input
+                                type="text"
+                                value={loc.address}
+                                onChange={(e) => updateLocation(index, "address", e.target.value)}
+                                className="w-full border rounded px-3 py-2 text-sm"
+                                placeholder="Address / Street"
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                              <input
+                                type="text"
+                                value={loc.latitude}
+                                onChange={(e) => updateLocation(index, "latitude", e.target.value)}
+                                className="border rounded px-3 py-2 text-sm"
+                                placeholder="Latitude (e.g. -3.38)"
+                              />
+                              <input
+                                type="text"
+                                value={loc.longitude}
+                                onChange={(e) => updateLocation(index, "longitude", e.target.value)}
+                                className="border rounded px-3 py-2 text-sm"
+                                placeholder="Longitude (e.g. 29.36)"
+                              />
+                              <input
+                                type="text"
+                                value={loc.phone}
+                                onChange={(e) => updateLocation(index, "phone", e.target.value)}
+                                className="border rounded px-3 py-2 text-sm"
+                                placeholder="Phone (Optional)"
+                              />
+                            </div>
+                            <div className="mt-2 flex justify-end gap-3 items-center">
+                              <button
+                                onClick={() => {
+                                  const query = `${loc.address} ${loc.city}`.trim();
+                                  if (!query) return alert("Please enter an address or city to search.");
+                                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+                                }}
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                              >
+                                Find on Map
+                              </button>
+                              <button
+                                onClick={() => handlePasteCoordinates(index)}
+                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium"
+                              >
+                                Paste Coordinates
+                              </button>
+                              <button
+                                onClick={() => handleUseCurrentLocation(index)}
+                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                Use Current Location
+                              </button>
+                            </div>
+                            {loc.latitude && loc.longitude && !isNaN(Number(loc.latitude)) && !isNaN(Number(loc.longitude)) && (
+                              <div className="mt-3 h-48 w-full rounded-lg overflow-hidden border border-gray-300 bg-gray-100">
+                                <iframe
+                                  width="100%"
+                                  height="100%"
+                                  style={{ border: 0 }}
+                                  loading="lazy"
+                                  src={`https://maps.google.com/maps?q=${loc.latitude},${loc.longitude}&z=15&output=embed`}
+                                ></iframe>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {Locations.length === 0 && <div className="text-sm text-gray-500 italic">No locations added.</div>}
+                      </div>
                     </div>
 
                     {/* Availability */}

@@ -14,6 +14,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Linking,
+  Dimensions,
 } from 'react-native';
 import { Alert, TextInput } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
@@ -26,6 +28,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import MapView, { Marker } from 'react-native-maps';
 
 const currencyMap: { [country: string]: string } = {
   Burundi: 'FBU',
@@ -54,7 +57,7 @@ type Doctor = {
   name: string | null;
   image: string | null;
   specialty: string | null;
-  location: string[] | null;
+  location: any[] | null;
   bio: string | null;
   booking_type: "online" | "in-office" | "both" | null;
   availability: Availability[] | null;
@@ -86,6 +89,7 @@ export default function DoctorDetailScreen() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const checkmarkScale = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -283,6 +287,7 @@ export default function DoctorDetailScreen() {
 
       // Success!
       setShowDetails(true);
+      setShowConfetti(true);
       console.log("Payment successful! Unlocking details.");
       showToast("Payment successful!");
       handleModalClose();
@@ -573,7 +578,59 @@ export default function DoctorDetailScreen() {
                   <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
                   {doctor.location && doctor.location.length > 0 ? (
                     doctor.location.map((loc, index) => (
-                      <Text key={index} style={styles.doctorLocation}>• {loc}</Text>
+                      <View key={index} style={{ marginBottom: 6 }}>
+                        {typeof loc === 'string' ? (
+                          <Text style={styles.doctorLocation}>• {loc}</Text>
+                        ) : (
+                          <View style={styles.locationCard}>
+                            {loc.latitude && loc.longitude && !isNaN(Number(loc.latitude)) && !isNaN(Number(loc.longitude)) && (
+                              <View style={styles.mapContainer}>
+                                <MapView
+                                  style={styles.map}
+                                  initialRegion={{
+                                    latitude: Number(loc.latitude),
+                                    longitude: Number(loc.longitude),
+                                    latitudeDelta: 0.01,
+                                    longitudeDelta: 0.01,
+                                  }}
+                                >
+                                  <Marker
+                                    coordinate={{ latitude: Number(loc.latitude), longitude: Number(loc.longitude) }}
+                                    title={loc.type || 'Location'}
+                                    description={loc.address}
+                                  />
+                                </MapView>
+                              </View>
+                            )}
+                            <Text style={styles.locationType}>{loc.type || 'Location'} {loc.city ? `- ${loc.city}` : ''}</Text>
+                            <Text style={styles.locationAddress}>{loc.address}</Text>
+                            {loc.phone ? <Text style={styles.locationPhone}>📞 {loc.phone}</Text> : null}
+                            {loc.latitude && loc.longitude && !isNaN(Number(loc.latitude)) && !isNaN(Number(loc.longitude)) && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  Alert.alert(
+                                    "Leave App",
+                                    "You are about to leave the app to open Google Maps. Do you want to continue?",
+                                    [
+                                      { text: "No", style: "cancel" },
+                                      { text: "Yes", onPress: () => {
+                                        const url = Platform.select({
+                                          ios: `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
+                                          android: `geo:${loc.latitude},${loc.longitude}?q=${loc.latitude},${loc.longitude}`
+                                        });
+                                        if (url) Linking.openURL(url);
+                                      }}
+                                    ]
+                                  );
+                                }}
+                                style={{ marginTop: 5 }}
+                              >
+                                <Text style={{ color: '#1E88E5', textDecorationLine: 'underline', fontSize: 13, fontFamily: 'Roboto-Medium' }}>Open in Google Maps</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        )}
+                      </View>
                     ))
                   ) : (
                     <Text style={styles.doctorLocation}>No locations specified.</Text>
@@ -810,6 +867,14 @@ export default function DoctorDetailScreen() {
            </View>
          </TouchableWithoutFeedback>
        </Modal>
+       {showConfetti && (
+        <ConfettiCannon
+          count={200}
+          origin={{ x: Dimensions.get('window').width / 2, y: 0 }}
+          onAnimationEnd={() => setShowConfetti(false)}
+        />
+      )}
+      <Toast />
     </View>
   );
 }
@@ -1107,5 +1172,41 @@ backButton: {
     fontSize: 18,
     fontFamily: 'Roboto-Bold',
     color: '#fff',
+  },
+  locationCard: {
+    backgroundColor: '#f9f9f9',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  locationType: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+  },
+  locationAddress: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#555',
+  },
+  locationPhone: {
+    fontSize: 13,
+    fontFamily: 'Roboto-Regular',
+    color: '#388E3C',
+    marginTop: 2,
+  },
+  mapContainer: {
+    height: 150,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  map: {
+    width: '100%',
+    height: '100%',
   },
 });

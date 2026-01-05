@@ -47,6 +47,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingUpdates, setIsEditingUpdates] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({ totalViews: 0 });
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
     name: "",
@@ -107,6 +109,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   };
 
   useEffect(() => {
+    if (activeTab === "dashboard" && app.id) {
+      setIsDashboardLoading(true);
+      fetch(`/api/hospital/apply?id=${app.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setDashboardStats({ totalViews: data.views || 0 });
+        })
+        .catch((err) => console.error("Failed to load dashboard stats", err))
+        .finally(() => setIsDashboardLoading(false));
+    }
+
     if ((activeTab === "profile" || activeTab === "updates") && app.id) {
       setIsProfileLoading(true);
       fetch(`/api/hospital/apply?id=${app.id}`)
@@ -321,11 +334,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   function removeLocation(index: number) { setLocations(Locations.filter((_, i) => i !== index)); }
   function updateLocation(index: number, field: string, value: string) {
     const list = [...Locations];
+    const updatedItem = { ...list[index] };
     if (field === "city" || field === "address") {
-      (list[index] as any)[field] = value.toUpperCase();
+      (updatedItem as any)[field] = value.toUpperCase();
     } else {
-      (list[index] as any)[field] = value;
+      (updatedItem as any)[field] = value;
     }
+    list[index] = updatedItem;
     setLocations(list);
   }
 
@@ -336,8 +351,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
     navigator.geolocation.getCurrentPosition((position) => {
       const list = [...Locations];
-      list[index].latitude = position.coords.latitude.toFixed(6);
-      list[index].longitude = position.coords.longitude.toFixed(6);
+      list[index] = {
+        ...list[index],
+        latitude: position.coords.latitude.toFixed(6),
+        longitude: position.coords.longitude.toFixed(6)
+      };
       setLocations(list);
     }, (err) => alert("Could not retrieve location: " + err.message));
   }
@@ -348,8 +366,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       const matches = text.match(/-?\d+(\.\d+)?/g);
       if (matches && matches.length >= 2) {
         const list = [...Locations];
-        list[index].latitude = matches[0];
-        list[index].longitude = matches[1];
+        list[index] = {
+          ...list[index],
+          latitude: matches[0],
+          longitude: matches[1]
+        };
         setLocations(list);
       } else {
         alert("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
@@ -388,7 +409,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
     const insurancesJson = JSON.stringify(insurancesList);
     const pharmaciesJson = JSON.stringify(pharmaciesList);
-    const locationsJson = Locations;
+    const locationsJson = JSON.stringify(Locations);
     const servicesJson = JSON.stringify(availableServices);
     const bloodTypesJson = JSON.stringify(availableBloodTypes);
     const equipmentJson = JSON.stringify(medicalEquipment);
@@ -538,6 +559,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-8">
+
+            {activeTab === "dashboard" && (
+              <div>
+                <h3 className="text-xl font-bold mb-6 text-gray-800">Dashboard Overview</h3>
+                {isDashboardLoading ? (
+                  <div className="text-center py-10">Loading stats...</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                      <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
+                      <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {activeTab === "status" && showStatus && (
               <div className="flex flex-col items-center">

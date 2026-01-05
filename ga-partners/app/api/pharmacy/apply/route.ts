@@ -100,7 +100,9 @@ export async function PUT(req: Request) {
       agreementImage,
       payment_id,
       country,
+      location,
       originCountry,
+      opening_hours,
     } = body;
 
     if (!id) {
@@ -112,29 +114,28 @@ export async function PUT(req: Request) {
       email,
       whatsapp_number,
       payment_id,
+      location,
       image,
       agreement_image: agreementImage,
       country,
       origin_country: originCountry,
-      status: "pending",
-      rejection_reason: null,
+      opening_hours,
     };
 
     if (password) {
       const hash = await bcrypt.hash(password, 10);
-      updates.password = hash;
 
-      const { error: userErr } = await supabaseAdmin
+      await supabaseAdmin
         .from("pharmacy_users")
         .update({ email, password_hash: hash })
         .eq("id", id);
-      if (userErr) throw userErr;
+
+      updates.password = hash;
     } else {
-      const { error: userErr } = await supabaseAdmin
+      await supabaseAdmin
         .from("pharmacy_users")
         .update({ email })
         .eq("id", id);
-      if (userErr) throw userErr;
     }
 
     const { error } = await supabaseAdmin
@@ -144,7 +145,7 @@ export async function PUT(req: Request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ ok: true, message: "Application updated" });
+    return NextResponse.json({ ok: true, message: "Profile updated successfully" });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });

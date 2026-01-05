@@ -10,8 +10,10 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
-   Animated,
-   Linking,
+  Animated,
+  Linking,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
@@ -23,6 +25,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
 import MapView, { Marker } from 'react-native-maps';
 import { API_BASE_URL } from '@/config';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 type Hospital = {
   id: string;
@@ -77,6 +80,7 @@ export default function HospitalDetailScreen() {
   const VIEW_FEE = 500;
   const [pinCode, setPinCode] = useState('');
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
     if (!showDetails) {
@@ -98,6 +102,14 @@ export default function HospitalDetailScreen() {
       return () => pulse.stop();
     }
   }, [showDetails]);
+
+  useEffect(() => {
+    if (id) {
+      supabase.rpc('increment_hospital_views', { row_id: id }).then(({ error }) => {
+        if (error) console.error('Error incrementing views:', error);
+      });
+    }
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -227,6 +239,7 @@ export default function HospitalDetailScreen() {
 
       // Success!
       setShowDetails(true);
+      setShowConfetti(true);
       console.log("Payment successful! Unlocking details.");
       showToast("Payment successful!");
       handleModalClose();
@@ -303,7 +316,9 @@ export default function HospitalDetailScreen() {
 
     try {
       if (hospital.locations) {
-        parsedLocations = JSON.parse(hospital.locations);
+        parsedLocations = typeof hospital.locations === 'string' 
+          ? JSON.parse(hospital.locations) 
+          : hospital.locations;
       }
     } catch (e) { parsedLocations = []; }
 
@@ -472,6 +487,29 @@ export default function HospitalDetailScreen() {
                           <Text style={styles.locationType}>{loc.type} - {loc.city}</Text>
                           <Text style={styles.locationAddress}>{loc.address}</Text>
                           {loc.phone ? <Text style={styles.locationPhone}>📞 {loc.phone}</Text> : null}
+                          {loc.latitude && loc.longitude && !isNaN(parseFloat(loc.latitude)) && !isNaN(parseFloat(loc.longitude)) && (
+                            <TouchableOpacity
+                              onPress={() => {
+                                Alert.alert(
+                                  "Leave App",
+                                  "You are about to leave the app to open Google Maps. Do you want to continue?",
+                                  [
+                                    { text: "No", style: "cancel" },
+                                    { text: "Yes", onPress: () => {
+                                      const url = Platform.select({
+                                        ios: `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
+                                        android: `geo:${loc.latitude},${loc.longitude}?q=${loc.latitude},${loc.longitude}`
+                                      });
+                                      if (url) Linking.openURL(url);
+                                    }}
+                                  ]
+                                );
+                              }}
+                              style={{ marginTop: 5 }}
+                            >
+                              <Text style={{ color: '#1E88E5', textDecorationLine: 'underline', fontSize: 13, fontFamily: 'Roboto-Medium' }}>Open in Google Maps</Text>
+                            </TouchableOpacity>
+                          )}
                         </View>
                       ))}
                     </View>
@@ -594,6 +632,13 @@ export default function HospitalDetailScreen() {
           </View>
         </View>
       </Modal>
+      {showConfetti && (
+        <ConfettiCannon
+          count={200}
+          origin={{ x: Dimensions.get('window').width / 2, y: 0 }}
+          onAnimationEnd={() => setShowConfetti(false)}
+        />
+      )}
       <Toast />
     </View>
   );
