@@ -7,6 +7,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +17,7 @@ import { useCartStore } from '@/stores/cartStore';
 import Toast from 'react-native-toast-message';
 import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -27,17 +30,12 @@ export default function CheckoutScreen() {
   }>();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isPinModalVisible, setIsPinModalVisible] = useState(false);
+  const [pin, setPin] = useState('');
+  const [showConfetti, setShowConfetti] = useState(false);
 
-  const handleConfirmPayment = async () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Processing...',
-      text2: 'Dr.Gahungu ariko arabikora',
-    });
-
-    // The rest of the payment logic is disabled for now.
-    // To re-enable, uncomment the block below.
-    /*
+  const handleInitiatePayment = async () => {
+   
         if (!total || !subtotal || !serviceFee) {
           Toast.show({
             type: 'error',
@@ -90,7 +88,7 @@ export default function CheckoutScreen() {
           }
     
           const balance = Number(walletData.wallet_balance);
-          const orderTotal = parseFloat(total);
+          const orderTotal = parseFloat(Array.isArray(total) ? total[0] : total);
     
           if (balance < orderTotal) {
             Toast.show({
@@ -101,20 +99,61 @@ export default function CheckoutScreen() {
             return;
           }
     
-          // 2️⃣ Create order (backend will handle wallet deduction)
+          // If balance is sufficient, show PIN modal
+          setPin('');
+          setIsPinModalVisible(true);
+        } catch (error) {
+          console.error('Payment initiation error:', error);
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: 'Failed to verify wallet balance.',
+          });
+        } finally {
+          setIsLoading(false);
+        }
+  };
+
+  const handleVerifyAndPay = async () => {
+    const orderTotal = parseFloat(Array.isArray(total) ? total[0] : total);
+    if (!pin || pin.length !== 4) {
+      Alert.alert('Invalid PIN', 'Please enter a 4-digit PIN.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      
+      // 1️⃣ Verify PIN
+      const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ pin_code: pin }),
+      });
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok || !verifyData.success) {
+        Alert.alert('Incorrect PIN', 'The PIN you entered is incorrect.');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2️⃣ Create order
           const orderDetails = {
             items: items.map((item) => ({
-              medicine_id: item.product.id,
+              stock_id: (item.product as any).stock_id || item.product.id,
               quantity: item.quantity,
-              price: item.product.price,
+              price: Number(item.product.price),
             })),
-            subtotal: parseFloat(subtotal),
-            service_fee: parseFloat(serviceFee),
+            subtotal: parseFloat(Array.isArray(subtotal) ? subtotal[0] : subtotal),
+            service_fee: parseFloat(Array.isArray(serviceFee) ? serviceFee[0] : serviceFee),
             total_amount: orderTotal,
             payment_method: 'wallet',
           };
     
-    
+          console.log('Sending order payload:', JSON.stringify(orderDetails, null, 2));
+
           const orderRes = await fetch(`${API_BASE_URL}/orders`, {
             method: 'POST',
             headers: {
@@ -150,6 +189,8 @@ export default function CheckoutScreen() {
           }
     
           clearCart();
+          setIsPinModalVisible(false);
+          setShowConfetti(true);
     
           Toast.show({
             type: 'success',
@@ -157,7 +198,7 @@ export default function CheckoutScreen() {
             text2: `Your order #${orderData.order_id} has been placed!`,
           });
     
-          setTimeout(() => router.replace('/orders'), 1500);
+          setTimeout(() => router.replace('/orders'), 3000);
         } catch (error) {
           console.error('Payment confirmation error:', error);
           Toast.show({
@@ -168,7 +209,6 @@ export default function CheckoutScreen() {
         } finally {
           setIsLoading(false);
         }
-    */
   };
 
   return (
@@ -179,6 +219,8 @@ export default function CheckoutScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Confirm Payment</Text>
       </View>
+
+      {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />}
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.summaryCard}>
@@ -204,7 +246,7 @@ export default function CheckoutScreen() {
 
         <TouchableOpacity
           style={[styles.confirmButton, isLoading && styles.disabledButton]}
-          onPress={handleConfirmPayment}
+          onPress={handleInitiatePayment}
           disabled={isLoading}
         >
           {isLoading ? (
@@ -214,6 +256,53 @@ export default function CheckoutScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={isPinModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsPinModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter Wallet PIN</Text>
+            <Text style={styles.modalSubtitle}>Please enter your 4-digit PIN to confirm payment.</Text>
+            
+            <TextInput
+              style={styles.pinInput}
+              value={pin}
+              onChangeText={setPin}
+              keyboardType="numeric"
+              maxLength={4}
+              secureTextEntry
+              placeholder="****"
+              placeholderTextColor="#ccc"
+              autoFocus
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setIsPinModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.verifyButton]} 
+                onPress={handleVerifyAndPay}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.verifyButtonText}>Verify & Pay</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -237,4 +326,15 @@ const styles = StyleSheet.create({
   confirmButton: { backgroundColor: '#4CAF50', paddingVertical: 16, borderRadius: 15, alignItems: 'center' },
   disabledButton: { backgroundColor: '#A5D6A7' },
   confirmButtonText: { color: '#fff', fontSize: 18, fontFamily: 'Roboto-Bold' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '85%', alignItems: 'center', elevation: 5 },
+  modalTitle: { fontSize: 20, fontFamily: 'Roboto-Bold', marginBottom: 8 },
+  modalSubtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
+  pinInput: { width: '100%', height: 50, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 16, fontSize: 24, textAlign: 'center', letterSpacing: 10, marginBottom: 24, fontFamily: 'Roboto-Bold' },
+  modalButtons: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
+  modalButton: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  cancelButton: { backgroundColor: '#f5f5f5', marginRight: 12 },
+  verifyButton: { backgroundColor: '#4CAF50', marginLeft: 12 },
+  cancelButtonText: { color: '#333', fontFamily: 'Roboto-Medium', fontSize: 16 },
+  verifyButtonText: { color: '#fff', fontFamily: 'Roboto-Medium', fontSize: 16 },
 });

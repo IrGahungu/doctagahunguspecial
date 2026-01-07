@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model banners {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  image      String
+  link       String?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  country    String?   @default("Burundi")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model bookings {
+  id                  String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  created_at          DateTime             @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  user_id             String?              @db.Uuid
+  doctor_id           String?              @db.Uuid
+  doctor_name         String?
+  date                String
+  time                String
+  type                String
+  amount              Decimal?             @db.Decimal
+  status              String?              @default("confirmed")
+  ticket_number       String?
+  payment_status      String?
+  doctor_applications doctor_applications? @relation(fields: [doctor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users               users?               @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model categories {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  image      String?
+  created_at DateTime    @default(now()) @db.Timestamp(6)
+  country    String?     @default("Burundi")
+  medicines  medicines[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model deals {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title      String
+  discount   String?
+  image      String
+  tagline    String?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  country    String?   @default("Burundi")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model doctor_applications {
+  id                       String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  created_at               DateTime      @default(dbgenerated("timezone('utc'::text, now())")) @db.Timestamptz(6)
+  name                     String?
+  email                    String?       @unique
+  specialty                String?
+  bio                      String?
+  booking_type             String?
+  availability             Json?
+  image                    String?
+  agreement_image          String?
+  country                  String?
+  whatsapp_number          String?
+  password                 String?
+  payment_id               String?
+  consultation_fee_online  String?
+  consultation_fee_offline String?
+  status                   String?
+  applicant_id             String?       @db.Uuid
+  origin_country           String?
+  id_image                 String?
+  medical_degree_image     String?
+  medical_licence_image    String?
+  proof_of_practice_image  String?
+  rejection_reason         String?
+  rejected_at              DateTime?     @db.Timestamptz(6)
+  updated_at               DateTime?     @default(now()) @db.Timestamptz(6)
+  views                    Int?          @default(0)
+  location                 Json?
+  bookings                 bookings[]
+  doctor_users             doctor_users? @relation(fields: [email], references: [email], onDelete: Cascade, onUpdate: NoAction, map: "fk_doctor_applications_user_email")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model doctor_users {
+  id                       String               @id
+  email                    String               @unique
+  password_hash            String
+  created_at               DateTime?            @default(now()) @db.Timestamptz(6)
+  name                     String?
+  whatsapp_number          String?
+  status                   String?
+  specialty                String?
+  location                 String?
+  bio                      String?
+  booking_type             booking_type_enum?
+  availability             String?
+  country                  String?
+  origin_country           String?
+  payment_id               String?
+  consultation_fee_online  String?
+  consultation_fee_offline String?
+  image                    String?
+  agreement_image          String?
+  id_image                 String?
+  medical_degree_image     String?
+  medical_licence_image    String?
+  proof_of_practice_image  String?
+  doctor_applications      doctor_applications?
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model doctors {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  specialty    String?
+  location     String?
+  bio          String?
+  booking_type String?   @default("online")
+  availability Json      @default("[]")
+  image        String?
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @db.Timestamptz(6)
+  country      String?   @default("Burundi")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model hospital_applications {
+  id                    String         @id @db.Uuid
+  name                  String?
+  email                 String?
+  password              String?
+  whatsapp_number       String?
+  payment_id            String?
+  image                 String?
+  agreement_image       String?
+  status                String?        @default("pending")
+  country               String?
+  origin_country        String?
+  rejection_reason      String?
+  created_at            DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?      @default(now()) @db.Timestamptz(6)
+  contact_details       String?
+  service_summary       String?
+  admission_process     String?
+  partner_insurances    String?
+  partner_pharmacies    String?
+  available_services    String?        @default("[]")
+  available_blood_types String?        @default("[]")
+  medical_equipment     String?        @default("[]")
+  locations             Json?
+  views                 Int?           @default(0)
+  hospital_users        hospital_users @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "insurance_applications_user_fk")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model hospital_users {
+  id                    String                 @id @db.Uuid
+  email                 String                 @unique
+  password_hash         String
+  created_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  hospital_applications hospital_applications?
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model hospitals {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String
+  image       String?
+  location    String?
+  specialties Json?
+  insurances  Json?
+  blood_types Json?
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  country     String?   @default("Burundi")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model insurance_applications {
+  id                 String          @id @db.Uuid
+  name               String?
+  email              String?
+  password           String?
+  whatsapp_number    String?
+  location           String?
+  payment_id         String?
+  image              String?
+  agreement_image    String?
+  status             String?         @default("pending")
+  country            String?
+  origin_country     String?
+  rejection_reason   String?
+  created_at         DateTime?       @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?       @default(now()) @db.Timestamptz(6)
+  insurance_plans    String?
+  coverage_summary   String?
+  claim_process      String?
+  partner_hospitals  String?
+  contact_details    String?
+  partner_pharmacies String?
+  office_locations   String?
+  views              Int?            @default(0)
+  insurance_users    insurance_users @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model insurance_users {
+  id                     String                  @id @db.Uuid
+  email                  String                  @unique
+  password_hash          String
+  created_at             DateTime?               @default(now()) @db.Timestamptz(6)
+  insurance_applications insurance_applications?
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model insurances {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  image      String?
+  locations  Json?     @default("[]")
+  created_by String?   @db.Uuid
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+  country    String?   @default("Burundi")
+  users      users?    @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model medicine_pharmacies {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  medicine_id String     @db.Uuid
+  pharmacy_id String     @db.Uuid
+  insurances  String[]   @default([])
+  locations   Json?      @default("[]")
+  created_at  DateTime?  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?  @default(now()) @db.Timestamp(6)
+  medicines   medicines  @relation(fields: [medicine_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  pharmacies  pharmacies @relation(fields: [pharmacy_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([medicine_id, pharmacy_id], map: "idx_medicine_pharmacy_unique")
+  @@index([medicine_id], map: "idx_medicine_pharmacies_medicine_id")
+  @@index([pharmacy_id], map: "idx_medicine_pharmacies_pharmacy_id")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model medicines {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                String?
+  title               String
+  description         String?
+  price               Decimal               @db.Decimal
+  original_price      Decimal?              @db.Decimal
+  image               String?
+  category_id         String?               @db.Uuid
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  country             String?               @default("Burundi")
+  updated_at          DateTime?             @default(now()) @db.Timestamp(6)
+  medicine_pharmacies medicine_pharmacies[]
+  categories          categories?           @relation(fields: [category_id], references: [id], onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model order_items {
+  id         Int       @id @default(autoincrement())
+  order_id   Int?
+  quantity   Int
+  price      Decimal   @db.Decimal(12, 2)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  stock_id   String?   @db.Uuid
+  stock      stock?    @relation(fields: [stock_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_order_items_stock")
+  orders     orders?   @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model orders {
+  id             Int           @id @default(autoincrement())
+  user_id        String?       @db.Uuid
+  subtotal       Decimal       @db.Decimal(12, 2)
+  service_fee    Decimal       @db.Decimal(12, 2)
+  total_amount   Decimal       @db.Decimal(12, 2)
+  payment_method String        @db.VarChar(50)
+  status         String?       @default("Pending") @db.VarChar(20)
+  created_at     DateTime?     @default(now()) @db.Timestamp(6)
+  country        String?       @default("Burundi")
+  order_items    order_items[]
+  users          users?        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pharmacies {
+  id                  String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                String
+  image               String?
+  locations           Json?                 @default("[]")
+  accepted_insurances String[]              @default([])
+  created_at          DateTime?             @default(now()) @db.Timestamp(6)
+  country             String?               @default("Burundi")
+  medicine_pharmacies medicine_pharmacies[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pharmacy_applications {
+  id                  String         @id @db.Uuid
+  name                String?
+  email               String
+  password            String
+  whatsapp_number     String?
+  location            String?
+  payment_id          String?
+  image               String?
+  agreement_image     String?
+  status              String?        @default("pending")
+  country             String?
+  origin_country      String?
+  created_at          DateTime?      @default(now()) @db.Timestamptz(6)
+  rejection_reason    String?
+  opening_hours       String?
+  contact_email       String?
+  contact_phone       String?
+  contact_office      String?
+  contact_website     String?
+  accepted_insurances String?
+  pharmacy_users      pharmacy_users @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "pharmacy_applications_user_fk")
+  stock               stock[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model pharmacy_users {
+  id                    String                 @id @db.Uuid
+  email                 String                 @unique
+  password_hash         String
+  created_at            DateTime?              @default(now()) @db.Timestamptz(6)
+  pharmacy_applications pharmacy_applications?
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model stock {
+  id                    String                @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  pharmacy_id           String                @db.Uuid
+  name                  String
+  description           String?
+  category              String
+  price                 Decimal               @db.Decimal(10, 2)
+  original_price        Decimal?              @db.Decimal(10, 2)
+  quantity              Int                   @default(0)
+  in_stock              Boolean               @default(true)
+  image                 String?
+  created_at            DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime              @default(now()) @db.Timestamptz(6)
+  insurances            String?
+  order_items           order_items[]
+  pharmacy_applications pharmacy_applications @relation(fields: [pharmacy_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model users {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullname        String
+  password_hash   String
+  whatsapp_number String       @unique
+  country         String?
+  gender          String?      @default("male")
+  role            String?      @default("user")
+  created_at      DateTime?    @default(now()) @db.Timestamptz(6)
+  secret_question String?
+  secret_answer   String?
+  is_verified     Boolean?     @default(false)
+  wallet_balance  Decimal?     @default(1000000) @db.Decimal
+  pin_code        String?      @default("1616")
+  bookings        bookings[]
+  insurances      insurances[]
+  orders          orders[]
+}
+
+enum booking_type_enum {
+  online
+  offline
+  both
+}

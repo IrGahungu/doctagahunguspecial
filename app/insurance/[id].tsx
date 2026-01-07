@@ -357,7 +357,7 @@ export default function InsuranceDetailScreen() {
                     <Icon name="visibility" size={40} color="#4CAF50" />
                   </Animated.View>
                   <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
-                    Click here to pay and view the doctor's details
+                    Click here to pay and view the insurance's details
                   </Text>
                 </TouchableOpacity>
               )}

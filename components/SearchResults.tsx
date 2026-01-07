@@ -79,7 +79,9 @@ interface Pharmacy {
   id: string;
   name: string;
   image?: string | number;
-  location: string;
+  location?: string;
+  price?: number;
+  stockId?: string;
   priceRange?: { min: number; max: number };
   insurances?: string[];
 }
@@ -104,6 +106,7 @@ type SearchResultsProps = {
 const { width } = Dimensions.get('window');
 
 const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProps) => {
+  console.log('SearchResults received results:', JSON.stringify(results, null, 2));
   const router = useRouter(); // Using Expo Router instead of React Navigation
   const [country, setCountry] = React.useState<string | null>(null);
 
@@ -114,15 +117,6 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
     Keyboard.dismiss();
     switch (item.type) {
       case 'medicine':
-        // Get all unique insurances from all pharmacies
-        const allInsurances = Array.from(
-          new Set(
-            (item.pharmacies || [])
-              .flatMap(pharmacy => pharmacy.insurances || [])
-              .filter(Boolean)
-          )
-        );
-
         router.push({
           pathname: '/product/[id]',
           params: {
@@ -172,12 +166,14 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
     }
   };
 
+  const safeResults = results || {};
+
   const allResults = [
-    ...results.medicines.map(item => ({ ...item, type: 'medicine' as const })),
-    ...results.pharmacies.map(item => ({ ...item, type: 'pharmacy' as const })),
-    ...results.hospitals.map(item => ({ ...item, type: 'hospital' as const })),
-    ...results.doctors.map(item => ({ ...item, type: 'doctor' as const })),
-    ...(results.insurances || []).map(item => ({ ...item, type: 'insurance' as const })),
+    ...(safeResults.medicines || (safeResults as any).medicine || []).map((item: any) => ({ ...item, type: 'medicine' as const })),
+    ...(safeResults.pharmacies || (safeResults as any).pharmacy || []).map((item: any) => ({ ...item, type: 'pharmacy' as const })),
+    ...(safeResults.hospitals || (safeResults as any).hospital || []).map((item: any) => ({ ...item, type: 'hospital' as const })),
+    ...(safeResults.doctors || (safeResults as any).doctor || []).map((item: any) => ({ ...item, type: 'doctor' as const })),
+    ...(safeResults.insurances || (safeResults as any).insurance || []).map((item: any) => ({ ...item, type: 'insurance' as const })),
   ];
 
   if (isLoading) {
@@ -198,44 +194,51 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
       </View>
     );
   }
-  const renderItem = ({ item }: { item: SearchResultItem }) => (
-    <TouchableOpacity
-      style={styles.item}
-      onPress={() => handleItemPress(item)}
-      activeOpacity={0.7}
-    >
-      {item.image ? (
-        typeof item.image === 'string' ? (
-          <Image source={{ uri: item.image }} style={styles.itemImage} />
+  const renderItem = ({ item }: { item: SearchResultItem }) => {
+    return (
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => handleItemPress(item)}
+        activeOpacity={0.7}
+      >
+        {item.image ? (
+          typeof item.image === 'string' ? (
+            <Image source={{ uri: item.image }} style={styles.itemImage} />
+          ) : (
+            <Image source={item.image} style={styles.itemImage} />
+          )
         ) : (
-          <Image source={item.image} style={styles.itemImage} />
-        )
-      ) : (
-        <View style={[styles.itemImage, styles.itemImagePlaceholder]}>
-          <Icon name={
-            item.type === 'medicine' ? 'medication' :
-              item.type === 'pharmacy' ? 'local-pharmacy' :
-                item.type === 'hospital' ? 'local-hospital' : 'person'
-                
-          } size={24} color="#555" />
+          <View style={[styles.itemImage, styles.itemImagePlaceholder]}>
+            <Icon name={
+              item.type === 'medicine' ? 'medication' :
+                item.type === 'pharmacy' ? 'local-pharmacy' :
+                  item.type === 'hospital' ? 'local-hospital' : 'person'
+                  
+            } size={24} color="#555" />
+          </View>
+        )}
+        <View style={styles.itemContent}>
+          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+          {item.type === 'medicine' && item.price && (
+            <Text style={styles.itemPrice}>{getCurrency(country)} {item.price.toFixed(2)}</Text>
+          )}
+          {item.type === 'medicine' && item.pharmacies && (
+            <Text style={styles.itemSubtext}>
+              Available in {item.pharmacies.length} pharmac{item.pharmacies.length !== 1 ? 'ies' : 'y'}
+            </Text>
+          )}
+          {item.type === 'doctor' && item.speciality && (
+            <Text style={styles.itemSpeciality}>{item.speciality}</Text>
+          )}
+          {item.address && item.type !== 'hospital' && item.type !== 'doctor' && (
+            <Text style={styles.itemAddress} numberOfLines={1}>
+              <Icon name="location-on" size={12} color="#888" /> {item.address}
+            </Text>
+          )}
         </View>
-      )}
-      <View style={styles.itemContent}>
-        <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-        {item.type === 'medicine' && item.price && (
-          <Text style={styles.itemPrice}>{getCurrency(country)} {item.price.toFixed(2)}</Text>
-        )}
-        {item.type === 'doctor' && item.speciality && (
-          <Text style={styles.itemSpeciality}>{item.speciality}</Text>
-        )}
-        {item.address && item.type !== 'hospital' && item.type !== 'doctor' && (
-          <Text style={styles.itemAddress} numberOfLines={1}>
-            <Icon name="location-on" size={12} color="#888" /> {item.address}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <FlatList
@@ -287,8 +290,8 @@ const styles = StyleSheet.create({
   item: {
     flexDirection: 'row',
     padding: 12,
-    borderRadius: 8,
     backgroundColor: '#f9f9f9',
+    borderRadius: 8,
   },
   itemImage: {
     width: 60,
@@ -323,6 +326,11 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 12,
     marginTop: 4,
+  },
+  itemSubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   ratingContainer: {
     flexDirection: 'row',

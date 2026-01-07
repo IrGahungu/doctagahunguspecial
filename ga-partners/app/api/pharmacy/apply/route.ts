@@ -53,13 +53,24 @@ export async function POST(req: Request) {
       throw insertUserErr;
     }
 
+    // Generate MGJK sequence
+    // We use a database RPC call to get a unique sequence number atomically.
+    // This prevents race conditions where multiple users apply at the same time.
+    const { data: sequenceNumber, error: seqError } = await supabaseAdmin.rpc("get_next_pharmacy_seq");
+
+    if (seqError) {
+      throw new Error(`Failed to generate sequence number: ${seqError.message}`);
+    }
+
+    const nameWithSequence = `${name} DMJKG${String(sequenceNumber).padStart(4, "0")}`;
+
     // 2) Insert application record linked to userId
     const { error: insertAppErr } = await supabaseAdmin
       .from("pharmacy_applications")
       .insert([
         {
           id: userId,
-          name,
+          name: nameWithSequence,
           email,
           password: hash,
           whatsapp_number,
@@ -103,6 +114,11 @@ export async function PUT(req: Request) {
       location,
       originCountry,
       opening_hours,
+      contact_email,
+      contact_phone,
+      contact_office,
+      contact_website,
+      accepted_insurances,
     } = body;
 
     if (!id) {
@@ -120,6 +136,11 @@ export async function PUT(req: Request) {
       country,
       origin_country: originCountry,
       opening_hours,
+      contact_email,
+      contact_phone,
+      contact_office,
+      contact_website,
+      accepted_insurances,
     };
 
     if (password) {

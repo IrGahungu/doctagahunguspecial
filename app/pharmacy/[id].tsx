@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   Image,
   TouchableOpacity,
   Pressable,
+  Animated,
   Modal,
+  Dimensions,
   ActivityIndicator,
   TextInput,
+  Linking,
 } from 'react-native';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
@@ -20,20 +23,36 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import { useToastStore } from '@/stores/toastStore';
 import Toast from '@/components/Toast';
+import ConfettiCannon from 'react-native-confetti-cannon';
+
 
 type Location = {
-  name: string;
-  openingTime: string;
-  closingTime: string;
-  isOpen: boolean;
+  city: string;
+  address: string;
+  latitude: string;
+  longitude: string;
+  phone: string;
+};
+
+type OpeningHour = {
+  day: string;
+  open: string;
+  close: string;
+  isClosed: boolean;
+  is24Hours?: boolean;
 };
 
 type Pharmacy = {
   id: string;
   name: string;
   image: string | null;
-  locations: Location[] | null;
+  location: Location[] | null;
   accepted_insurances: string[] | null;
+  opening_hours: OpeningHour[] | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_office: string | null;
+  contact_website: string | null;
 };
 
 export default function PharmacyDetailScreen() {
@@ -53,6 +72,29 @@ export default function PharmacyDetailScreen() {
   const [isPaying, setIsPaying] = useState(false);
   const VIEW_FEE = 500;
   const [pinCode, setPinCode] = useState('');
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  useEffect(() => {
+      if (!showDetails) {
+        const pulse = Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.2,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+        pulse.start();
+        return () => pulse.stop();
+      }
+    }, [showDetails]);
 
   useEffect(() => {
     if (!id || typeof id !== 'string') {
@@ -64,7 +106,7 @@ export default function PharmacyDetailScreen() {
     const fetchPharmacyDetails = async () => {
       setLoading(true);
       const { data, error: dbError } = await supabase
-        .from('pharmacies')
+        .from('pharmacy_applications')
         .select('*')
         .eq('id', id)
         .single();
@@ -73,7 +115,39 @@ export default function PharmacyDetailScreen() {
         console.error('Error fetching pharmacy details:', dbError);
         setError('Failed to load pharmacy information.');
       } else {
-        setPharmacy(data as Pharmacy);
+        let parsedLocation = data.location;
+        if (typeof parsedLocation === 'string') {
+          try {
+            parsedLocation = JSON.parse(parsedLocation);
+          } catch (e) {
+            parsedLocation = [];
+          }
+        }
+
+        let parsedInsurances = data.accepted_insurances;
+        if (typeof parsedInsurances === 'string') {
+          try {
+            parsedInsurances = JSON.parse(parsedInsurances);
+          } catch (e) {
+            parsedInsurances = [];
+          }
+        }
+
+        let parsedHours = data.opening_hours;
+        if (typeof parsedHours === 'string') {
+          try {
+            parsedHours = JSON.parse(parsedHours);
+          } catch (e) {
+            parsedHours = [];
+          }
+        }
+
+        setPharmacy({
+          ...data,
+          location: Array.isArray(parsedLocation) ? parsedLocation : [],
+          accepted_insurances: Array.isArray(parsedInsurances) ? parsedInsurances : [],
+          opening_hours: Array.isArray(parsedHours) ? parsedHours : [],
+        } as Pharmacy);
       }
       setLoading(false);
     };
@@ -88,7 +162,7 @@ export default function PharmacyDetailScreen() {
         {
           event: '*',
           schema: 'public',
-          table: 'pharmacies',
+          table: 'pharmacy_applications',
           filter: `id=eq.${id}`,
         },
         (payload) => {
@@ -96,7 +170,40 @@ export default function PharmacyDetailScreen() {
             setPharmacy(null);
             setError('This pharmacy has been removed.');
           } else if (payload.new) {
-            setPharmacy(payload.new as Pharmacy);
+            const newData = payload.new;
+            let parsedLocation = newData.location;
+            if (typeof parsedLocation === 'string') {
+              try {
+                parsedLocation = JSON.parse(parsedLocation);
+              } catch (e) {
+                parsedLocation = [];
+              }
+            }
+
+            let parsedInsurances = newData.accepted_insurances;
+            if (typeof parsedInsurances === 'string') {
+              try {
+                parsedInsurances = JSON.parse(parsedInsurances);
+              } catch (e) {
+                parsedInsurances = [];
+              }
+            }
+
+            let parsedHours = newData.opening_hours;
+            if (typeof parsedHours === 'string') {
+              try {
+                parsedHours = JSON.parse(parsedHours);
+              } catch (e) {
+                parsedHours = [];
+              }
+            }
+
+            setPharmacy({
+              ...newData,
+              location: Array.isArray(parsedLocation) ? parsedLocation : [],
+              accepted_insurances: Array.isArray(parsedInsurances) ? parsedInsurances : [],
+              opening_hours: Array.isArray(parsedHours) ? parsedHours : [],
+            } as Pharmacy);
           }
         }
       )
@@ -144,16 +251,18 @@ export default function PharmacyDetailScreen() {
 
   // Handle payment to view
   const handleConfirmViewPayment = async () => {
+    console.log("Starting payment process...");
     if (walletBalance === null || walletBalance < VIEW_FEE) {
       showToast("Insufficient wallet balance.");
       return;
     }
-     if (!pinCode) {
+    if (!pinCode) {
       showToast("Please enter your PIN code.");
       return;
     }
 
     setIsPaying(true);
+    console.log(`Attempting to pay ${VIEW_FEE} with PIN: ${pinCode}`);
     try {
       const token = await SecureStore.getItemAsync("token");
       if (!token) {
@@ -163,13 +272,14 @@ export default function PharmacyDetailScreen() {
       }
 
       // Step 1: Verify the PIN first
+      console.log("Step 1: Verifying PIN...");
       const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ pin: pinCode }),
+        body: JSON.stringify({ pin_code: pinCode }),
       });
 
       if (!verifyRes.ok) {
@@ -177,23 +287,31 @@ export default function PharmacyDetailScreen() {
         throw new Error(errorData.error || "Incorrect PIN.");
       }
 
+      console.log("PIN verification successful.");
+
       // Step 2: If PIN is correct, proceed with deduction
+      const deductionPayload = { amount: VIEW_FEE, reason: `View doctor ${id} details`, pin: pinCode };
+      console.log("Step 2: Proceeding with deduction. Payload:", JSON.stringify(deductionPayload));
       const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ amount: VIEW_FEE, reason: `View pharmacy ${id} details` }),
+        body: JSON.stringify(deductionPayload),
       });
 
       if (!deductRes.ok) {
+        console.error("Deduction failed. Status:", deductRes.status);
         const errorData = await deductRes.json();
+        console.error("Deduction error response:", errorData);
         throw new Error(errorData.error || "Payment failed after PIN verification.");
       }
 
       // Success!
       setShowDetails(true);
+      setShowConfetti(true);
+      console.log("Payment successful! Unlocking details.");
       showToast("Payment successful!");
       handleModalClose();
     } catch (error: unknown) {
@@ -201,6 +319,7 @@ export default function PharmacyDetailScreen() {
       if (error instanceof Error) {
         errorMessage = error.message;
       }
+      console.error("An error occurred during payment:", errorMessage);
       Alert.alert("Payment Failed", errorMessage);
     } finally {
       setIsPaying(false);
@@ -210,7 +329,15 @@ export default function PharmacyDetailScreen() {
   // Modal close handler
   const handleModalClose = () => {
     setIsModalVisible(false);
-     setPinCode(''); // Clear PIN on modal close
+    setPinCode(''); // Clear PIN on modal close
+  };
+
+  const openMap = (loc: Location) => {
+    const query = loc.latitude && loc.longitude
+      ? `${loc.latitude},${loc.longitude}`
+      : `${loc.address || ''} ${loc.city || ''}`;
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    Linking.openURL(url);
   };
 
   if (loading) {
@@ -233,53 +360,47 @@ export default function PharmacyDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#212121" />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Pharmacy Details</Text>
-
-        {/* Placeholder for right icon to balance layout */}
-        <View style={styles.headerRightPlaceholder} />
-      </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Image Section */}
-        {pharmacy.image ? (
-          <Image
-            source={{ uri: pharmacy.image }}
-            style={styles.pharmacyImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Icon name="local-pharmacy" size={40} color="#666" />
-            <Text style={styles.placeholderText}>No Image Available</Text>
+          {/* Header */}
+          <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Icon name="arrow-back" size={24} color="#212121" />
+            </TouchableOpacity>
+    
+            <Text style={styles.headerTitle}>Pharmacy Details</Text>
+    
+            {/* Placeholder for right icon to balance layout */}
+            <View style={styles.headerRightPlaceholder} />
           </View>
-        )}
-
-        {/* Details Section */}
-        <View style={styles.detailsContainer}>
-          {/* Pharmacy Name */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-            <Icon name="local-pharmacy" size={25} color='red' style={styles.icon} />
-            <Text style={styles.pharmacyName}>{pharmacy.name}</Text>
-          </View>
-
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            {pharmacy.image ? (
+              <Image source={{ uri: pharmacy.image }} style={styles.pharmacyImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Text style={styles.placeholderText}>No Image Available</Text>
+              </View>
+            )}
+            <View style={styles.detailsContainer}>
+              {showDetails && (
+                <Text style={styles.pharmacyName}>{pharmacy.name || 'Unknown Hospital'}</Text>
+              )}
           {/* Locked Section */}
           <View style={styles.section}>
             <View style={styles.lockHeader}>
-              <Text style={styles.sectionTitle}>Location & Insurance Details</Text>
               {!showDetails && (
-                <TouchableOpacity onPress={handleLockPress}>
-                  <Icon name="lock" size={24} color="#4CAF50" />
+                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Icon name="visibility" size={40} color="#4CAF50" />
+                  </Animated.View>
+                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
+                    Click here to pay and view the doctor's details
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {showDetails && (
               <>
+                
                 {/* Locations */}
                 <View style={{ marginTop: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
@@ -287,21 +408,22 @@ export default function PharmacyDetailScreen() {
                     <Text style={styles.subSectionTitle}>Locations</Text>
                   </View>
 
-                  {pharmacy.locations && pharmacy.locations.length > 0 ? (
-                    pharmacy.locations.map((loc, idx) => (
+                  {pharmacy.location && pharmacy.location.length > 0 ? (
+                    pharmacy.location.map((loc, idx) => (
                       <View key={idx} style={styles.locationItem}>
-                        <Text style={styles.locationName}>{loc.name}</Text>
+                        <Text style={styles.locationName}>{loc.city || "City not set"}</Text>
                         <Text style={styles.locationTime}>
-                          {loc.openingTime} - {loc.closingTime}
+                          {loc.address || "Address not set"}
                         </Text>
-                        <Text
-                          style={[
-                            styles.locationStatus,
-                            { color: loc.isOpen ? 'green' : 'red' },
-                          ]}
-                        >
-                          {loc.isOpen ? 'Open' : 'Closed'}
-                        </Text>
+                        {loc.phone ? (
+                          <Text style={[styles.locationStatus, { color: '#555', fontWeight: 'normal' }]}>
+                            Tel: {loc.phone}
+                          </Text>
+                        ) : null}
+                        <TouchableOpacity onPress={() => openMap(loc)} style={styles.mapButton}>
+                          <Icon name="map" size={16} color="#fff" />
+                          <Text style={styles.mapButtonText}>View on Map</Text>
+                        </TouchableOpacity>
                       </View>
                     ))
                   ) : (
@@ -309,9 +431,42 @@ export default function PharmacyDetailScreen() {
                   )}
                 </View>
 
+                {/* Opening Hours */}
+                <View style={{ marginTop: 15 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                    <Icon name="access-time" size={20} color="#4CAF50" />
+                    <Text style={styles.subSectionTitle}>Opening Hours</Text>
+                  </View>
+                  <View style={{ marginLeft: 30 }}>
+                    {pharmacy.opening_hours && pharmacy.opening_hours.length > 0 ? (
+                      pharmacy.opening_hours.map((day, idx) => {
+                        const isToday = day.day && day.day.toUpperCase() === ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][new Date().getDay()];
+                        return (
+                        <View key={idx} style={[
+                          styles.hoursRow,
+                          isToday && { backgroundColor: '#E8F5E9', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, marginLeft: -6 }
+                        ]}>
+                          <Text style={[styles.dayText, isToday && { fontWeight: 'bold', color: '#2E7D32' }]}>
+                            {day.day ? day.day.substring(0, 3) : ""}
+                          </Text>
+                          <Text style={[
+                            styles.hoursText,
+                            day.isClosed ? { color: 'red' } : { color: isToday ? '#2E7D32' : '#333' },
+                            isToday && { fontWeight: 'bold' }
+                          ]}>
+                            {day.isClosed ? 'Closed' : day.is24Hours ? '24 Hours' : `${day.open} - ${day.close}`}
+                          </Text>
+                        </View>
+                      )})
+                    ) : (
+                      <Text style={styles.noData}>Opening hours not available</Text>
+                    )}
+                  </View>
+                </View>
+
                 {/* Accepted Insurances */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5, marginTop: 15 }}>
-                  <Icon name="verified-user" style={styles.icon} color='red' />
+                  <Icon name="verified-user" style={styles.icon} color="#4CAF50" size={20} />
                   <Text style={styles.subSectionTitle}>Accepted Insurances</Text>
                 </View>
                 {pharmacy.accepted_insurances && pharmacy.accepted_insurances.length > 0 ? (
@@ -324,6 +479,28 @@ export default function PharmacyDetailScreen() {
                 ) : (
                   <Text style={styles.noData}>No insurance information available</Text>
                 )}
+
+                {/* Contact Details */}
+                <View style={{ marginTop: 10, marginBottom: 15 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
+                    <Icon name="contact-phone" size={20} color="#4CAF50" />
+                    <Text style={styles.subSectionTitle}>Contact Details</Text>
+                  </View>
+                  <View style={{ marginLeft: 30 }}>
+                    {pharmacy.contact_email ? <Text style={styles.contactText}>📧 {pharmacy.contact_email}</Text> : null}
+                    {pharmacy.contact_phone ? <Text style={styles.contactText}>📞 {pharmacy.contact_phone}</Text> : null}
+                    {pharmacy.contact_office ? <Text style={styles.contactText}>🏢 {pharmacy.contact_office}</Text> : null}
+                    {pharmacy.contact_website ? (
+                      <TouchableOpacity onPress={() => Linking.openURL(pharmacy.contact_website!)}>
+                        <Text style={[styles.contactText, { color: 'blue', textDecorationLine: 'underline' }]}>
+                          🌐 {pharmacy.contact_website}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {!pharmacy.contact_email && !pharmacy.contact_phone && !pharmacy.contact_office && !pharmacy.contact_website && <Text style={styles.noData}>No contact details available</Text>}
+                  </View>
+                </View>
+
               </>
             )}
           </View>
@@ -354,12 +531,12 @@ export default function PharmacyDetailScreen() {
             ) : (
               <View style={{ alignItems: 'center', width: '100%' }}>
                 <Text style={styles.modalText}>
-                  Pay <Text style={{ fontWeight: 'bold' }}> {VIEW_FEE} FBU</Text> to view with Gahungu Wallet.
+                  Pay <Text style={{ fontWeight: 'bold' }}>{VIEW_FEE} FBU</Text> to view with Gahungu Wallet.
                 </Text>
                 <Text style={styles.balanceText}>
                   Your balance: {walletBalance?.toLocaleString() ?? '...'} FBU
                 </Text>
-                  <TextInput
+                <TextInput
                   style={styles.pinCodeInput}
                   placeholder="Enter your PIN code"
                   keyboardType="number-pad"
@@ -384,6 +561,13 @@ export default function PharmacyDetailScreen() {
           </View>
         </View>
       </Modal>
+      {showConfetti && (
+        <ConfettiCannon
+          count={200}
+          origin={{ x: Dimensions.get('window').width / 2, y: 0 }}
+          onAnimationEnd={() => setShowConfetti(false)}
+        />
+      )}
       <Toast />
     </View>
   );
@@ -476,6 +660,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+  contactText: {
+    fontSize: 15,
+    color: '#555',
+    marginBottom: 4,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    paddingRight: 10,
+  },
+  dayText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
+    width: 50,
+  },
+  hoursText: {
+    fontSize: 15,
+    color: '#555',
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2196F3',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+  },
+  mapButtonText: { color: '#fff', marginLeft: 5, fontSize: 12, fontWeight: 'bold' },
   subSectionTitle: {
     fontSize: 16, fontWeight: 'bold', marginLeft: 8, color: '#333'
   },
@@ -601,7 +817,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#fff',
   },
-   pinCodeInput: {
+  pinCodeInput: {
     backgroundColor: '#fff',
     padding: 10,
     borderRadius: 8,

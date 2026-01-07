@@ -63,10 +63,25 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
 
     const fetchProducts = async () => {
       setLoading(true);
+
+      // First fetch pharmacies in the user's country
+      const { data: pharmacies } = await supabase
+        .from('pharmacy_applications')
+        .select('id')
+        .eq('country', country);
+
+      const pharmacyIds = pharmacies?.map((p) => p.id) || [];
+
+      if (pharmacyIds.length === 0) {
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
-        .from('medicines')
+        .from('stock')
         .select('*')
-        .eq('country', country)
+        .in('pharmacy_id', pharmacyIds)
         .order('created_at', { ascending: false })
         .limit(6);
 
@@ -102,8 +117,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
         description: product.description || 'No description available',
         pharmacies: JSON.stringify(product.pharmacies || []),
         insurances: JSON.stringify(product.insurances || []),
-        isFreeDelivery: product.isFreeDelivery?.toString() || 'false',
-        isAssured: product.isAssured?.toString() || 'false',
         discountPercentage: product.discountPercentage?.toString() || '0',
         originalPrice: product.originalPrice?.toString() || '0'
       }
@@ -111,10 +124,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
   };
 
   const renderProduct = ({ item }: { item: Product }) => {
-    const hasDiscount = item.originalPrice && item.originalPrice > item.price;
-    const discountPercentage = hasDiscount
-      ? Math.round(((item.originalPrice! - item.price) / item.originalPrice!) * 100)
-      : 0;
 
     return (
       <TouchableOpacity
@@ -137,18 +146,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
           <Text numberOfLines={2} style={styles.productTitle}>
             {item.title || item.name} {/* Fallback to name if title is empty */}
           </Text>
-
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}>{item.price.toLocaleString()} {getCurrency(country)}</Text>
-            {hasDiscount && (
-              <>
-                <Text style={styles.originalPrice}>
-                  {item.originalPrice!.toLocaleString()} {getCurrency(country)}
-                </Text>
-                <Text style={styles.discount}>{discountPercentage}% off</Text>
-              </>
-            )}
-          </View>
 
         </View>
       </TouchableOpacity>

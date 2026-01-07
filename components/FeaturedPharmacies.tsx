@@ -36,6 +36,7 @@ export default function FeaturedPharmacies({ title, onViewAll }: Props) {
   useEffect(() => {
     const fetchCountry = async () => {
       const storedCountry = await SecureStore.getItemAsync("user_country");
+      console.log('FeaturedPharmacies: Retrieved country from storage:', storedCountry);
       setCountry(storedCountry);
     };
 
@@ -43,20 +44,25 @@ export default function FeaturedPharmacies({ title, onViewAll }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!country) return;
+    if (!country) {
+      console.log('FeaturedPharmacies: Country state is null/empty, skipping fetch.');
+      return;
+    }
 
     const fetchPharmacies = async () => {
+      console.log('FeaturedPharmacies: Attempting to fetch for country:', country);
       setLoading(true);
       const { data, error } = await supabase
-        .from('pharmacies')
+        .from('pharmacy_applications')
         .select('id, name, image')
         .eq('country', country)
         .order('created_at', { ascending: false })
         .limit(4);
 
       if (error) {
-        console.error('Error fetching featured pharmacies:', error.message);
+        console.error('FeaturedPharmacies: Supabase error:', error);
       } else if (data) {
+        console.log('FeaturedPharmacies: Successfully fetched data:', data);
         setItems(data);
       }
       setLoading(false);

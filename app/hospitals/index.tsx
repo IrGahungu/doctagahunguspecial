@@ -10,13 +10,19 @@ const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
 
 type Hospital = {
-  id: string;
-  name: string | null;
-  image: string | null;
-  location: string | null;
-  specialties: string[] | null;
-  insurances: string[] | null;
-  bloodTypes: string[] | null;
+    id: string;
+    name: string | null;
+    image: string | null;
+    country: string | null;
+    service_summary: string | null;
+    admission_process: string | null;
+    partner_insurances: string | null;
+    partner_pharmacies: string | null;
+    contact_details: string | null;
+    locations: string | null;
+    available_services: string | null;
+    available_blood_types: string | null;
+    medical_equipment: string | null;
 };
 
 const SkeletonCard = () => (
@@ -51,15 +57,15 @@ export default function AllHospitalsScreen() {
     const fetchHospitals = async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from('hospitals')
-        .select('id, name, image, location, specialties, insurances, blood_types')
+        .from('hospital_applications')
+        .select('id, name, image, country, service_summary, admission_process, partner_insurances, partner_pharmacies, contact_details, locations, available_services, available_blood_types, medical_equipment')
         .eq('country', country)
         .order('name', { ascending: true });
 
       if (error) {
         console.error('Error fetching hospitals:', error.message);
       } else if (data) {
-        const formattedData = data.map(h => ({ ...h, bloodTypes: h.blood_types }));
+        const formattedData = data.map(h => ({ ...h, bloodTypes: h.available_blood_types }));
         setHospitals(formattedData);
       }
       setLoading(false);
@@ -68,7 +74,7 @@ export default function AllHospitalsScreen() {
     fetchHospitals();
     const channel = supabase
       .channel('all-hospitals-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'hospitals', filter: `country=eq.${country}` }, fetchHospitals)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'hospital_applications', filter: `country=eq.${country}` }, fetchHospitals)
       .subscribe();
       
     return () => { supabase.removeChannel(channel); };
@@ -85,10 +91,7 @@ export default function AllHospitalsScreen() {
             id: item.id,
             name: item.name || '',
             image: item.image || '',
-            location: JSON.stringify(item.location || []),
-            specialties: JSON.stringify(item.specialties || []),
-            insurances: JSON.stringify(item.insurances || []),
-            bloodTypes: JSON.stringify(item.bloodTypes || []),
+            locations: JSON.stringify(item.locations || []),
           },
         });
       }}

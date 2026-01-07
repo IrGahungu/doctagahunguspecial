@@ -244,7 +244,7 @@ export default function PharmacyPage() {
     try {
       const url = "/api/pharmacy/apply";
       const method = editingPharmacy ? "PUT" : "POST";
-      const body = editingPharmacy ? { ...pharmacyForm, id: editingPharmacy.id } : pharmacyForm;
+      const body = editingPharmacy ? { ...pharmacyForm, id: editingPharmacy.id } : { ...pharmacyForm };
       
       // If editing and password is empty, remove it so we don't overwrite with empty string
       if (editingPharmacy && !body.password) delete (body as any).password;

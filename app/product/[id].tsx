@@ -5,11 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  Pressable,
   TouchableOpacity,
   Platform,
   Animated,
   Modal,
+  Dimensions,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Alert } from 'react-native';
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -22,6 +25,8 @@ import { supabase } from '@/lib/supabase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
+import ConfettiCannon from 'react-native-confetti-cannon';
+
 
 const currencyMap: { [country: string]: string } = {
   Burundi: 'FBU',
@@ -49,6 +54,12 @@ export default function ProductDetailScreen() {
   const VIEW_FEE = 500;
   const [pinCode, setPinCode] = useState('');
   const [country, setCountry] = useState<string | null>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const showToast = useToastStore(state => state.showToast);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -60,6 +71,27 @@ export default function ProductDetailScreen() {
   }, []);
 
   useEffect(() => {
+    if (!showDetails) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [showDetails]);
+
+  useEffect(() => {
     if (!id) {
       setProduct(null);
       setLoading(false);
@@ -67,33 +99,90 @@ export default function ProductDetailScreen() {
     }
 
     const fetchProduct = async () => {
-      const { data, error } = await supabase
-        .from('medicines')
-        .select(`
-          id, name, title, price, original_price, image, description,
-          medicine_pharmacies (
-            locations,
-            insurances,
-            pharmacies ( id, name, image, accepted_insurances )
-          )
-        `)
+      // 1. Fetch the stock item to get basic details
+      const { data: stockData, error: stockError } = await supabase
+        .from('stock')
+        .select('*')
         .eq('id', id)
         .single();
 
-      if (error) {
-        console.error('Error fetching product details:', error.message);
+      if (stockError) {
+        console.error('Error fetching product details:', stockError.message);
         setProduct(null);
-      } else if (data) {
+      } else if (stockData) {
+        // 2. Fetch all stocks with the same name to list all pharmacies
+        const userCountry = await SecureStore.getItemAsync("user_country");
+        
+        const { data: allStocks } = await supabase
+            .from('stock')
+            .select(`
+                *,
+                pharmacy:pharmacy_applications!stock_pharmacy_id_fkey (
+                    id, name, image, location, accepted_insurances, country
+                )
+            `)
+            .ilike('name', stockData.name)
+            .eq('in_stock', true);
+
+        let pharmacyList: any[] = [];
+
+        if (allStocks) {
+             pharmacyList = allStocks
+                .filter((item: any) => item.pharmacy && (!userCountry || item.pharmacy.country === userCountry))
+                .map((item: any) => {
+                    const pData = item.pharmacy;
+                    
+                    let parsedLocation = [];
+                    try {
+                        parsedLocation = typeof pData.location === 'string' ? JSON.parse(pData.location) : pData.location || [];
+                    } catch (e) { parsedLocation = []; }
+
+                    let parsedInsurances = [];
+                    try {
+                        parsedInsurances = typeof pData.accepted_insurances === 'string' ? JSON.parse(pData.accepted_insurances) : pData.accepted_insurances || [];
+                    } catch (e) { parsedInsurances = []; }
+
+                    let productInsurances = null;
+                    if (item.insurances) {
+                        try {
+                            productInsurances = typeof item.insurances === 'string' ? JSON.parse(item.insurances) : item.insurances;
+                        } catch (e) { productInsurances = null; }
+                    }
+                    const finalInsurances = (Array.isArray(productInsurances) && productInsurances.length > 0) ? productInsurances : parsedInsurances;
+
+                    return {
+                        id: pData.id,
+                        name: pData.name,
+                        image: pData.image,
+                        locations: Array.isArray(parsedLocation) ? parsedLocation.map((l: any) => `${l.city || ''} ${l.address || ''}`.trim()).filter(Boolean) : [],
+                        insurances: Array.isArray(finalInsurances) ? finalInsurances : [],
+                        price: item.price,
+                        originalPrice: item.original_price,
+                        stockId: item.id,
+                        medicineId: item.medicine_id
+                    };
+                });
+        }
+
+        // Sort by price ascending
+        pharmacyList.sort((a, b) => a.price - b.price);
+
         const transformedProduct = {
-          ...data,
-          originalPrice: data.original_price,
-          pharmacies: data.medicine_pharmacies.map((mp: any) => ({
-            ...(mp.pharmacies || {}),
-            insurances: mp.insurances || [],
-            locations: mp.locations || [],
-          })),
+          id: stockData.id,
+          name: stockData.name,
+          price: stockData.price,
+          originalPrice: stockData.original_price,
+          image: stockData.image,
+          description: stockData.description,
+          pharmacies: pharmacyList,
         };
         setProduct(transformedProduct as unknown as Product);
+
+        // Auto-select the pharmacy that matches the current stock ID (the one clicked)
+        const currentPharmacy = pharmacyList.find((p: any) => p.stockId === stockData.id);
+        if (currentPharmacy) {
+          setSelectedPharmacyId(currentPharmacy.id);
+        }
       }
       setLoading(false);
     };
@@ -102,8 +191,7 @@ export default function ProductDetailScreen() {
 
     const channel = supabase
       .channel(`product-details-${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'medicines', filter: `id=eq.${id}` }, () => fetchProduct())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'medicine_pharmacies', filter: `medicine_id=eq.${id}` }, () => fetchProduct())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock', filter: `id=eq.${id}` }, () => fetchProduct())
       .subscribe();
 
     navigation.getParent()?.setOptions({
@@ -118,6 +206,120 @@ export default function ProductDetailScreen() {
     };
   }, [id, navigation]);
 
+  // Lock modal handler
+  const handleLockPress = async () => {
+    setIsModalVisible(true);
+    setIsBalanceLoading(true);
+    try {
+      const token = await SecureStore.getItemAsync("token");
+      if (!token) {
+        showToast("Please log in to view details.");
+        router.push('/auth');
+        setIsModalVisible(false);
+        return;
+      }
+      const res = await fetch(`${API_BASE_URL}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setWalletBalance(Number(data.wallet_balance) || 0);
+      } else {
+        showToast("Could not fetch wallet balance.");
+        setIsModalVisible(false);
+      }
+    } catch (error) {
+      console.error("Failed to fetch wallet balance:", error);
+      showToast("An error occurred.");
+      setIsModalVisible(false);
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  };
+
+  // Handle payment to view
+  const handleConfirmViewPayment = async () => {
+    console.log("Starting payment process...");
+    if (walletBalance === null || walletBalance < VIEW_FEE) {
+      showToast(walletBalance === null ? "Unable to verify wallet balance." : "Insufficient wallet balance.");
+      return;
+    }
+    if (!pinCode) {
+      showToast("Please enter your PIN code.");
+      return;
+    }
+
+    setIsPaying(true);
+    console.log(`Attempting to pay ${VIEW_FEE} with PIN: ${pinCode}`);
+    try {
+      const token = await SecureStore.getItemAsync("token");
+      if (!token) {
+        showToast("Authentication error. Please log in again.");
+        router.push('/auth');
+        return;
+      }
+
+      // Step 1: Verify the PIN first
+      console.log("Step 1: Verifying PIN...");
+      const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ pin_code: pinCode }),
+      });
+
+      if (!verifyRes.ok) {
+        const errorData = await verifyRes.json();
+        throw new Error(errorData.error || "Incorrect PIN.");
+      }
+
+      console.log("PIN verification successful.");
+
+      // Step 2: If PIN is correct, proceed with deduction
+      const deductionPayload = { amount: VIEW_FEE, reason: `View product ${id} details`, pin: pinCode };
+      console.log("Step 2: Proceeding with deduction. Payload:", JSON.stringify(deductionPayload));
+      const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(deductionPayload),
+      });
+
+      if (!deductRes.ok) {
+        console.error("Deduction failed. Status:", deductRes.status);
+        const errorData = await deductRes.json();
+        console.error("Deduction error response:", errorData);
+        throw new Error(errorData.error || "Payment failed after PIN verification.");
+      }
+
+      // Success!
+      setShowDetails(true);
+      setShowConfetti(true);
+      console.log("Payment successful! Unlocking details.");
+      showToast("Payment successful!");
+      handleModalClose();
+    } catch (error: unknown) {
+      let errorMessage = "An error occurred during payment.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      console.error("An error occurred during payment:", errorMessage);
+      Alert.alert("Payment Failed", errorMessage);
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  // Modal close handler
+  const handleModalClose = () => {
+    setIsModalVisible(false);
+    setPinCode(''); // Clear PIN on modal close
+  };
+
   const [quantity, setQuantity] = useState(1);
 
   // Animation state
@@ -125,11 +327,6 @@ export default function ProductDetailScreen() {
   const animation = useRef(new Animated.Value(0)).current;
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [endPos, setEndPos] = useState({ x: 0, y: 0 });
-
-  // Lock modal states
-  const [lockModalType, setLockModalType] = useState<'insurances' | 'pharmacies' | null>(null);
-  const [showInsurances, setShowInsurances] = useState(false);
-  const [showPharmacies, setShowPharmacies] = useState(false);
 
   // Refs for measuring
   const cartIconRef = useRef<View>(null);
@@ -141,6 +338,24 @@ export default function ProductDetailScreen() {
 
   const handleAddToCart = () => {
     if (product) {
+      if (!selectedPharmacyId) {
+        showToast("Please select a pharmacy first.");
+        return;
+      }
+
+      const selectedPharmacy = (product.pharmacies || []).find(p => p.id === selectedPharmacyId);
+      if (!selectedPharmacy) {
+        showToast("Selected pharmacy not found.");
+        return;
+      }
+
+      const productToAdd = {
+        ...product,
+        id: (selectedPharmacy as any).stockId,
+        price: (selectedPharmacy as any).price,
+        medicine_id: (selectedPharmacy as any).medicineId,
+      };
+
       setTimeout(() => {
         if (addToCartBtnRef.current && cartIconRef.current) {
           addToCartBtnRef.current.measure((fx, fy, width, height, px, py) => {
@@ -163,7 +378,7 @@ export default function ProductDetailScreen() {
         }
       }, 50);
 
-      addToCart(product, quantity);
+      addToCart(productToAdd, quantity);
       useToastStore.getState().showToast("Product added to cart!");
     }
   };
@@ -184,11 +399,6 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const hasDiscount = product.originalPrice && product.originalPrice > product.price;
-  const discountPercentage = hasDiscount
-    ? Math.round(((product.originalPrice! - product.price) / product.originalPrice!) * 100)
-    : 0;
-
   const allInsurances = Array.from(
     new Set(
       (product.pharmacies || [])
@@ -206,111 +416,6 @@ export default function ProductDetailScreen() {
     inputRange: [0, 1],
     outputRange: [startPos.y, endPos.y],
   });
-
-  // Lock modal handler
-  const handleLockPress = async (type: 'insurances' | 'pharmacies') => {
-    setLockModalType(type);
-    setIsBalanceLoading(true);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        useToastStore.getState().showToast("Please log in to view details.");
-        router.push('/auth');
-        setLockModalType(null);
-        return;
-      }
-      const res = await fetch(`${API_BASE_URL}/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setWalletBalance(data.wallet_balance || 0);
-        setWalletBalance(Number(data.wallet_balance) || 0);
-      } else {
-        useToastStore.getState().showToast("Could not fetch wallet balance.");
-        setLockModalType(null);
-      }
-    } catch (error) {
-      console.error("Failed to fetch wallet balance:", error);
-      useToastStore.getState().showToast("An error occurred.");
-      setLockModalType(null);
-    } finally {
-      setIsBalanceLoading(false);
-    }
-  };
-
-  // Handle payment to view
-  const handleConfirmViewPayment = async () => {
-    if (walletBalance === null || walletBalance < VIEW_FEE) {
-      useToastStore.getState().showToast("Insufficient wallet balance.");
-      return;
-    }
-
-    if (!pinCode) {
-      useToastStore.getState().showToast("Please enter your PIN code.");
-      return;
-    }
-
-    setIsPaying(true);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        useToastStore.getState().showToast("Authentication error. Please log in again.");
-        router.push('/auth');
-        return;
-      }
-
-      // Step 1: Verify the PIN first
-      const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ pin: pinCode }),
-      });
-
-      if (!verifyRes.ok) {
-        const errorData = await verifyRes.json();
-        throw new Error(errorData.error || "Incorrect PIN.");
-      }
-
-      // Step 2: If PIN is correct, proceed with deduction
-      const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ amount: VIEW_FEE, reason: `View product ${id} details` }),
-      });
-
-      if (!deductRes.ok) {
-        const errorData = await deductRes.json();
-        throw new Error(errorData.error || "Payment failed after PIN verification.");
-      }
-
-      // Success!
-      if (lockModalType === 'pharmacies') setShowPharmacies(true);
-      if (lockModalType === 'insurances') setShowInsurances(true);
-      useToastStore.getState().showToast("Payment successful!");
-      handleModalClose();
-    } catch (error: unknown) {
-      let errorMessage = "An error occurred during payment.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      Alert.alert("Payment Failed", errorMessage);
-    } finally {
-      setIsPaying(false);
-    }
-  };
-
-  // Modal close handler
-  const handleModalClose = () => {
-    setLockModalType(null);
-    setPinCode(''); // Clear PIN on modal close
-  };
 
   return (
     <View style={styles.container}>
@@ -354,32 +459,44 @@ export default function ProductDetailScreen() {
 
 
         <View style={styles.detailsContainer}>
-          <Text style={styles.productName}>{product.name}</Text>
-          <View style={styles.priceContainer}>
-            <Text style={styles.price}> {parseFloat(String(product.price)).toFixed(2)} {getCurrency(country)}</Text>
-            {hasDiscount && (
-              <>
-                <Text style={styles.originalPrice}> {parseFloat(String(product.originalPrice)).toFixed(2)} {getCurrency(country)}</Text>
-                <Text style={styles.discountPercentage}>{discountPercentage}% OFF</Text>
-              </>
-            )}
-          </View>
-          <Text style={styles.description}>{product.description}</Text>
+          {showDetails ? (
+            <>
+              <Text style={styles.productName}>{product.name}</Text>
+              <Text style={styles.description}>{product.description}</Text>
+            </>
+          ) : (
+            null
+          )}
 
           {/* Available At Lock */}
           <View style={styles.section}>
             <View style={styles.lockHeader}>
-              <Text style={styles.sectionTitle}>Available At</Text>
-              <TouchableOpacity onPress={() => handleLockPress('pharmacies')}>
-                <Icon name="lock" size={24} color="#4CAF50" />
-              </TouchableOpacity>
+              {!showDetails && (
+                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
+                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                    <Icon name="visibility" size={40} color="#4CAF50" />
+                  </Animated.View>
+                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
+                    Click here to pay and view the medecine's details
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
-            {showPharmacies && (
+            {showDetails && (
               product.pharmacies && product.pharmacies.length > 0 ? (
                 product.pharmacies.map((pharmacy) => (
+                  <View key={pharmacy.id} style={styles.pharmacyRow}>
+                    <TouchableOpacity
+                      style={styles.selectionContainer}
+                      onPress={() => setSelectedPharmacyId(pharmacy.id)}
+                    >
+                      <Icon name={selectedPharmacyId === pharmacy.id ? "radio-button-checked" : "radio-button-unchecked"} size={24} color={selectedPharmacyId === pharmacy.id ? "#4CAF50" : "#9e9e9e"} />
+                    </TouchableOpacity>
                   <TouchableOpacity
-                    key={pharmacy.id}
-                    style={styles.pharmacyCard}
+                    style={[
+                      styles.pharmacyCard,
+                      selectedPharmacyId === pharmacy.id && styles.selectedPharmacyCard
+                    ]}
                     onPress={() => router.push({
                       pathname: '/pharmacy/[id]',
                       params: { id: pharmacy.id }
@@ -398,74 +515,117 @@ export default function ProductDetailScreen() {
                         </View>
                       )}
                       <Text style={styles.pharmacyName}>{pharmacy.name}</Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        {(pharmacy as any).price && (
+                          <Text style={styles.pharmacyPrice}>
+                             {(pharmacy as any).price.toLocaleString()} {getCurrency(country)}
+                          </Text>
+                        )}
+                        {(pharmacy as any).originalPrice > (pharmacy as any).price && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                            <Text style={styles.pharmacyOriginalPrice}>
+                              {(pharmacy as any).originalPrice.toLocaleString()} {getCurrency(country)}
+                            </Text>
+                            <Text style={styles.pharmacyDiscount}>
+                              {Math.round((((pharmacy as any).originalPrice - (pharmacy as any).price) / (pharmacy as any).originalPrice) * 100)}% OFF
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                     <View style={styles.pharmacyDetails}>
-                      <View style={styles.detailRow}>
-                        <Icon name="location-on" size={16} color="#4CAF50" />
-                        <Text style={styles.detailText}>
+                      <View style={{ marginBottom: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                          <Icon name="location-on" size={16} color="#4CAF50" />
+                          <Text style={{ marginLeft: 8, fontWeight: 'bold', color: '#616161' }}>Locations</Text>
+                        </View>
+                        <View style={{ paddingLeft: 24 }}>
                           {(pharmacy as any).locations && (pharmacy as any).locations.length > 0
-                            ? (pharmacy as any).locations.join(', ')
-                            : pharmacy.location || 'Location not specified'}
-                        </Text>
+                            ? (pharmacy as any).locations.map((loc: string, i: number) => (
+                                <Text key={i} style={styles.detailTextList}>{loc}</Text>
+                              ))
+                            : <Text style={styles.detailTextList}>{pharmacy.location || 'Location not specified'}</Text>
+                          }
+                        </View>
                       </View>
                       {pharmacy.insurances?.length > 0 && (
-                        <View style={styles.detailRow}>
-                          <Icon name="verified-user" size={16} color="#4CAF50" />
-                          <Text style={styles.detailText}>
-                            {pharmacy.insurances.join(', ')}
-                          </Text>
+                        <View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                            <Icon name="verified-user" size={16} color="#4CAF50" />
+                            <Text style={{ marginLeft: 8, fontWeight: 'bold', color: '#616161' }}>Insurances</Text>
+                          </View>
+                          <View style={{ paddingLeft: 24 }}>
+                            {pharmacy.insurances.map((ins: string, i: number) => (
+                              <Text key={i} style={styles.detailTextList}>➢ {ins}</Text>
+                            ))}
+                          </View>
                         </View>
                       )}
                     </View>
                   </TouchableOpacity>
+                  </View>
                 ))
               ) : (
                 <Text style={styles.noDataText}>No pharmacies listed</Text>
               )
             )}
           </View>
+          <Pressable
+              style={styles.carButton}
+              onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
+            >
+              <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
+            </Pressable>
         </View>
-        <View ref={addToCartBtnRef}>
-          <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
-            <Text style={styles.addToCartText}>Add to Cart</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+
+        {showDetails && (
+          <>
+
+            <View ref={addToCartBtnRef}>
+              <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
+                <Text style={styles.addToCartText}>
+                  Add to Cart
+                  {selectedPharmacyId && product?.pharmacies?.find(p => p.id === selectedPharmacyId)
+                    ? ` - ${(product.pharmacies.find(p => p.id === selectedPharmacyId) as any).price.toLocaleString()} ${getCurrency(country)}`
+                    : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </ScrollView >
       {/* Animation component */}
-      {showAnimation && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            zIndex: 100,
-            transform: [
-              { translateX },
-              { translateY }
-            ],
-          }}
-          pointerEvents="none"
-        >
-          <Icon name="shopping-cart" size={30} color="green" />
-        </Animated.View>
-      )}
+      {
+        showAnimation && (
+          <Animated.View
+            style={{
+              position: 'absolute',
+              zIndex: 100,
+              transform: [
+                { translateX },
+                { translateY }
+              ],
+            }}
+            pointerEvents="none"
+          >
+            <Icon name="shopping-cart" size={30} color="green" />
+          </Animated.View>
+        )
+      }
       {/* Lock Modal */}
       <Modal
-        visible={!!lockModalType}
+        visible={isModalVisible}
         transparent
         animationType="fade"
         onRequestClose={handleModalClose}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            {/* Cross icon to close modal */}
-            <TouchableOpacity
-              style={styles.closeIcon}
-              onPress={handleModalClose}
-            >
+            <TouchableOpacity style={styles.closeIcon} onPress={handleModalClose}>
               <Icon name="close" size={24} color="#212121" />
             </TouchableOpacity>
-            
             <Text style={styles.modalTitle}>Unlock Information</Text>
-            
+
             {isBalanceLoading ? (
               <ActivityIndicator size="large" color="#4CAF50" />
             ) : (
@@ -497,10 +657,10 @@ export default function ProductDetailScreen() {
                   <TouchableOpacity
                     style={[
                       styles.modalButton,
-                      (isPaying || (walletBalance !== null && walletBalance < VIEW_FEE) || pinCode.length !== 4) && styles.disabledButton
+                      (isPaying || (walletBalance !== null && walletBalance < VIEW_FEE)) && styles.disabledButton
                     ]}
                     onPress={handleConfirmViewPayment}
-                    disabled={isPaying || (walletBalance !== null && walletBalance < VIEW_FEE)}
+                    disabled={isPaying}
                   >
                     {isPaying ? (
                       <ActivityIndicator color="#fff" />
@@ -514,12 +674,19 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
+      {showConfetti && (
+        <ConfettiCannon
+          count={200}
+          origin={{ x: Dimensions.get('window').width / 2, y: 0 }}
+          onAnimationEnd={() => setShowConfetti(false)}
+        />
+      )}
+
       <Toast />
-    </View>
+    </View >
   );
 }
 
-import { ActivityIndicator } from 'react-native';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -680,13 +847,29 @@ const styles = StyleSheet.create({
     color: '#2e7d32',
     marginLeft: 4,
   },
+  pharmacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  selectionContainer: {
+    paddingRight: 10,
+    paddingLeft: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   pharmacyCard: {
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
-    marginBottom: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    flex: 1,
+  },
+  selectedPharmacyCard: {
+    borderColor: '#4CAF50',
+    borderWidth: 2,
+    backgroundColor: '#e8f5e9',
   },
   pharmacyHeader: {
     flexDirection: 'row',
@@ -715,6 +898,24 @@ const styles = StyleSheet.create({
     color: '#212121',
     flex: 1,
   },
+  pharmacyPrice: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    color: '#2e7d32',
+    marginLeft: 8,
+  },
+  pharmacyOriginalPrice: {
+    fontSize: 12,
+    fontFamily: 'Roboto-Regular',
+    color: '#9e9e9e',
+    textDecorationLine: 'line-through',
+    marginRight: 4,
+  },
+  pharmacyDiscount: {
+    fontSize: 12,
+    fontFamily: 'Roboto-Bold',
+    color: '#f44336',
+  },
   pharmacyDetails: {
     padding: 12,
   },
@@ -729,6 +930,12 @@ const styles = StyleSheet.create({
     color: '#616161',
     marginLeft: 8,
     flex: 1,
+  },
+  detailTextList: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: 'purple',
+    marginBottom: 2,
   },
   noDataText: {
     fontSize: 14,
@@ -787,6 +994,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#424242',
   },
+
+  carButton: {
+    marginTop: 16,
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderColor: 'green'
+  },
+  carButtonText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
+    color: '#fff',
+    textAlign: 'center',
+  },
+
   balanceText: {
     fontSize: 14,
     fontFamily: 'Roboto-Medium',

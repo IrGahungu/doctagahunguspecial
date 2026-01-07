@@ -48,7 +48,7 @@ export default function AllPharmaciesScreen() {
     const fetchPharmacies = async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from('pharmacies')
+        .from('pharmacy_applications')
         .select('*')
         .eq('country', country)
         .order('created_at', { ascending: false });
@@ -62,7 +62,7 @@ export default function AllPharmaciesScreen() {
     };
 
     fetchPharmacies();
-    const channel = supabase.channel('all-pharmacies-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacies', filter: `country=eq.${country}` }, fetchPharmacies).subscribe();
+    const channel = supabase.channel('all-pharmacies-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacy_applications', filter: `country=eq.${country}` }, fetchPharmacies).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [country]);
 

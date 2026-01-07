@@ -26,6 +26,7 @@ type StockItem = {
   description?: string;
   category: string;
   image?: string;
+  insurances?: string[];
 };
 
 type Category = {
@@ -54,18 +55,25 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     image: "",
     password: "",
     confirmPassword: "",
+    contact_email: "",
+    contact_phone: "",
+    contact_office: "",
+    contact_website: "",
   });
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [openingHours, setOpeningHours] = useState<{ day: string; open: string; close: string; isClosed: boolean; is24Hours?: boolean }[]>([]);
   const [location, setlocation] = useState<{ city: string; address: string; latitude: string; longitude: string; phone: string }[]>([]);
+  const [insurancesList, setInsurancesList] = useState<string[]>([]);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isStockLoading, setIsStockLoading] = useState(false);
   const [isAddingStock, setIsAddingStock] = useState(false);
   const [isUploadingStockImage, setIsUploadingStockImage] = useState(false);
-  const [stockForm, setStockForm] = useState({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "" });
+  const [stockForm, setStockForm] = useState({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "", insurances: [] as string[] });
+  const [editingStockId, setEditingStockId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const statusColorMap = {
     pending: "text-yellow-500",
@@ -110,6 +118,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             image: data.image || "",
             password: "",
             confirmPassword: "",
+            contact_email: data.contact_email || "",
+            contact_phone: data.contact_phone || "",
+            contact_office: data.contact_office || "",
+            contact_website: data.contact_website || "",
           });
 
           let hours = [];
@@ -130,7 +142,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           if (!Array.isArray(locs) || locs.length === 0) {
             locs = [{ city: "", address: "", latitude: "", longitude: "", phone: "" }];
           }
+          // Enforce single location
+          if (locs.length > 1) locs = [locs[0]];
           setlocation(locs);
+
+          let insurances = [];
+          try {
+            if (data.accepted_insurances) insurances = JSON.parse(data.accepted_insurances);
+          } catch (e) { console.error("Error parsing insurances", e); }
+          if (!Array.isArray(insurances)) insurances = [];
+          setInsurancesList(insurances);
         })
         .catch((err) => console.error("Failed to load profile", err))
         .finally(() => setIsProfileLoading(false));
@@ -142,11 +163,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       setIsStockLoading(true);
       Promise.all([
         fetch(`/api/pharmacy/stock?pharmacy_id=${app.id}`).then((res) => res.json()),
-        fetch(`/api/categories`).then((res) => res.json())
+        fetch(`/api/categories`).then((res) => res.json()),
+        fetch(`/api/pharmacy/apply?id=${app.id}`).then((res) => res.json())
       ])
-        .then(([stockData, categoriesData]) => {
+        .then(([stockData, categoriesData, profileData]) => {
           if (Array.isArray(stockData)) setStockItems(stockData);
           if (Array.isArray(categoriesData)) setCategories(categoriesData);
+
+          // Parse insurances from profileData to populate the dropdown options
+          let insurances = [];
+          try {
+            if (profileData.accepted_insurances) insurances = JSON.parse(profileData.accepted_insurances);
+          } catch (e) { console.error("Error parsing insurances", e); }
+          if (!Array.isArray(insurances)) insurances = [];
+          setInsurancesList(insurances);
         })
         .catch((err) => console.error("Failed to load data", err))
         .finally(() => setIsStockLoading(false));
@@ -220,6 +250,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       id: app.id, 
       opening_hours: JSON.stringify(sanitizedOpeningHours),
       location: JSON.stringify(location),
+      accepted_insurances: JSON.stringify(insurancesList),
     };
 
     if (!updateData.password) {
@@ -274,12 +305,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     setlocation(newlocation);
   };
 
-  const addLocation = () => {
-    setlocation([...location, { city: "", address: "", latitude: "", longitude: "", phone: "" }]);
+  const updateInsurance = (index: number, value: string) => {
+    const newList = [...insurancesList];
+    newList[index] = value;
+    setInsurancesList(newList);
   };
 
-  const removeLocation = (index: number) => {
-    setlocation(location.filter((_, i) => i !== index));
+  const addInsurance = () => {
+    setInsurancesList([...insurancesList, ""]);
+  };
+
+  const removeInsurance = (index: number) => {
+    setInsurancesList(insurancesList.filter((_, i) => i !== index));
   };
 
   const handleCurrentLocation = (index: number) => {
@@ -326,32 +363,69 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
   };
 
-  async function handleAddStock() {
+  async function handleSaveStock() {
     if (!stockForm.name || !stockForm.price || !stockForm.category) {
       toast.error("Name, Price, and Category are required");
       return;
     }
     setIsAddingStock(true);
     try {
-      const res = await fetch("/api/pharmacy/stock", {
-        method: "POST",
+      const url = editingStockId ? `/api/pharmacy/stock?id=${editingStockId}` : "/api/pharmacy/stock";
+      const method = editingStockId ? "PUT" : "POST";
+      
+      const currentItem = editingStockId ? stockItems.find(i => i.id === editingStockId) : null;
+
+      const res = await fetch(url, {
+        method: method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...stockForm, pharmacy_id: app.id, in_stock: true }),
+        body: JSON.stringify({ 
+          ...stockForm, 
+          pharmacy_id: app.id, 
+          in_stock: Number(stockForm.quantity) > 0,
+          id: editingStockId,
+          insurances: stockForm.insurances
+        }),
       });
       if (res.ok) {
-        const newItem = await res.json();
-        setStockItems((prev) => [...prev, newItem]);
-        setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "" });
-        toast.success("Stock item added");
+        const savedItem = await res.json();
+        if (editingStockId) {
+          setStockItems((prev) => prev.map(item => item.id === editingStockId ? savedItem : item));
+          toast.success("Stock item updated");
+        } else {
+          setStockItems((prev) => [...prev, savedItem]);
+          toast.success("Stock item added");
+        }
+        setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "", insurances: [] });
+        setEditingStockId(null);
       } else {
-        toast.error("Failed to add item");
+        toast.error("Failed to save item");
       }
     } catch (e) {
       console.error(e);
-      toast.error("Error adding item");
+      toast.error("Error saving item");
     } finally {
       setIsAddingStock(false);
     }
+  }
+
+  function handleEditStock(item: StockItem) {
+    setStockForm({
+      name: item.name,
+      price: item.price.toString(),
+      original_price: item.original_price.toString(),
+      quantity: item.quantity.toString(),
+      description: item.description || "",
+      category: item.category,
+      image: item.image || "",
+      insurances: item.insurances || [],
+    });
+    setEditingStockId(item.id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function handleCancelEdit() {
+    setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "", insurances: [] });
+    setEditingStockId(null);
   }
 
   async function handleDeleteStock(id: string) {
@@ -548,7 +622,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <h3 className="text-xl font-bold mb-6 text-gray-800">My Stock Management</h3>
 
                 <div className="mb-8 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-semibold text-gray-700 mb-3">Add New Item</h4>
+                  <h4 className="font-semibold text-gray-700 mb-3">{editingStockId ? "Edit Item" : "Add New Item"}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <input
                       placeholder="Item Name"
@@ -596,6 +670,31 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                   </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Applicable Insurances</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
+                      {insurancesList.length > 0 ? insurancesList.map((ins) => (
+                        <label key={ins} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                          <input
+                            type="checkbox"
+                            checked={stockForm.insurances.includes(ins)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setStockForm(prev => ({
+                                ...prev,
+                                insurances: checked 
+                                  ? [...prev.insurances, ins]
+                                  : prev.insurances.filter(i => i !== ins)
+                              }));
+                            }}
+                            className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 border-gray-300"
+                          />
+                          <span className="text-sm text-gray-700">{ins}</span>
+                        </label>
+                      )) : <p className="text-sm text-gray-500 italic">No insurances found in profile.</p>}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Select specific insurances. Leave empty to accept all pharmacy insurances.</p>
+                  </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm font-medium text-gray-700 w-full justify-center">
@@ -608,13 +707,36 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <img src={stockForm.image} alt="Preview" className="h-full w-full object-cover" />
                       </div>
                     )}
+                    {editingStockId && (
+                      <button
+                        onClick={handleCancelEdit}
+                        className="bg-gray-500 text-white rounded px-6 py-2 hover:bg-gray-600 transition"
+                      >
+                        Cancel
+                      </button>
+                    )}
                     <button
-                      onClick={handleAddStock}
+                      onClick={handleSaveStock}
                       disabled={isAddingStock}
                       className="bg-indigo-600 text-white rounded px-6 py-2 hover:bg-indigo-700 disabled:bg-indigo-400 transition"
                     >
-                      {isAddingStock ? "Adding..." : "Add Item"}
+                      {isAddingStock ? "Saving..." : editingStockId ? "Update Item" : "Add Item"}
                     </button>
+                  </div>
+                </div>
+
+                <div className="mb-4 flex justify-end">
+                  <div className="relative w-full md:w-64">
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full border rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
                   </div>
                 </div>
 
@@ -636,14 +758,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {stockItems.length === 0 ? (
+                        {stockItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                           <tr>
                             <td colSpan={8} className="p-4 text-center text-gray-500">
-                              No items in stock
+                              {stockItems.length === 0 ? "No items in stock" : "No items match your search"}
                             </td>
                           </tr>
                         ) : (
-                          stockItems.map((item) => (
+                          stockItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())).map((item) => (
                             <tr key={item.id} className="hover:bg-gray-50 transition">
                               <td className="p-3">
                                 {item.image ? (
@@ -658,11 +780,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <td className="p-3 text-gray-500 text-sm">{item.original_price}</td>
                               <td className="p-3">{item.quantity}</td>
                               <td className="p-3">
-                                <span className={`px-2 py-1 rounded-full text-xs ${item.in_stock ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                                  {item.in_stock ? "In Stock" : "Out of Stock"}
+                                <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${item.in_stock && item.quantity > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                                  {item.in_stock && item.quantity > 0 ? "In Stock" : "Out-of-Stock"}
                                 </span>
                               </td>
                               <td className="p-3 text-right">
+                                <button
+                                  onClick={() => handleEditStock(item)}
+                                  className="text-blue-600 hover:text-blue-800 text-sm font-medium mr-3"
+                                >
+                                  Edit
+                                </button>
                                 <button
                                   onClick={() => handleDeleteStock(item.id)}
                                   className="text-red-500 hover:text-red-700 text-sm font-medium"
@@ -765,6 +893,35 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           ))}
                         </div>
                       </div>
+
+                      <div className="border-t border-gray-200 pt-6 mt-6">
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-4">📞 Contact Details</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="block text-gray-500 text-xs uppercase">Customer Support Email</span>
+                            <span className="text-gray-700 font-medium">{profileForm.contact_email || "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-gray-500 text-xs uppercase">Phone / WhatsApp</span>
+                            <span className="text-gray-700 font-medium">{profileForm.contact_phone || "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-gray-500 text-xs uppercase">Head Office</span>
+                            <span className="text-gray-700 font-medium">{profileForm.contact_office || "N/A"}</span>
+                          </div>
+                          <div>
+                            <span className="block text-gray-500 text-xs uppercase">Website</span>
+                            <a href={profileForm.contact_website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">{profileForm.contact_website || "N/A"}</a>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-200 pt-6 mt-6">
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏥 Accepted Insurances</h4>
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                          {insurancesList.length > 0 ? insurancesList.map((p, i) => <li key={i} className="text-gray-600">➢ {p}</li>) : <li className="text-gray-500 italic">No insurances listed</li>}
+                        </ul>
+                      </div>
                     </div>
 
                     <button
@@ -860,6 +1017,48 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div className="border-t border-gray-100 pt-4 mt-4">
+                      <h4 className="font-semibold text-gray-800 mb-4">Contact Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Support Email</label>
+                          <input
+                            type="email"
+                            value={profileForm.contact_email}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_email: e.target.value }))}
+                            className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Phone / WhatsApp</label>
+                          <input
+                            type="text"
+                            value={profileForm.contact_phone}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_phone: e.target.value }))}
+                            className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Head Office Address</label>
+                          <input
+                            type="text"
+                            value={profileForm.contact_office}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value }))}
+                            className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-1">Website URL</label>
+                          <input
+                            type="text"
+                            value={profileForm.contact_website}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_website: e.target.value }))}
+                            className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4 mt-4">
                       <h4 className="font-semibold text-gray-800 mb-4">Manage Opening Hours</h4>
                       <div className="space-y-3">
                         {openingHours.map((day, i) => (
@@ -948,15 +1147,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 onChange={(e) => updateLocation(index, "address", e.target.value)}
                                 className="flex-2 min-w-[200px] border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                               />
-                              <button
-                                onClick={() => removeLocation(index)}
-                                className="ml-auto text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition"
-                                title="Remove"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
                             </div>
                             <div className="grid grid-cols-3 gap-3 mb-3">
                               <input
@@ -1029,8 +1219,35 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             )}
                           </div>
                         ))}
-                        <button onClick={addLocation} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2">
-                          + Add Another Location
+
+                      </div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-4 mt-4">
+                      <h4 className="font-semibold text-gray-800 mb-4">Accepted Insurances</h4>
+                      <div className="space-y-3">
+                        {insurancesList.map((ins, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <span className="text-gray-500">➢</span>
+                            <input
+                              type="text"
+                              value={ins}
+                              onChange={(e) => updateInsurance(index, e.target.value)}
+                              className="flex-1 border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                              placeholder="Insurance Name"
+                            />
+                            <button
+                              onClick={() => removeInsurance(index)}
+                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                        <button onClick={addInsurance} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2">
+                          + Add Insurance
                         </button>
                       </div>
                     </div>
