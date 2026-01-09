@@ -15,12 +15,12 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import { supabase } from '@/lib/supabase';
 
-type OrderStatus = 'Delivered' | 'Packed' | 'Pending';
+type OrderStatus = "Pending" | "Accepted" | "Cancelled" | "Packed" | "On the way" | "Delivered";
 
 type Order = {
   id: string;
   created_at: string;
-  status: OrderStatus;
+  status?: OrderStatus;
   total_amount: number;
 };
 
@@ -99,28 +99,6 @@ export default function OrdersScreen() {
   }, [userId, fetchOrders]
   );
 
-  const getStatusStyle = (status: OrderStatus): TextStyle => {
-    const baseStyle: TextStyle = {
-      color: 'white',
-      fontWeight: 'bold',
-      paddingHorizontal: 12,
-      paddingVertical: 4,
-      borderRadius: 12,
-      overflow: 'hidden', // Ensures border radius is applied on Android
-    };
-
-    switch (status) {
-      case 'Delivered':
-        return { ...baseStyle, backgroundColor: 'green' };
-      case 'Packed':
-        return { ...baseStyle, backgroundColor: 'orange' };
-      case 'Pending':
-        return { ...baseStyle, backgroundColor: 'red' };
-      default:
-        return { ...baseStyle, backgroundColor: 'gray' };
-    }
-  };
-
   const renderOrderItem = ({ item }: { item: Order }) => (
     <TouchableOpacity style={styles.orderItem} onPress={() => router.push(`/order/${item.id}` as any)}>
       <View style={styles.orderInfo}>
@@ -129,7 +107,7 @@ export default function OrdersScreen() {
         <Text style={styles.orderTotal}>Total: BIF {Number(item.total_amount || 0).toFixed(2)}</Text>
       </View>
       <View style={styles.statusContainer}>
-        <Text style={[styles.orderStatus, getStatusStyle(item.status)]}>{item.status}</Text>
+        <Text style={styles.checkStatusText}>Check your order status</Text>
         <ChevronRight size={22} color="#757575" />
       </View>
     </TouchableOpacity>
@@ -224,7 +202,12 @@ const styles = StyleSheet.create({
   orderDate: { fontFamily: 'Roboto-Regular', fontSize: 14, color: '#757575', marginBottom: 4 },
   orderTotal: { fontFamily: 'Roboto-Regular', fontSize: 14, color: '#757575' },
   statusContainer: { flexDirection: 'row', alignItems: 'center' },
-  orderStatus: { fontFamily: 'Roboto-Medium', fontSize: 12, marginRight: 8 },
+  checkStatusText: {
+    fontFamily: 'Roboto-Medium',
+    fontSize: 12,
+    color: '#4CAF50',
+    marginRight: 4,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
