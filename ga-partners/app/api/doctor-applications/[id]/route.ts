@@ -67,6 +67,7 @@ export async function PUT(
       if (body.booking_type !== undefined) userUpdates.booking_type = body.booking_type;
       if (body.availability !== undefined) userUpdates.availability = body.availability;
       if (body.origin_country !== undefined) userUpdates.origin_country = body.origin_country;
+      if (body.work_schedule !== undefined) userUpdates.work_schedule = body.work_schedule;
       
       // Handle password update if provided
       if (password && password.trim() !== "") {

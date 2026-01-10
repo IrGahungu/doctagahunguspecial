@@ -3,8 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { createClient } from '@supabase/supabase-js';
 
 type PharmacyApplication = {
+  contact_email: string;
+  contact_phone: string;
   id: string;
   name: string;
   email: string;
@@ -14,6 +18,7 @@ type PharmacyApplication = {
   image?: string | null;
   opening_hours?: string | null;
   location?: string | null;
+  views?: number;
 };
 
 type StockItem = {
@@ -49,11 +54,17 @@ type Order = {
   status: "Pending" | "Accepted" | "Cancelled" | "Packed" | "On the way" | "Delivered";
   total_amount: number;
   items: OrderItem[];
+  customer_name?: string;
 };
 
 interface DashboardClientProps {
   app: PharmacyApplication;
 }
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function DashboardClient({ app }: DashboardClientProps) {
   const [showStatus, setShowStatus] = useState(false);
@@ -94,6 +105,21 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("All");
+  const [orderStartDate, setOrderStartDate] = useState("");
+  const [orderEndDate, setOrderEndDate] = useState("");
+  const [dashboardStats, setDashboardStats] = useState({
+    totalCustomers: 0,
+    totalProducts: 0,
+    totalRevenue: 0,
+    totalPendingOrders: 0,
+    totalViews: 0,
+  });
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [chartData, setChartData] = useState<{ date: string; revenue: number; orders: number; views: number }[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
 
   const statusColorMap = {
     pending: "text-yellow-500",
@@ -122,6 +148,138 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     setActiveTab(tab);
     if (tab === "status") setShowStatus(true);
   };
+
+  const fetchOrders = async () => {
+    setIsOrdersLoading(true);
+    try {
+      const res = await fetch(`/api/pharmacy/orders?pharmacy_id=${app.id}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setOrders(data);
+      } else {
+        setOrders([]);
+      }
+    } catch (err) {
+      console.error("Failed to load orders", err);
+      toast.error("Failed to load orders");
+    } finally {
+      setIsOrdersLoading(false);
+    }
+  };
+
+  const updatePendingCount = async () => {
+    if (!app.id) return;
+    try {
+      const res = await fetch(`/api/pharmacy/orders?pharmacy_id=${app.id}`);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const count = data.filter((o: Order) => o.status === "Pending").length;
+        setPendingOrdersCount(count);
+      }
+    } catch (e) {
+      console.error("Error fetching pending count", e);
+    }
+  };
+
+  useEffect(() => {
+    if (!app.id) return;
+
+    const channel = supabase
+      .channel('pharmacy-orders')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'order_items' },
+        async (payload) => {
+          const { data } = await supabase.from('stock').select('pharmacy_id').eq('id', payload.new.stock_id).single();
+          if (data && data.pharmacy_id === app.id) {
+            toast.success("New Order Received! 🔔", { duration: 5000 });
+            updatePendingCount();
+            if (activeTab === 'bookings') {
+              fetchOrders();
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [app.id, activeTab]);
+
+  useEffect(() => {
+    updatePendingCount();
+  }, [app.id]);
+
+  useEffect(() => {
+    if (activeTab === "dashboard" && app.id) {
+      setIsDashboardLoading(true);
+      Promise.all([
+        fetch(`/api/pharmacy/orders?pharmacy_id=${app.id}`).then((res) => res.json()),
+        fetch(`/api/pharmacy/stock?pharmacy_id=${app.id}`).then((res) => res.json()),
+        fetch(`/api/pharmacy/apply?id=${app.id}`).then((res) => res.json()),
+        fetch(`/api/pharmacy/views?pharmacy_id=${app.id}`).then((res) => res.json().catch(() => ({}))),
+      ])
+        .then(([ordersData, stockData, appData, viewsData]) => {
+          // Process orders
+          const ordersList = Array.isArray(ordersData) ? ordersData : [];
+          const uniqueCustomers = new Set(ordersList.map((o: any) => o.customer_name || o.user_id)).size;
+          const pendingOrders = ordersList.filter((o: any) => o.status === "Pending").length;
+
+          // Calculate revenue based on Delivered orders for this pharmacy
+          const revenue = ordersList
+            .filter((o: any) => o.status === "Delivered")
+            .reduce((acc: number, order: any) => {
+              const orderTotal = order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+              return acc + orderTotal;
+            }, 0);
+
+          // Process stock
+          const productsCount = Array.isArray(stockData) ? stockData.length : 0;
+
+          // Process views
+          const views = appData.views || 0;
+
+          setDashboardStats({
+            totalCustomers: uniqueCustomers,
+            totalProducts: productsCount,
+            totalRevenue: revenue,
+            totalPendingOrders: pendingOrders,
+            totalViews: views,
+          });
+          setRecentOrders(ordersList.slice(0, 5));
+
+          // Prepare Chart Data (Last 7 Days)
+          const last7Days = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            return d.toISOString().split('T')[0];
+          }).reverse();
+
+          const dataMap = last7Days.reduce((acc, date) => {
+            acc[date] = { date, revenue: 0, orders: 0, views: viewsData[date] || 0 };
+            return acc;
+          }, {} as any);
+
+          ordersList.forEach((o: any) => {
+            const d = new Date(o.created_at).toISOString().split('T')[0];
+            if (dataMap[d]) {
+              dataMap[d].orders += 1;
+              if (o.status === 'Delivered') {
+                const total = o.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+                dataMap[d].revenue += total;
+              }
+            }
+          });
+          setChartData(Object.values(dataMap));
+        })
+        .catch((err) => {
+          console.error("Error fetching dashboard stats:", err);
+          toast.error("Failed to load dashboard statistics");
+        })
+        .finally(() => setIsDashboardLoading(false));
+    }
+  }, [activeTab, app.id]);
 
   useEffect(() => {
     if (activeTab === "profile" && app.id) {
@@ -205,23 +363,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   useEffect(() => {
     if (activeTab === "bookings" && app.id) {
-      setIsOrdersLoading(true);
-      console.log("Fetching orders for pharmacy:", app.id);
-      fetch(`/api/pharmacy/orders?pharmacy_id=${app.id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          console.log("Orders fetched:", data);
-          if (Array.isArray(data)) {
-            setOrders(data);
-          } else {
-            setOrders([]);
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load orders", err);
-          toast.error("Failed to load orders");
-        })
-        .finally(() => setIsOrdersLoading(false));
+      fetchOrders();
     }
   }, [activeTab, app.id]);
 
@@ -252,6 +394,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         })
       );
       toast.success(`Order marked as ${newStatus}`);
+      updatePendingCount();
     } catch (error) {
       console.error(error);
       toast.error("Failed to update status");
@@ -518,6 +661,110 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
   }
 
+  const handlePrintOrder = (order: Order) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast.error("Please allow popups to print");
+      return;
+    }
+
+    const itemsHtml = order.items.map(item => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.product_name}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">BIF ${item.price.toLocaleString()}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">BIF ${(item.price * item.quantity).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    const totalAmount = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Order #${order.id}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .pharmacy-name { font-size: 24px; font-weight: bold; color: #333; }
+          .order-info { margin-bottom: 20px; }
+          .order-info p { margin: 5px 0; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { text-align: left; padding: 10px; background-color: #f8f9fa; border-bottom: 2px solid #ddd; }
+          .total-section { text-align: right; font-size: 18px; font-weight: bold; margin-top: 20px; }
+          .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #666; }
+          @media print {
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="pharmacy-name">${app.name}</div>
+          <p>Order Receipt</p>
+        </div>
+        
+        <div class="order-info">
+          <p><strong>Order ID:</strong> #${order.id}</p>
+          <p><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+          <p><strong>Customer:</strong> ${order.customer_name || 'Guest'}</p>
+          <p><strong>Status:</strong> ${order.status}</p>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+
+        <div class="total-section">
+          Total Amount: BIF ${totalAmount.toLocaleString()}
+        </div>
+
+        <div class="footer">
+          <p>Thank you for your business!</p>
+          <p>${app.contact_phone || ''} | ${app.contact_email || ''}</p>
+        </div>
+        
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch =
+      String(order.id).toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
+      (order.customer_name && order.customer_name.toLowerCase().includes(orderSearchQuery.toLowerCase()));
+
+    const matchesStatus = orderStatusFilter === "All" || order.status === orderStatusFilter;
+
+    let matchesDate = true;
+    if (orderStartDate) {
+      matchesDate = matchesDate && new Date(order.created_at) >= new Date(orderStartDate);
+    }
+    if (orderEndDate) {
+      const end = new Date(orderEndDate);
+      end.setHours(23, 59, 59, 999);
+      matchesDate = matchesDate && new Date(order.created_at) <= end;
+    }
+    return matchesSearch && matchesStatus && matchesDate;
+  });
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
@@ -575,24 +822,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <span className="hidden md:block">Orders</span>
+                <span className="absolute -top-1 -right-1 md:top-1/2 md:-translate-y-1/2 md:right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-white">
+                  {pendingOrdersCount}
+                </span>
               </>
           </button>
           {activeTab === "bookings" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-green-600 rounded-full"></div>}
-        </div>
-
-        <div className="relative">
-          <button
-            onClick={() => handleNavClick("scan")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400"
-          >
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                </svg>
-                <span className="hidden md:block">Scan Bill</span>
-              </>
-          </button>
-          {activeTab === "scan" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-teal-600 rounded-full"></div>}
         </div>
 
         <div className="relative">
@@ -645,6 +880,135 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         </div>
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-8">
+
+            {activeTab === "dashboard" && (
+              <div>
+                <h3 className="text-xl font-bold mb-6 text-gray-800">Dashboard Overview</h3>
+                {isDashboardLoading ? (
+                  <div className="text-center py-10">Loading stats...</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Customers</h4>
+                      <div className="text-2xl font-bold text-center text-gray-800">{dashboardStats.totalCustomers}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Products</h4>
+                      <div className="text-2xl font-bold text-center text-blue-600">{dashboardStats.totalProducts}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Revenue</h4>
+                      <div className="text-2xl font-bold text-center text-green-600">
+                        {dashboardStats.totalRevenue.toLocaleString()} <span className="text-xs text-gray-400">BIF</span>
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Pending Orders</h4>
+                      <div className="text-2xl font-bold text-center text-orange-500">{dashboardStats.totalPendingOrders}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Views</h4>
+                      <div className="text-2xl font-bold text-center text-indigo-600">{dashboardStats.totalViews}</div>
+                    </div>
+                  </div>
+                )}
+
+                {!isDashboardLoading && (
+                  <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="text-gray-800 font-bold mb-4">Revenue (Last 7 Days)</h4>
+                      <div className="h-80 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={(val) => val.slice(5)} />
+                            <YAxis tick={{ fontSize: 12 }} />
+                            <Tooltip formatter={(value: any) => [`BIF ${value.toLocaleString()}`, 'Revenue']} />
+                            <Bar dataKey="revenue" fill="#10B981" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="text-gray-800 font-bold mb-4">Orders (Last 7 Days)</h4>
+                      <div className="h-80 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={(val) => val.slice(5)} />
+                            <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                            <Tooltip formatter={(value: any) => [value, 'Orders']} />
+                            <Bar dataKey="orders" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="text-gray-800 font-bold mb-4">Profile Views (Last 7 Days)</h4>
+                      <div className="h-80 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={(val) => val.slice(5)} />
+                            <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                            <Tooltip formatter={(value: any) => [value, 'Views']} />
+                            <Line type="monotone" dataKey="views" stroke="#8884d8" strokeWidth={2} dot={{ r: 4 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!isDashboardLoading && (
+                  <div className="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 className="text-gray-800 font-bold mb-4">Recent Activity</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-gray-600 font-semibold text-sm">
+                          <tr>
+                            <th className="p-3 rounded-l-lg">Order ID</th>
+                            <th className="p-3">Customer</th>
+                            <th className="p-3">Date</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3 rounded-r-lg">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {recentOrders.length === 0 ? (
+                            <tr><td colSpan={5} className="p-4 text-center text-gray-500">No recent orders</td></tr>
+                          ) : (
+                            recentOrders.map((order) => (
+                              <tr key={order.id} className="hover:bg-gray-50 transition">
+                                <td className="p-3 font-medium">#{String(order.id).substring(0, 8)}</td>
+                                <td className="p-3 text-sm">{order.customer_name || "Unknown"}</td>
+                                <td className="p-3 text-sm text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
+                                <td className="p-3">
+                                  <span className={`text-[10px] font-medium px-2 py-1 rounded-full ${
+                                    order.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                                    order.status === 'Accepted' ? 'bg-blue-100 text-blue-700' :
+                                    order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
+                                    order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>{order.status}</span>
+                                </td>
+                                <td className="p-3 font-medium">BIF {order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {!isDashboardLoading && (
+                  <div className="mt-8 text-center text-gray-400 text-sm italic">Select other tabs to manage your pharmacy.</div>
+                )}
+              </div>
+            )}
 
             {activeTab === "status" && showStatus && (
               <div className="flex flex-col items-center">
@@ -888,6 +1252,51 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             {activeTab === "bookings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-xl font-bold mb-6 text-gray-800">Incoming Orders</h3>
+                
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search Order ID or Customer..."
+                      value={orderSearchQuery}
+                      onChange={(e) => setOrderSearchQuery(e.target.value)}
+                      className="w-full border rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {/* Status Filter */}
+                  <select
+                    value={orderStatusFilter}
+                    onChange={(e) => setOrderStatusFilter(e.target.value)}
+                    className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  >
+                    <option value="All">All Statuses</option>
+                    {["Pending", "Accepted", "Packed", "On the way", "Delivered", "Cancelled"].map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+
+                  {/* Date Range */}
+                  <input
+                    type="date"
+                    value={orderStartDate}
+                    onChange={(e) => setOrderStartDate(e.target.value)}
+                    className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Start Date"
+                  />
+                  <input
+                    type="date"
+                    value={orderEndDate}
+                    onChange={(e) => setOrderEndDate(e.target.value)}
+                    className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="End Date"
+                  />
+                </div>
+
                 {isOrdersLoading ? (
                   <div className="text-center py-10">Loading orders...</div>
                 ) : (
@@ -896,6 +1305,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <thead className="bg-gray-50 text-gray-600 font-semibold text-sm">
                         <tr>
                           <th className="p-3 rounded-l-lg">Order ID</th>
+                          <th className="p-3">Customer</th>
                           <th className="p-3">Date</th>
                           <th className="p-3">Status</th>
                           <th className="p-3">Total Amount</th>
@@ -903,14 +1313,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {orders.length === 0 ? (
+                        {filteredOrders.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="p-4 text-center text-gray-500">No orders found</td>
+                            <td colSpan={6} className="p-4 text-center text-gray-500">No orders found</td>
                           </tr>
                         ) : (
-                          orders.map((order: Order) => (
+                          filteredOrders.map((order: Order) => (
                             <tr key={order.id} className="hover:bg-gray-50 transition">
                               <td className="p-3 font-medium">#{String(order.id).substring(0, 8)}</td>
+                              <td className="p-3 text-sm text-gray-800">{order.customer_name || "Unknown"}</td>
                               <td className="p-3 text-sm text-gray-600">{new Date(order.created_at).toLocaleDateString()}</td>
                               <td className="p-3">
                                 <div className="relative inline-block">
@@ -937,7 +1348,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   </div>
                                 </div>
                               </td>
-                              <td className="p-3 font-medium">BIF {order.total_amount.toLocaleString()}</td>
+                              <td className="p-3 font-medium">BIF {order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString()}</td>
                               <td className="p-3">
                                 <details className="group cursor-pointer">
                                   <summary className="text-indigo-600 text-sm font-medium hover:text-indigo-800 list-none flex items-center gap-1">
@@ -971,6 +1382,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                         <span className="text-gray-600 font-medium">BIF {(item.price * item.quantity).toLocaleString()}</span>
                                       </div>
                                     ))}
+                                    <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end">
+                                      <button
+                                        onClick={() => handlePrintOrder(order)}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded hover:bg-gray-700 transition"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                        </svg>
+                                        Print Invoice
+                                      </button>
+                                    </div>
                                   </div>
                                 </details>
                               </td>

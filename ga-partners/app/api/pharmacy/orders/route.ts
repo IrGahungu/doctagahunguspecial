@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     // 3. Fetch the actual orders
     const { data: orders, error: ordersError } = await supabaseAdmin
       .from("orders")
-      .select("id, created_at, total_amount, subtotal, service_fee, user_id") // Select specific columns, excluding 'status'
+      .select("id, created_at, total_amount, subtotal, service_fee, user_id, users(fullname)") // Select specific columns, excluding 'status'
       .in("id", orderIds)
       .order("created_at", { ascending: false });
 
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       // If items have a status, use the first one (assuming bulk update), otherwise default to 'Pending'
       const pharmacyStatus = (pharmacyItems.length > 0 && pharmacyItems[0].status) ? pharmacyItems[0].status : "Pending";
 
-      return { ...order, status: pharmacyStatus, items: pharmacyItems };
+      return { ...order, customer_name: (order.users as any)?.fullname, status: pharmacyStatus, items: pharmacyItems };
     });
 
     return NextResponse.json(ordersWithItems);

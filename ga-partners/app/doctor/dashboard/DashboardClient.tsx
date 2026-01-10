@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
+import { toast, Toaster } from "react-hot-toast";
 import { updateBookingStatus } from "./actions"
-// @ts-ignore
-import { Html5QrcodeScanner } from 'html5-qrcode';
 
 type DoctorApplication = {
   id: string;
@@ -17,6 +16,7 @@ type DoctorApplication = {
   rejection_reason: string | null;
   image?: string | null;
   views?: number;
+  work_schedule?: any;
 };
 
 type Availability = {
@@ -25,6 +25,15 @@ type Availability = {
   booking_type?: "online" | "in-office" | "both";
   consultation_fee_online?: string;
   consultation_fee_offline?: string;
+};
+
+type WorkSchedule = {
+  _ui_id?: string;
+  day: string;
+  start_time: string;
+  end_time: string;
+  break_start_time?: string;
+  break_end_time?: string;
 };
 
 type Booking = {
@@ -50,6 +59,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const DAYS_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function sortSchedule(schedule: WorkSchedule[]) {
+  return [...schedule].sort((a, b) => {
+    const diff = DAYS_ORDER.indexOf(a.day) - DAYS_ORDER.indexOf(b.day);
+    if (diff !== 0) return diff;
+    return a.start_time.localeCompare(b.start_time);
+  });
+}
+
 export default function DashboardClient({ app }: DashboardClientProps) {
   const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
@@ -57,6 +76,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [activeTab, setActiveTab] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showDeleteLocationConfirm, setShowDeleteLocationConfirm] = useState(false);
+  const [locationToDeleteIndex, setLocationToDeleteIndex] = useState<number | null>(null);
   const [loadingTab, setLoadingTab] = useState("");
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -88,6 +109,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isAvailabilityLoading, setIsAvailabilityLoading] = useState(false);
   const [isSavingAvailability, setIsSavingAvailability] = useState(false);
 
+  const [scheduleForm, setScheduleForm] = useState<WorkSchedule[]>([]);
+  const [isScheduleLoading, setIsScheduleLoading] = useState(false);
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
+  const endInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const breakEndInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isBookingsLoading, setIsBookingsLoading] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({
@@ -99,13 +127,58 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   });
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [revenueChartData, setRevenueChartData] = useState<{ date: string; revenue: number }[]>([]);
-  const [scannedBooking, setScannedBooking] = useState<Booking | null>(null);
+  const [pendingBookingsCount, setPendingBookingsCount] = useState(0);
+  const [updatingBookingId, setUpdatingBookingId] = useState<string | null>(null);
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    bookingId: string | null;
+    action: "confirmed" | "cancelled" | null;
+  }>({ isOpen: false, bookingId: null, action: null });
 
   const statusColorMap = {
     pending: "text-yellow-500",
     approved: "text-green-500",
     rejected: "text-red-500",
   };
+
+  const updatePendingBookingsCount = async () => {
+    if (!app.id) return;
+    const { count, error } = await supabase
+      .from("bookings")
+      .select("*", { count: 'exact', head: true })
+      .eq("doctor_id", app.id)
+      .eq("status", "pending");
+
+    if (!error && count !== null) {
+      setPendingBookingsCount(count);
+    }
+  };
+
+  useEffect(() => {
+    updatePendingBookingsCount();
+
+    const channel = supabase
+      .channel('doctor-bookings-count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings', filter: `doctor_id=eq.${app.id}` },
+        () => {
+          updatePendingBookingsCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [app.id]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.sessionStorage.getItem('justLoggedIn')) {
+      toast.success('Logged In');
+      window.sessionStorage.removeItem('justLoggedIn');
+    }
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -293,48 +366,51 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         };
         loadDashboardData();
       }
+
+      if (activeTab === "schedule" && app.id) {
+        setIsScheduleLoading(true);
+        fetch(`/api/doctor-applications/${app.id}`)
+          .then(async (res) => {
+            if (!res.ok) throw new Error("Failed to fetch schedule");
+            return res.json();
+          })
+          .then((data) => {
+            let schedule = [];
+            try {
+              schedule = typeof data.work_schedule === 'string' ? JSON.parse(data.work_schedule) : data.work_schedule || [];
+            } catch (e) { schedule = []; }
+            // Add unique IDs for UI stability and focus management
+            setScheduleForm(sortSchedule(schedule.map((s: any) => ({ 
+              ...s, 
+              _ui_id: s._ui_id || Math.random().toString(36).substr(2, 9),
+              break_start_time: s.break_start_time || "",
+              break_end_time: s.break_end_time || ""
+            }))));
+          })
+          .catch(console.error)
+          .finally(() => setIsScheduleLoading(false));
+      }
     };
     loadData();
   }, [activeTab, app.id, app.status]);
 
-  useEffect(() => {
-    if (activeTab === "scan" && !scannedBooking) {
-      const scannerId = "reader";
-      let scanner: Html5QrcodeScanner | null = null;
-
-      // Small delay to ensure DOM element exists
-      const timer = setTimeout(() => {
-        const element = document.getElementById(scannerId);
-        if (element) {
-          scanner = new Html5QrcodeScanner(
-            scannerId,
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            /* verbose= */ false
-          );
-
-          scanner.render(
-            (decodedText) => {
-              handleScanResult({ text: decodedText }, null);
-            },
-            (errorMessage) => {
-              // parse error, ignore
-            }
-          );
-        }
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
-        if (scanner) {
-          scanner.clear().catch((error) => console.error("Failed to clear html5-qrcode scanner. ", error));
-        }
-      };
-    }
-  }, [activeTab, scannedBooking]);
-
   // Helper functions for the availability form
   function addLocation() { setLocations([...Locations, { type: "Main Location", city: "", address: "", phone: "", latitude: "", longitude: "" }]); }
-  function removeLocation(index: number) { setLocations(Locations.filter((_, i) => i !== index)); }
+  
+  function removeLocation(index: number) {
+    setLocationToDeleteIndex(index);
+    setShowDeleteLocationConfirm(true);
+  }
+
+  function confirmDeleteLocation() {
+    if (locationToDeleteIndex !== null) {
+      setLocations(Locations.filter((_, i) => i !== locationToDeleteIndex));
+      setShowDeleteLocationConfirm(false);
+      setLocationToDeleteIndex(null);
+      toast.success("Location removed");
+    }
+  }
+
   function updateLocation(index: number, field: string, value: string) {
     const list = [...Locations];
     const updatedItem = { ...list[index] };
@@ -349,7 +425,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   function handleUseCurrentLocation(index: number) {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      toast.error("Geolocation is not supported by your browser");
       return;
     }
     navigator.geolocation.getCurrentPosition((position) => {
@@ -360,7 +436,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         longitude: position.coords.longitude.toFixed(6)
       };
       setLocations(list);
-    }, (err) => alert("Could not retrieve location: " + err.message));
+    }, (err) => toast.error("Could not retrieve location: " + err.message));
   }
 
   async function handlePasteCoordinates(index: number) {
@@ -376,10 +452,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         };
         setLocations(list);
       } else {
-        alert("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
-      alert("Failed to read clipboard.");
+      toast.error("Failed to read clipboard.");
     }
   }
 
@@ -418,6 +494,102 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     });
   }
 
+  function handleApplyToAllDays() {
+    const template = scheduleForm.length > 0 ? scheduleForm[0] : { start_time: "09:00", end_time: "17:00", break_start_time: "", break_end_time: "" };
+    
+    if (scheduleForm.length > 0 && !window.confirm(`Apply ${template.start_time} - ${template.end_time} to all days of the week? This will overwrite existing entries.`)) {
+      return;
+    }
+
+    const newSchedule = DAYS_ORDER.map((day) => ({
+      _ui_id: Math.random().toString(36).substr(2, 9),
+      day,
+      start_time: template.start_time,
+      end_time: template.end_time,
+      break_start_time: template.break_start_time || "",
+      break_end_time: template.break_end_time || "",
+    }));
+    
+    setScheduleForm(newSchedule);
+    toast.success("Schedule applied to all days");
+  }
+
+  function handleAddScheduleRow() {
+    const existingDays = scheduleForm.map((item) => item.day);
+    const nextAvailableDay = DAYS_ORDER.find((day) => !existingDays.includes(day));
+
+    if (!nextAvailableDay) {
+      toast.error("All days of the week are already added.");
+      return;
+    }
+
+    const newSchedule = [...scheduleForm, { 
+      _ui_id: Math.random().toString(36).substr(2, 9), 
+      day: nextAvailableDay, 
+      start_time: "09:00", 
+      end_time: "17:00",
+      break_start_time: "",
+      break_end_time: ""
+    }];
+    setScheduleForm(sortSchedule(newSchedule));
+  }
+
+  function handleRemoveScheduleRow(index: number) {
+    setScheduleForm(scheduleForm.filter((_, i) => i !== index));
+  }
+
+  function handleScheduleChange(index: number, field: keyof WorkSchedule, value: string) {
+    if (field === "day" && scheduleForm.some((item, i) => i !== index && item.day === value)) {
+      toast.error(`${value} is already in the schedule.`);
+      return;
+    }
+    const updated = [...scheduleForm];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    const sorted = sortSchedule(updated);
+    setScheduleForm(sorted);
+  }
+
+  async function handleSaveSchedule() {
+    for (const item of scheduleForm) {
+      if (item.start_time >= item.end_time) {
+        toast.error(`Invalid hours for ${item.day}: End time must be after start time.`);
+        return;
+      }
+      if (item.break_start_time && item.break_end_time) {
+        if (item.break_start_time < item.start_time || item.break_end_time > item.end_time) {
+          toast.error(`Invalid break for ${item.day}: Break must be within working hours (${item.start_time} - ${item.end_time}).`);
+          return;
+        }
+        if (item.break_start_time >= item.break_end_time) {
+          toast.error(`Invalid break for ${item.day}: Break end time must be after break start time.`);
+          return;
+        }
+      } else if (item.break_start_time || item.break_end_time) {
+        toast.error(`Invalid break for ${item.day}: Both break start and end times are required.`);
+        return;
+      }
+    }
+
+    setIsSavingSchedule(true);
+    try {
+      const scheduleToSave = scheduleForm.map(({ _ui_id, ...rest }) => rest);
+      const res = await fetch(`/api/doctor-applications/${app.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ work_schedule: JSON.stringify(scheduleToSave) }),
+      });
+      if (!res.ok) throw new Error("Failed to update schedule");
+      toast.success("Schedule updated successfully!");
+      setIsEditingSchedule(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Error updating schedule");
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  }
+
   async function handleSaveAvailability() {
     setIsSavingAvailability(true);
     try {
@@ -440,11 +612,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || errorData.message || "Failed to update");
       }
-      alert("Availability updated successfully!");
+      toast.success("Availability updated successfully!");
       setIsEditingAvailability(false);
     } catch (e: any) {
       console.error(e);
-      alert(`Error updating availability: ${e.message || "Unknown error"}`);
+      toast.error(`Error updating availability: ${e.message || "Unknown error"}`);
     } finally {
       setIsSavingAvailability(false);
     }
@@ -467,7 +639,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       setProfileForm((prev) => ({ ...prev, image: result.publicUrl }));
     } catch (err) {
       console.error(err);
-      alert("Image upload failed");
+      toast.error("Image upload failed");
     } finally {
       setIsUploadingProfileImage(false);
     }
@@ -477,7 +649,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     setIsSavingProfile(true);
 
     if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match!");
       setIsSavingProfile(false);
       return;
     }
@@ -489,126 +661,110 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         body: JSON.stringify(profileForm),
       });
       if (!res.ok) throw new Error("Failed to update profile");
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       router.refresh();
       setIsEditingProfile(false);
     } catch (e) {
       console.error(e);
-      alert("Error updating profile");
+      toast.error("Error updating profile");
     } finally {
       setIsSavingProfile(false);
     }
   }
 
-  async function handleUpdateStatus(bookingId: string, newStatus: "confirmed" | "cancelled" | "completed") {
+  async function performBookingUpdate(bookingId: string, newStatus: "confirmed" | "cancelled" | "completed") {
     const booking = bookings.find((b) => b.id === bookingId);
     if (!booking) return;
 
-    if (newStatus === "cancelled" && !window.confirm("Are you sure you want to cancel this booking?")) {
-      return;
-    }
+    setUpdatingBookingId(bookingId);
 
-    const updates: any = { status: newStatus };
+    try {
+      const updates: any = { status: newStatus };
 
-    if (newStatus === "confirmed") {
-      // Generate a ticket number
-      const existingTickets = bookings
-        .map((b) => b.ticket_number)
-        .filter((t) => t && t.startsWith("#"))
-        .map((t) => parseInt(t!.replace("#", ""), 10))
-        .filter((n) => !isNaN(n));
+      if (newStatus === "confirmed") {
+        // Generate a ticket number
+        const existingTickets = bookings
+          .map((b) => b.ticket_number)
+          .filter((t) => t && t.startsWith("#"))
+          .map((t) => parseInt(t!.replace("#", ""), 10))
+          .filter((n) => !isNaN(n));
 
-      const maxTicket = existingTickets.length > 0 ? Math.max(...existingTickets) : 0;
-      updates.ticket_number = `#${maxTicket + 1}`;
-    } else if (newStatus === "cancelled" && booking.payment_status === "paid") {
-      console.log("Starting refund process for booking:", booking);
-      // Automatically refund if paid
-      updates.payment_status = "refunded";
+        const maxTicket = existingTickets.length > 0 ? Math.max(...existingTickets) : 0;
+        updates.ticket_number = `#${maxTicket + 1}`;
+      } else if (newStatus === "cancelled" && booking.payment_status === "paid") {
+        console.log("Starting refund process for booking:", booking);
+        // Automatically refund if paid
+        updates.payment_status = "refunded";
 
-      if (booking.user_id && booking.amount) {
-        console.log(`Fetching wallet for user ${booking.user_id}`);
-        const { data: userData, error: userFetchError } = await supabase
-          .from("users")
-          .select("wallet_balance")
-          .eq("id", booking.user_id)
-          .single();
+        if (booking.user_id && booking.amount) {
+          console.log(`Fetching wallet for user ${booking.user_id}`);
+          const { data: userData, error: userFetchError } = await supabase
+            .from("users")
+            .select("wallet_balance")
+            .eq("id", booking.user_id)
+            .single();
 
-        if (userFetchError) {
-          console.error("Error fetching user wallet balance:", userFetchError);
-        }
+          if (userFetchError) {
+            console.error("Error fetching user wallet balance:", userFetchError);
+          }
 
-        if (userData) {
-          const refundAmount = Number(booking.amount);
-          const currentBalance = Number(userData.wallet_balance || 0);
-          const newBalance = currentBalance + refundAmount;
-          console.log(`Wallet found. Balance: ${currentBalance}. Refunding: ${refundAmount}. New Balance: ${newBalance}`);
+          if (userData) {
+            const refundAmount = Number(booking.amount);
+            const currentBalance = Number(userData.wallet_balance || 0);
+            const newBalance = currentBalance + refundAmount;
+            console.log(`Wallet found. Balance: ${currentBalance}. Refunding: ${refundAmount}. New Balance: ${newBalance}`);
 
-          // Use RPC to bypass RLS update restrictions
-          const { error: refundError } = await supabase.rpc("refund_patient", {
-            patient_id: booking.user_id,
-            refund_amount: refundAmount,
-          });
+            // Use RPC to bypass RLS update restrictions
+            const { error: refundError } = await supabase.rpc("refund_patient", {
+              patient_id: booking.user_id,
+              refund_amount: refundAmount,
+            });
 
-          if (refundError) {
-            console.error("Error refunding wallet:", refundError);
-            alert(`Refund failed: ${refundError.message}`);
-            return;
+            if (refundError) {
+              console.error("Error refunding wallet:", refundError);
+              toast.error(`Refund failed: ${refundError.message}`);
+              return;
+            } else {
+              console.log("Refund successful.");
+            }
           } else {
-            console.log("Refund successful.");
+            console.warn("User not found for this refund.");
+            toast.error("Refund failed: User wallet not found.");
+            return;
           }
         } else {
-          console.warn("User not found for this refund.");
-          alert("Refund failed: User wallet not found.");
+          console.warn("Cannot refund: Missing user_id or amount is 0/undefined.", { user_id: booking.user_id, amount: booking.amount });
+          toast.error("Refund failed: Missing booking details.");
           return;
         }
+      }
+
+      const { error } = await updateBookingStatus(bookingId, updates);
+
+      if (error) {
+        console.error("Failed to update booking status", error);
+        toast.error(`Failed to update status: ${error || "Unknown error"}`);
       } else {
-        console.warn("Cannot refund: Missing user_id or amount is 0/undefined.", { user_id: booking.user_id, amount: booking.amount });
-        alert("Refund failed: Missing booking details.");
-        return;
+        setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...updates } : b)));
+        updatePendingBookingsCount();
+        if (newStatus === "cancelled" && updates.payment_status === "refunded" && booking.payment_status === "paid") {
+          toast.success("Booking cancelled and payment has been refunded.");
+        }
       }
-    }
-
-    const { error } = await updateBookingStatus(bookingId, updates);
-
-    if (error) {
-      console.error("Failed to update booking status", error);
-      alert(`Failed to update status: ${error || "Unknown error"}`);
-    } else {
-      setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, ...updates } : b)));
-      if (newStatus === "cancelled" && updates.payment_status === "refunded") {
-        alert("Booking cancelled and payment has been refunded.");
-      }
+    } catch (err) {
+      console.error("Unexpected error in performBookingUpdate", err);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setUpdatingBookingId(null);
+      setConfirmationModal({ isOpen: false, bookingId: null, action: null });
     }
   }
 
-  async function handleScanResult(result: any, error: any) {
-    if (!!result && !scannedBooking) {
-      const bookingId = result?.text;
-      if (!bookingId) return;
-
-      // Fetch the booking details from Supabase
-      const { data, error } = await supabase
-        .from("bookings")
-        .select('*, users(*)')
-        .eq('id', bookingId)
-        .single();
-
-      if (data) {
-        const user = Array.isArray(data.users) ? data.users[0] : data.users;
-        const b: Booking = {
-          id: data.id,
-          patient_name: data.patient_name || user?.fullname || user?.name || user?.whatsapp_number || (data.user_id ? `User ${data.user_id.slice(0, 6)}` : 'Unknown'),
-          appointment_date: data.date,
-          appointment_time: data.time,
-          type: data.type,
-          status: data.status,
-          payment_status: data.payment_status || (data.amount > 0 ? 'paid' : 'unpaid'),
-          ticket_number: data.ticket_number,
-          amount: data.amount,
-          user_id: data.user_id,
-        };
-        setScannedBooking(b);
-      }
+  function handleBookingAction(bookingId: string, action: "confirmed" | "cancelled" | "completed") {
+    if (action === "completed") {
+      performBookingUpdate(bookingId, action);
+    } else {
+      setConfirmationModal({ isOpen: true, bookingId, action });
     }
   }
 
@@ -633,13 +789,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       if (tab === "status") setShowStatus(true);
       if (tab === "availability") setIsEditingAvailability(false);
       if (tab === "profile") setIsEditingProfile(false);
-      if (tab === "scan") setScannedBooking(null);
+      if (tab === "schedule") {
+        setIsEditingAvailability(false);
+        setIsEditingSchedule(false);
+      }
       setLoadingTab("");
     }, 500);
   };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
       {/* Sidebar */}
       <div className="w-20 md:w-64 bg-white shadow-lg p-4 md:p-6 flex flex-col space-y-4 border-r border-gray-200 overflow-y-auto transition-all duration-300">
         <div className="mb-6 flex flex-col items-center justify-center">
@@ -702,6 +862,29 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <div className="relative">
           <button
+            onClick={() => handleNavClick("schedule")}
+            disabled={loadingTab === "schedule"}
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400"
+          >
+            {loadingTab === "schedule" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span className="hidden md:block">Days and Hours</span>
+              </>
+            )}
+          </button>
+          {activeTab === "schedule" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-teal-600 rounded-full"></div>}
+        </div>
+
+        <div className="relative">
+          <button
             onClick={() => handleNavClick("bookings")}
             disabled={loadingTab === "bookings"}
             className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400"
@@ -717,30 +900,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <span className="hidden md:block">Bookings</span>
+                {pendingBookingsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 md:top-1/2 md:-translate-y-1/2 md:right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-white">
+                    {pendingBookingsCount}
+                  </span>
+                )}
               </>
             )}
           </button>
           {activeTab === "bookings" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-green-600 rounded-full"></div>}
-        </div>
-
-        <div className="relative">
-          <button
-            onClick={() => handleNavClick("scan")}
-            disabled={loadingTab === "scan"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400"
-          >
-            {loadingTab === "scan" ? (
-              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                </svg>
-                <span className="hidden md:block">Scan Ticket</span>
-              </>
-            )}
-          </button>
-          {activeTab === "scan" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-teal-600 rounded-full"></div>}
         </div>
 
         <div className="relative">
@@ -1239,25 +1407,46 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <td className="py-3 px-4 flex gap-2">
                               {booking.status === 'pending' && (
                                 <button
-                                  onClick={() => handleUpdateStatus(booking.id, 'confirmed')}
-                                  className="text-green-600 hover:text-green-800 font-medium text-xs border border-green-200 bg-green-50 px-2 py-1 rounded"
+                                  onClick={() => handleBookingAction(booking.id, 'confirmed')}
+                                  disabled={updatingBookingId === booking.id}
+                                  className="text-green-600 hover:text-green-800 font-medium text-xs border border-green-200 bg-green-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
                                 >
+                                  {updatingBookingId === booking.id && (
+                                    <svg className="animate-spin h-3 w-3 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  )}
                                   Confirm
                                 </button>
                               )}
                               {booking.status === 'confirmed' && (
                                 <button
-                                  onClick={() => handleUpdateStatus(booking.id, 'completed')}
-                                  className="text-blue-600 hover:text-blue-800 font-medium text-xs border border-blue-200 bg-blue-50 px-2 py-1 rounded"
+                                  onClick={() => handleBookingAction(booking.id, 'completed')}
+                                  disabled={updatingBookingId === booking.id}
+                                  className="text-blue-600 hover:text-blue-800 font-medium text-xs border border-blue-200 bg-blue-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
                                 >
+                                  {updatingBookingId === booking.id && (
+                                    <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  )}
                                   Complete
                                 </button>
                               )}
                               {(booking.status === 'pending' || booking.status === 'confirmed') && (
                                 <button
-                                  onClick={() => handleUpdateStatus(booking.id, 'cancelled')}
-                                  className="text-red-600 hover:text-red-800 font-medium text-xs border border-red-200 bg-red-50 px-2 py-1 rounded"
+                                  onClick={() => handleBookingAction(booking.id, 'cancelled')}
+                                  disabled={updatingBookingId === booking.id}
+                                  className="text-red-600 hover:text-red-800 font-medium text-xs border border-red-200 bg-red-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
                                 >
+                                  {updatingBookingId === booking.id && (
+                                    <svg className="animate-spin h-3 w-3 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                  )}
                                   Cancel
                                 </button>
                               )}
@@ -1271,76 +1460,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 ) : (
                   <div className="text-center py-10 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                     <p>No bookings found.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === "scan" && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Scan Patient Ticket</h3>
-                {!scannedBooking ? (
-                  <div className="max-w-md mx-auto flex flex-col items-center">
-                    <div className="w-full bg-white rounded-lg overflow-hidden relative">
-                      <div id="reader" className="w-full"></div>
-                    </div>
-                    <p className="text-center mt-4 text-gray-500">Point your camera at the patient's ticket QR code.</p>
-                  </div>
-                ) : (
-                  <div className="max-w-2xl mx-auto">
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-6">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h4 className="text-lg font-bold text-gray-900">Ticket Found!</h4>
-                          <p className="text-green-700">Booking details retrieved successfully.</p>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-4 rounded-lg border border-gray-100">
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase font-semibold">Patient Name</p>
-                          <p className="text-lg font-medium text-gray-900">{scannedBooking.patient_name}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase font-semibold">Ticket Number</p>
-                          <p className="text-lg font-medium text-gray-900">{scannedBooking.ticket_number || "N/A"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase font-semibold">Date & Time</p>
-                          <p className="text-gray-900">{scannedBooking.appointment_date} at {scannedBooking.appointment_time}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase font-semibold">Status</p>
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs capitalize mt-1 ${
-                            scannedBooking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                            scannedBooking.status === 'completed' ? 'bg-purple-100 text-purple-700' :
-                            scannedBooking.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                          }`}>{scannedBooking.status}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 flex gap-3">
-                        {scannedBooking.status === 'confirmed' && (
-                          <button
-                            onClick={() => handleUpdateStatus(scannedBooking.id, 'completed')}
-                            className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-medium"
-                          >
-                            Mark as Completed
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setScannedBooking(null)}
-                          className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition font-medium"
-                        >
-                          Scan Another
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -1612,6 +1731,197 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               </div>
             )}
 
+            {activeTab === "schedule" && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="text-xl font-bold mb-6 text-gray-800">Manage Working Days & Hours</h3>
+                {isScheduleLoading ? (
+                  <div className="text-center py-10">Loading schedule...</div>
+                ) : !isEditingSchedule ? (
+                  <div className="space-y-6">
+                    {scheduleForm.length === 0 ? (
+                      <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-gray-500 mb-6">You haven't set up your working schedule yet.</p>
+                        <button
+                          onClick={() => setIsEditingSchedule(true)}
+                          className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+                        >
+                          Create Schedule
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {scheduleForm.map((item, idx) => (
+                            <div key={idx} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-bold text-lg text-gray-800">{item.day}</h4>
+                                <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                  <span className="text-gray-500">Hours</span>
+                                  <span className="font-medium text-gray-900">{item.start_time} - {item.end_time}</span>
+                                </div>
+                                {(item.break_start_time && item.break_end_time) ? (
+                                  <div className="flex justify-between items-center p-2 bg-orange-50 rounded text-orange-700">
+                                    <span className="opacity-75">Break</span>
+                                    <span className="font-medium">{item.break_start_time} - {item.break_end_time}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex justify-between items-center p-2 bg-gray-50 rounded text-gray-400">
+                                    <span>Break</span>
+                                    <span>None</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex justify-end pt-4 border-t border-gray-100">
+                          <button
+                            onClick={() => setIsEditingSchedule(true)}
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 font-medium"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            Edit Schedule
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-semibold text-gray-700">Weekly Schedule</h4>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleApplyToAllDays}
+                          className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                        >
+                          Apply to All Days
+                        </button>
+                        <button onClick={handleAddScheduleRow} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Day</button>
+                      </div>
+                    </div>
+
+                    {scheduleForm.length === 0 ? (
+                      <p className="text-gray-500 italic text-center py-4">No working days added yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {scheduleForm.map((item, idx) => (
+                          <div key={item._ui_id || idx} className="flex flex-col md:flex-row gap-3 items-end md:items-center bg-gray-50 p-3 rounded border border-gray-200">
+                            <div className="w-full md:w-32 shrink-0">
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Day</label>
+                              <select
+                                value={item.day}
+                                onChange={(e) => handleScheduleChange(idx, "day", e.target.value)}
+                                className="w-full border rounded px-2 py-1.5 text-sm"
+                              >
+                                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(d => (
+                                  <option key={d} value={d}>{d}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-full md:flex-1">
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Start</label>
+                              <input
+                                type="time"
+                                value={item.start_time}
+                                onChange={(e) => handleScheduleChange(idx, "start_time", e.target.value)}
+                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && item._ui_id) {
+                                    e.preventDefault();
+                                    endInputRefs.current.get(item._ui_id)?.focus();
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="w-full md:flex-1">
+                              <label className="block text-xs font-medium text-gray-500 mb-1">End</label>
+                              <input
+                                type="time"
+                                value={item.end_time}
+                                onChange={(e) => handleScheduleChange(idx, "end_time", e.target.value)}
+                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                ref={(el) => {
+                                  if (el && item._ui_id) endInputRefs.current.set(item._ui_id, el);
+                                  else if (item._ui_id) endInputRefs.current.delete(item._ui_id);
+                                }}
+                              />
+                            </div>
+                            <div className="w-full md:flex-1">
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Break Start</label>
+                              <input
+                                type="time"
+                                value={item.break_start_time || ""}
+                                onChange={(e) => handleScheduleChange(idx, "break_start_time", e.target.value)}
+                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && item._ui_id) {
+                                    e.preventDefault();
+                                    breakEndInputRefs.current.get(item._ui_id)?.focus();
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="w-full md:flex-1">
+                              <label className="block text-xs font-medium text-gray-500 mb-1">Break End</label>
+                              <input
+                                type="time"
+                                value={item.break_end_time || ""}
+                                onChange={(e) => handleScheduleChange(idx, "break_end_time", e.target.value)}
+                                className="w-full border rounded px-2 py-1.5 text-sm"
+                                ref={(el) => {
+                                  if (el && item._ui_id) breakEndInputRefs.current.set(item._ui_id, el);
+                                  else if (item._ui_id) breakEndInputRefs.current.delete(item._ui_id);
+                                }}
+                              />
+                            </div>
+                            <button onClick={() => handleRemoveScheduleRow(idx)} className="text-red-600 p-2 hover:bg-red-50 rounded">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="pt-4 flex gap-3">
+                      <button
+                        onClick={() => setIsEditingSchedule(false)}
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                        disabled={isSavingSchedule}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveSchedule}
+                        disabled={isSavingSchedule}
+                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-400 transition flex items-center gap-2"
+                      >
+                        {isSavingSchedule ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving...
+                          </>
+                        ) : "Save Schedule"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {showLogoutConfirm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
                 <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
@@ -1638,6 +1948,74 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           Logging out...
                         </>
                       ) : "Logout"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {confirmationModal.isOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
+                <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    {confirmationModal.action === "confirmed" ? "Confirm Booking" : "Cancel Booking"}
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {confirmationModal.action === "confirmed"
+                      ? "Are you sure you want to confirm this booking?"
+                      : "Are you sure you want to cancel this booking? This action cannot be undone."}
+                  </p>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setConfirmationModal({ isOpen: false, bookingId: null, action: null })}
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      disabled={!!updatingBookingId}
+                    >
+                      No, Go Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirmationModal.bookingId && confirmationModal.action) {
+                          performBookingUpdate(confirmationModal.bookingId, confirmationModal.action);
+                        }
+                      }}
+                      disabled={!!updatingBookingId}
+                      className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 ${
+                        confirmationModal.action === "confirmed" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                      }`}
+                    >
+                      {updatingBookingId ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </>
+                      ) : "Yes, Proceed"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showDeleteLocationConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
+                <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Deletion</h3>
+                  <p className="text-gray-600 mb-6">Are you sure you want to delete this location?</p>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => setShowDeleteLocationConfirm(false)}
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDeleteLocation}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Delete
                     </button>
                   </div>
                 </div>

@@ -103,6 +103,12 @@ export default function PharmacyDetailScreen() {
       return;
     }
 
+    const incrementView = async () => {
+      const { error } = await supabase.rpc('increment_pharmacy_view', { row_id: id });
+      if (error) console.error('Error incrementing views:', error);
+    };
+    incrementView();
+
     const fetchPharmacyDetails = async () => {
       setLoading(true);
       const { data, error: dbError } = await supabase
