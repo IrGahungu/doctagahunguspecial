@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast, Toaster } from "react-hot-toast";
 
 type Pharmacy = {
   id: string;
@@ -266,7 +267,7 @@ export default function PharmacyPage() {
       }
       if (!res.ok) throw new Error(result.error || "Failed to save Pharmacy");
 
-      alert("Application is submitted successfully, Please login to see the status");
+      toast.success("Application is submitted successfully, Please login to see the status");
       router.push("/login");
     } catch (err) {
       console.error(err);
@@ -278,6 +279,7 @@ export default function PharmacyPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Toaster position="top-center" />
       <div className="w-full max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center mb-15">
           <h1 className="inline-block text-2xl font-extrabold tracking-tight text-slate-900 border-b-2 border-green-300 pb-2">

@@ -105,6 +105,9 @@ export default function LoginPage() {
             {showPassword ? "Hide" : "Show"}
           </button>
         </div>
+        <div className="flex justify-end">
+          <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">Forgot Password?</Link>
+        </div>
         <button type="submit" className="w-full p-3 bg-green-600 text-white rounded-lg flex justify-center items-center" disabled={busy}>
           {busy ? (
             <Spinner />
@@ -112,7 +115,7 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="text-center mt-4">
-        <Link href="/" className="text-blue-600 underline">Go to homepage</Link>
+        <Link href="/" className="text-blue-600 underline">Go to Homepage</Link>
       </p>
     </div>
   );

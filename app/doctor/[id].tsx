@@ -59,6 +59,7 @@ type Doctor = {
   specialty: string | null;
   location: any[] | null;
   bio: string | null;
+  work_schedule: any[] | null;
   booking_type: "online" | "in-office" | "both" | null;
   availability: Availability[] | null;
   consultation_fee_online: number | null;
@@ -90,6 +91,11 @@ export default function DoctorDetailScreen() {
   const checkmarkScale = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [showConfetti, setShowConfetti] = useState(false);
+
+  const currentDayName = useMemo(() => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[new Date().getDay()];
+  }, []);
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -170,6 +176,7 @@ export default function DoctorDetailScreen() {
         const data = {
           ...rawData,
           location: parseArrayField(rawData.location || params.location),
+          work_schedule: parseArrayField(rawData.work_schedule),
           // Explicitly convert to numbers to ensure math works
           consultation_fee_online: Number(rawData.consultation_fee_online || 0),
           consultation_fee_offline: Number(rawData.consultation_fee_offline || 0),
@@ -604,7 +611,6 @@ export default function DoctorDetailScreen() {
                             )}
                             <Text style={styles.locationType}>{loc.type || 'Location'} {loc.city ? `- ${loc.city}` : ''}</Text>
                             <Text style={styles.locationAddress}>{loc.address}</Text>
-                            {loc.phone ? <Text style={styles.locationPhone}>📞 {loc.phone}</Text> : null}
                             {loc.latitude && loc.longitude && !isNaN(Number(loc.latitude)) && !isNaN(Number(loc.longitude)) && (
                               <TouchableOpacity
                                 onPress={() => {
@@ -623,9 +629,9 @@ export default function DoctorDetailScreen() {
                                     ]
                                   );
                                 }}
-                                style={{ marginTop: 5 }}
+                                style={styles.mapButton}
                               >
-                                <Text style={{ color: '#1E88E5', textDecorationLine: 'underline', fontSize: 13, fontFamily: 'Roboto-Medium' }}>Open in Google Maps</Text>
+                                <Text style={styles.mapButtonText}>Open in Google Maps</Text>
                               </TouchableOpacity>
                             )}
                           </View>
@@ -643,6 +649,41 @@ export default function DoctorDetailScreen() {
                 <Text style={styles.bio}>
                   {doctor.bio || `Dr. ${doctor.name} is a dedicated ${doctor.specialty?.toLowerCase()} professional.`}
                 </Text>
+
+                {doctor.work_schedule && doctor.work_schedule.length > 0 && (
+                  <View style={{ marginTop: 8, marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                      <Icon name="schedule" size={20} color="green" style={{ marginRight: 8 }} />
+                      <Text style={styles.bioTitle}>Working Hours</Text>
+                    </View>
+                    <View style={styles.scheduleCard}>
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, index) => {
+                        const item = doctor.work_schedule?.find((s: any) => s.day === day);
+                        const isToday = day === currentDayName;
+                        return (
+                        <View key={index} style={[
+                          styles.scheduleRow,
+                          index !== 6 && styles.scheduleRowBorder,
+                          isToday && styles.scheduleRowToday
+                        ]}>
+                          <Text style={[styles.scheduleDay, isToday && styles.scheduleTextToday]}>{day}</Text>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            {item ? (
+                              <>
+                                <Text style={[styles.scheduleTime, isToday && styles.scheduleTextToday]}>{item.start_time} - {item.end_time}</Text>
+                                {item.break_start_time && item.break_end_time && (
+                                  <Text style={[styles.breakTime, isToday && styles.scheduleTextToday]}>Break: {item.break_start_time} - {item.break_end_time}</Text>
+                                )}
+                              </>
+                            ) : (
+                              <Text style={[styles.scheduleTime, { color: '#E53935', fontStyle: 'italic' }, isToday && styles.scheduleTextToday]}>Closed</Text>
+                            )}
+                          </View>
+                        </View>
+                      )})}
+                    </View>
+                  </View>
+                )}
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16 }}>
                   <Icon name="event-available" size={20} color="green" style={{ marginRight: 8 }} />
@@ -1208,5 +1249,61 @@ backButton: {
   map: {
     width: '100%',
     height: '100%',
+  },
+  scheduleCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+    marginLeft: 30,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  scheduleRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  scheduleDay: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
+    color: '#212121',
+  },
+  scheduleTime: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Regular',
+    color: '#555',
+  },
+  breakTime: {
+    fontSize: 12,
+    fontFamily: 'Roboto-Regular',
+    color: '#E65100',
+    marginTop: 2,
+  },
+  scheduleRowToday: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    marginHorizontal: -6,
+  },
+  scheduleTextToday: {
+    color: '#2E7D32',
+    fontFamily: 'Roboto-Bold',
+  },
+  mapButton: {
+    marginTop: 8,
+    backgroundColor: '#1E88E5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  mapButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Roboto-Medium',
   },
 });

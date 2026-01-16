@@ -443,7 +443,6 @@ export default function InsuranceDetailScreen() {
                           )}
                           <Text style={styles.locationType}>{loc.type} - {loc.city}</Text>
                           <Text style={styles.locationAddress}>{loc.address}</Text>
-                          {loc.phone ? <Text style={styles.locationPhone}>📞 {loc.phone}</Text> : null}
                           {loc.latitude && loc.longitude && !isNaN(parseFloat(loc.latitude)) && !isNaN(parseFloat(loc.longitude)) && (
                             <TouchableOpacity
                               onPress={() => {
@@ -462,9 +461,9 @@ export default function InsuranceDetailScreen() {
                                   ]
                                 );
                               }}
-                              style={{ marginTop: 5 }}
+                              style={styles.mapButton}
                             >
-                              <Text style={{ color: '#1E88E5', textDecorationLine: 'underline', fontSize: 13, fontFamily: 'Roboto-Medium' }}>Open in Google Maps</Text>
+                              <Text style={styles.mapButtonText}>Open in Google Maps</Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -855,5 +854,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     width: '80%',
     textAlign: 'center',
+  },
+  mapButton: {
+    marginTop: 8,
+    backgroundColor: '#1E88E5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  mapButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Roboto-Medium',
   },
 });

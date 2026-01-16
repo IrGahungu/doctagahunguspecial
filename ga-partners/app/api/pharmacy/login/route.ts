@@ -1,6 +1,5 @@
 // ga-partners/app/api/doctor/login/route.ts
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { cookies } from "next/headers";
 
@@ -18,7 +17,7 @@ export async function POST(req: Request) {
     if (error) throw error;
     if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = password === user.password_hash;
     if (!ok) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 
     // Set a simple cookie with user id (for demo). In production use secure, signed sessions.

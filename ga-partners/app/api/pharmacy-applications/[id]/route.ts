@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import bcrypt from "bcryptjs";
 
 export async function GET(
   request: Request,
@@ -62,13 +61,6 @@ export async function PUT(
       if (body.location !== undefined) userUpdates.location = body.location;
       if (body.origin_country !== undefined) userUpdates.origin_country = body.origin_country;
       
-      // Handle password update if provided
-      if (password && password.trim() !== "") {
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(password, salt);
-        userUpdates.password_hash = hash;
-      }
-
       if (Object.keys(userUpdates).length > 0) {
         console.log(`Syncing pharmacy_users for ${data.email}:`, userUpdates);
         

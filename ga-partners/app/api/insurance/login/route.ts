@@ -1,6 +1,5 @@
 // ga-partners/app/api/insurance/login/route.ts
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { cookies } from "next/headers";
 
@@ -26,7 +25,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const ok = await bcrypt.compare(password, user.password_hash);
+    const ok = password === user.password_hash;
     if (!ok) {
       console.log("Password mismatch");
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });

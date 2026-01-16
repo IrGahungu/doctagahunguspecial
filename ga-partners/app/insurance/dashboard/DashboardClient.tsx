@@ -78,13 +78,23 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     const [hospitalsList, setHospitalsList] = useState<string[]>([]);
     const [pharmaciesList, setPharmaciesList] = useState<string[]>([]);
     const [officeLocations, setOfficeLocations] = useState<{ type: string; city: string; address: string; phone: string; latitude: string; longitude: string }[]>([]);
-  
+    const [isEditingPassword, setIsEditingPassword] = useState(false);
+    const [isSavingPassword, setIsSavingPassword] = useState(false);
+    const [showOldPassword, setShowOldPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const statusColorMap = {
     pending: "text-yellow-500",
     approved: "text-green-500",
     rejected: "text-red-500",
   };
+
+  const [passwordForm, setPasswordForm] = useState({
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -98,6 +108,44 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       router.push("/login");
     }
   }
+
+  async function handlePasswordUpdate() {
+        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+          toast.error("New passwords do not match");
+          return;
+        }
+        if (!passwordForm.oldPassword) {
+          toast.error("Please enter your current password");
+          return;
+        }
+        if (passwordForm.newPassword.length < 6) {
+          toast.error("New password must be at least 6 characters");
+          return;
+        }
+    
+        setIsSavingPassword(true);
+        try {
+          const res = await fetch(`/api/insurance/change-password`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: app.id,
+              oldPassword: passwordForm.oldPassword,
+              newPassword: passwordForm.newPassword,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to update password");
+          toast.success("Password updated successfully");
+          setIsEditingPassword(false);
+          setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+        } catch (e: any) {
+          console.error(e);
+          toast.error(e.message || "Error updating password");
+        } finally {
+          setIsSavingPassword(false);
+        }
+      }
 
   const handleNavClick = (tab: string) => {
     if (app.status !== "approved" && tab !== "status") {
@@ -498,6 +546,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <div className="relative">
           <button
+            onClick={() => handleNavClick("settings")}
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400"
+          >
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="hidden md:block">Settings</span>
+              </>
+          </button>
+          {activeTab === "settings" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-gray-600 rounded-full"></div>}
+        </div>
+
+        <div className="relative">
+          <button
             onClick={() => handleNavClick("status")}
             className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
           >
@@ -538,12 +602,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 {isDashboardLoading ? (
                   <div className="text-center py-10">Loading stats...</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
-                      <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
-                      <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
+                        <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
+                      </div>
                     </div>
-                  </div>
+                    <div className="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h4 className="text-gray-800 font-bold mb-4">Recent Activity</h4>
+                      <div className="text-center py-8 text-gray-400 italic">
+                        No recent activity found.
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -1163,30 +1235,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       </div>
                     </div>
 
-                    <div className="border-t border-gray-100 pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-800 mb-4">Change Password <span className="text-sm font-normal text-gray-500">(Leave blank to keep current)</span></h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block font-semibold text-gray-700 mb-1">New Password</label>
-                          <input
-                            type="password"
-                            value={profileForm.password}
-                            onChange={(e) => setProfileForm(prev => ({ ...prev, password: e.target.value }))}
-                            className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Confirm New Password</label>
-                          <input
-                            type="password"
-                            value={profileForm.confirmPassword}
-                            onChange={(e) => setProfileForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                            className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingProfile(false)}
@@ -1207,6 +1255,131 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </>
                         ) : "Save Profile"}
                       </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {activeTab === "settings" && (
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="text-xl font-bold mb-6 text-gray-800">Settings</h3>
+                {isProfileLoading ? (
+                  <div className="text-center py-10">Loading settings...</div>
+                ) : (
+                  <div className="max-w-2xl">
+                    <div className="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+                      <div className="text-lg font-bold text-gray-900">{profileForm.name}</div>
+                    </div>
+
+                    <div className="border-t border-gray-100 pt-6">
+                      <h4 className="font-bold text-gray-800 mb-4">Security</h4>
+                      {!isEditingPassword ? (
+                        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Password</label>
+                            <div className="text-lg font-bold text-gray-900">••••••••</div>
+                          </div>
+                          <button
+                            onClick={() => setIsEditingPassword(true)}
+                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium"
+                          >
+                            Update Password
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
+                          <div>
+                            <label className="block font-semibold text-gray-700 mb-1">Current Password</label>
+                            <div className="relative">
+                              <input
+                                type={showOldPassword ? "text" : "password"}
+                                value={passwordForm.oldPassword}
+                                onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
+                                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
+                                placeholder="Enter current password"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowOldPassword(!showOldPassword)}
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                              >
+                                {showOldPassword ? (
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-gray-700 mb-1">New Password</label>
+                            <div className="relative">
+                              <input
+                                type={showNewPassword ? "text" : "password"}
+                                value={passwordForm.newPassword}
+                                onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
+                                placeholder="Enter new password"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                              >
+                                {showNewPassword ? (
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block font-semibold text-gray-700 mb-1">Confirm New Password</label>
+                            <div className="relative">
+                              <input
+                                type={showConfirmPassword ? "text" : "password"}
+                                value={passwordForm.confirmPassword}
+                                onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
+                                placeholder="Confirm new password"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                              >
+                                {showConfirmPassword ? (
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="pt-2 flex gap-3">
+                            <button
+                              onClick={() => {
+                                setIsEditingPassword(false);
+                                setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
+                              }}
+                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                              disabled={isSavingPassword}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handlePasswordUpdate}
+                              disabled={isSavingPassword || !passwordForm.newPassword || !passwordForm.oldPassword}
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+                            >
+                              {isSavingPassword ? "Updating..." : "Save Password"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -109,7 +109,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Header />
       <ScrollView style={styles.content}>
         <View style={styles.profileSection}>
@@ -159,7 +159,7 @@ export default function AccountScreen() {
 
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

@@ -99,7 +99,7 @@ export default function CategoriesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Header />
       <Text style={styles.pageTitle}>All Categories</Text>
       {loading ? (
@@ -114,7 +114,7 @@ export default function CategoriesScreen() {
           contentContainerStyle={styles.listContent}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

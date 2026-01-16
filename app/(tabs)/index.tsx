@@ -322,12 +322,12 @@ const renderMainContent = () => (
 //
 return (
   <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Header />
 
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
-          <Icon name="search" size={20} color="#888" />
+          <Icon name="search" size={20} color="#2874F0" />
           <TextInput
             style={styles.searchInput}
             placeholder="Ronderera hano na Gahungu Search..."
@@ -368,7 +368,7 @@ return (
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   </TouchableWithoutFeedback>
 );
 }
@@ -392,6 +392,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#2874F0',
     paddingHorizontal: 15,
     paddingVertical: 10,
     elevation: 4,
@@ -400,5 +402,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 10,
     fontSize: 14,
+    color: 'black',
   },
 });

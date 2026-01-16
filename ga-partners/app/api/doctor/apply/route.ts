@@ -1,6 +1,5 @@
 // ga-partners/app/api/doctor/apply/route.ts
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
 
@@ -40,7 +39,7 @@ export async function POST(req: Request) {
     // We generate a simple uuid for user id.
     const userId = uuidv4();
     // Hash password
-    const hash = await bcrypt.hash(password, 10);
+    const hash = password;
 
     // Check if email already exists
     const { data: existing } = await supabaseAdmin

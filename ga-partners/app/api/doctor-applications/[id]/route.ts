@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import bcrypt from "bcryptjs";
 
 export async function GET(
   request: Request,
@@ -71,9 +70,7 @@ export async function PUT(
       
       // Handle password update if provided
       if (password && password.trim() !== "") {
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(password, salt);
-        userUpdates.password_hash = hash;
+        userUpdates.password_hash = password;
       }
 
       if (Object.keys(userUpdates).length > 0) {

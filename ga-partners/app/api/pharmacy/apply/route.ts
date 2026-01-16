@@ -1,6 +1,5 @@
 // ga-partners/app/api/pharmacy/apply/route.ts
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
 
@@ -28,8 +27,6 @@ export async function POST(req: Request) {
     // 1) Create user in doctor_users table (if email exists, return 409)
     // We generate a simple uuid for user id.
     const userId = uuidv4();
-    // Hash password
-    const hash = await bcrypt.hash(password, 10);
 
     // Check if email already exists
     const { data: existing } = await supabaseAdmin
@@ -45,7 +42,7 @@ export async function POST(req: Request) {
     const { error: insertUserErr } = await supabaseAdmin
       .from("pharmacy_users")
       .insert([
-        { id: userId, email, password_hash: hash }
+        { id: userId, email, password_hash: password }
       ]);
 
     if (insertUserErr) {
@@ -72,7 +69,7 @@ export async function POST(req: Request) {
           id: userId,
           name: nameWithSequence,
           email,
-          password: hash,
+          password: password,
           whatsapp_number,
           location,
           payment_id,
@@ -144,14 +141,12 @@ export async function PUT(req: Request) {
     };
 
     if (password) {
-      const hash = await bcrypt.hash(password, 10);
-
       await supabaseAdmin
         .from("pharmacy_users")
-        .update({ email, password_hash: hash })
+        .update({ email, password_hash: password })
         .eq("id", id);
 
-      updates.password = hash;
+      updates.password = password;
     } else {
       await supabaseAdmin
         .from("pharmacy_users")

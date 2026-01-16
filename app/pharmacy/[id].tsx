@@ -338,6 +338,10 @@ export default function PharmacyDetailScreen() {
     setPinCode(''); // Clear PIN on modal close
   };
 
+  const handleContactPress = () => {
+    Alert.alert('Alert', 'I may the app');
+  };
+
   const openMap = (loc: Location) => {
     const query = loc.latitude && loc.longitude
       ? `${loc.latitude},${loc.longitude}`
@@ -493,13 +497,25 @@ export default function PharmacyDetailScreen() {
                     <Text style={styles.subSectionTitle}>Contact Details</Text>
                   </View>
                   <View style={{ marginLeft: 30 }}>
-                    {pharmacy.contact_email ? <Text style={styles.contactText}>📧 {pharmacy.contact_email}</Text> : null}
-                    {pharmacy.contact_phone ? <Text style={styles.contactText}>📞 {pharmacy.contact_phone}</Text> : null}
-                    {pharmacy.contact_office ? <Text style={styles.contactText}>🏢 {pharmacy.contact_office}</Text> : null}
+                    {pharmacy.contact_email ? (
+                      <TouchableOpacity onPress={handleContactPress}>
+                        <Text style={styles.contactText}>
+                          Email: <Text style={{ color: 'blue', textDecorationLine: 'underline' }}>{pharmacy.contact_email}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {pharmacy.contact_phone ? (
+                      <TouchableOpacity onPress={handleContactPress}>
+                        <Text style={styles.contactText}>
+                          Phone: <Text style={{ color: 'blue', textDecorationLine: 'underline' }}>{pharmacy.contact_phone}</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    {pharmacy.contact_office ? <Text style={styles.contactText}>Office: {pharmacy.contact_office}</Text> : null}
                     {pharmacy.contact_website ? (
-                      <TouchableOpacity onPress={() => Linking.openURL(pharmacy.contact_website!)}>
-                        <Text style={[styles.contactText, { color: 'blue', textDecorationLine: 'underline' }]}>
-                          🌐 {pharmacy.contact_website}
+                      <TouchableOpacity onPress={handleContactPress}>
+                        <Text style={styles.contactText}>
+                          Website: <Text style={{ color: 'blue', textDecorationLine: 'underline' }}>{pharmacy.contact_website}</Text>
                         </Text>
                       </TouchableOpacity>
                     ) : null}

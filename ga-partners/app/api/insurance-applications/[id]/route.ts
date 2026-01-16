@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { v4 as uuidv4 } from "uuid";
 
@@ -33,13 +32,12 @@ export async function POST(req: Request) {
 
     // Create user
     const userId = uuidv4();
-    const hashedPassword = await bcrypt.hash(password, 10);
     const { error: userInsertError } = await supabaseAdmin
       .from("insurance_users")
       .insert([{  
         id: userId, // Add this line to link the user to themselves
         email, 
-        password_hash: hashedPassword,
+        password_hash: password,
         name,
         status: "pending",
         country,
@@ -54,12 +52,12 @@ export async function POST(req: Request) {
 
     // Create application
     const { error: appInsertError } = await supabaseAdmin
-      .from("doctor_applications")
+      .from("insurance_applications")
       .insert([{
         id: userId,
         name,
         email,
-        password: hashedPassword,
+        password: password,
         country,
         whatsapp_number,
         location,
@@ -85,4 +83,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || "Server error" }, { status: 500 });
   }
 }
-
