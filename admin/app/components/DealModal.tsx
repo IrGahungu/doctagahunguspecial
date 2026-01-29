@@ -110,11 +110,15 @@ export default function DealModal({
       const url = "/api/deals";
       const method = editingDeal ? "PUT" : "POST";
 
+      const imageFilename = dealForm.image.split("/").pop() || "";
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
-          editingDeal ? { ...dealForm, id: editingDeal.id } : dealForm
+          editingDeal
+            ? { ...dealForm, image: imageFilename, id: editingDeal.id }
+            : { ...dealForm, image: imageFilename }
         ),
       });
 

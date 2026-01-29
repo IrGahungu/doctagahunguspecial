@@ -138,7 +138,7 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll }: 
                 source={
                   doctor.image
                     ? { uri: doctor.image }
-                    : require('@/assets/images/Doctor1.jpg')
+                    : require('@/assets/images/two.jpg')
                 }
                 style={styles.image}
                 resizeMode="cover"

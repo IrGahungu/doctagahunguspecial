@@ -102,13 +102,15 @@ export default function BannerModal({
       const url = "/api/banners";
       const method = editingBanner ? "PUT" : "POST";
 
+      const imageFilename = bannerForm.image.split("/").pop() || "";
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           editingBanner
-            ? { ...bannerForm, id: editingBanner.id }
-            : bannerForm
+            ? { ...bannerForm, image: imageFilename, id: editingBanner.id }
+            : { ...bannerForm, image: imageFilename }
         ),
       });
 

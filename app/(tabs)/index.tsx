@@ -92,6 +92,9 @@ type SearchResultsState = {
   insurances: Insurance[];
 };
 
+const BANNER_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/banner-images/";
+const DEAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/deal-images/";
+
 //
 // =======================
 // COMPONENT
@@ -305,9 +308,9 @@ const hasSearchResults = Object.values(searchResults).some(
 //
 const renderMainContent = () => (
   <View key={contentKey}>
-    <Carousel />
+    <Carousel baseUrl={BANNER_URL_PREFIX} />
     <CategorySlider />
-    <DealSection title="Deals of the Day" />
+    <DealSection title="Deals of the Day" baseUrl={DEAL_URL_PREFIX} />
     <ProductGrid title="Recommended for You" />
     <FeaturedPharmacies title="Featured Pharmacies" />
     <FeaturedHospitals />

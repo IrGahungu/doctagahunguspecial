@@ -15,6 +15,7 @@ import {
 // import { Banner } from '../types'; 
 import { supabase } from "@/lib/supabase";
 import * as SecureStore from "expo-secure-store";
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH;
@@ -27,7 +28,11 @@ type Banner = {
   link: string;
 };
 
-const Carousel: React.FC = () => {
+interface CarouselProps {
+  baseUrl?: string;
+}
+
+const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
@@ -117,7 +122,18 @@ const Carousel: React.FC = () => {
         {banners.map((item) => (
           <TouchableOpacity key={item.id} activeOpacity={0.9} style={styles.slide}>
             <View style={styles.imageWrapper}>
-              <Image source={{ uri: item.image }} style={styles.image} />
+              {item.image ? (
+                <Image 
+                  source={{ 
+                    uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image 
+                  }} 
+                  style={styles.image} 
+                />
+              ) : (
+                <View style={[styles.image, styles.placeholderImage]}>
+                  <Icon name="image" size={60} color="#ccc" />
+                </View>
+              )}
             </View>
           </TouchableOpacity>
         ))}
@@ -163,6 +179,11 @@ const styles = StyleSheet.create({
     resizeMode: 'cover', // Show the whole image
     backgroundColor: '#fff', // Optional: for images with transparency
     borderRadius: 20,
+  },
+  placeholderImage: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pagination: {
     flexDirection: 'row',

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function LoginPage() {
         minHeight: "80vh",
         padding: 20
       }}>
-        <h1 style={{ textAlign: "center", marginBottom: 40 }}>
+        <h1 style={{ textAlign: "center", marginBottom: 40, fontWeight: "bold" }}>
           WELCOME ONBOARD M.SC. I.T JEAN KEVIN GAHUNGU
         </h1>
         <form
@@ -73,15 +74,31 @@ export default function LoginPage() {
             placeholder="WhatsApp Number"
             value={whatsappNumber}
             onChange={(e) => setWhatsappNumber(e.target.value)}
-            style={{ padding: 10, fontSize: 16 }}
+            style={{ padding: 10, fontSize: 16, border: "1px solid black"}}
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ padding: 10, fontSize: 16 }}
-          />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ padding: 10, fontSize: 16, width: '100%', border: "1px solid black" }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: 10,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#333'
+              }}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           <button
             type="submit"
             disabled={loading}

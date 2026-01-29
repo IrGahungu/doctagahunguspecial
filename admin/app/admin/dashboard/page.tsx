@@ -111,6 +111,9 @@ const Spinner = ({ className = "h-5 w-5" }: { className?: string }) => (
   </svg>
 );
 
+const BANNER_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/banner-images/";
+const DEAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/deal-images/";
+
 export default function AdminDashboard() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
@@ -446,7 +449,13 @@ export default function AdminDashboard() {
   }
 
   function openEditBannerModal(banner: Banner) {
-    setEditingBanner(banner);
+    const bannerWithFullUrl = {
+      ...banner,
+      image: banner.image && !banner.image.startsWith("http") 
+        ? `${BANNER_URL_PREFIX}${banner.image}` 
+        : banner.image
+    };
+    setEditingBanner(bannerWithFullUrl);
     setBannerModalOpen(true);
   }
 
@@ -485,7 +494,13 @@ export default function AdminDashboard() {
   }
 
   function openEditDealModal(deal: Deal) {
-    setEditingDeal(deal);
+    const dealWithFullUrl = {
+      ...deal,
+      image: deal.image && !deal.image.startsWith("http")
+        ? `${DEAL_URL_PREFIX}${deal.image}`
+        : deal.image
+    };
+    setEditingDeal(dealWithFullUrl);
     setDealModalOpen(true);
   }
 
@@ -1185,7 +1200,7 @@ export default function AdminDashboard() {
                   <tr key={banner.id} className="border-t">
                     <td className="p-2">
                       {banner.image ? (
-                        <img src={banner.image} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
+                        <img src={banner.image.startsWith("http") ? banner.image : `${BANNER_URL_PREFIX}${banner.image}`} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
                       ) : (
                         <span className="text-gray-400">No Image</span>
                       )}
@@ -1248,7 +1263,7 @@ export default function AdminDashboard() {
                   <tr key={deal.id} className="border-t">
                     <td className="p-2">
                       {deal.image ? (
-                        <img src={deal.image} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
+                        <img src={deal.image.startsWith("http") ? deal.image : `${DEAL_URL_PREFIX}${deal.image}`} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
                       ) : (
                         <span className="text-gray-400">No Image</span>
                       )}

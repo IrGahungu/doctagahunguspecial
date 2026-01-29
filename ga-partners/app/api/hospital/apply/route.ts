@@ -1,3 +1,4 @@
+
 // ga-partners/app/api/hospital/apply/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -5,26 +6,39 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const formData: any = await req.formData();
 
-    const {
-      name,
-      email,
-      whatsapp_number,
-      locations,
-      password,
-      image,
-      agreementImage,
-      payment_id,
-      country,
-      origin_country,
-    } = body;
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const whatsapp_number = formData.get("whatsapp_number") as string;
+    const locations = formData.get("locations") as string;
+    const password = formData.get("password") as string;
+    const payment_id = formData.get("payment_id") as string;
+    const country = formData.get("country") as string;
+    const origin_country = formData.get("origin_country") as string;
+    
+    const imageFile = formData.get("image");
+    let imagePath = null;
+
+    if (imageFile && imageFile instanceof File) {
+      const fileExt = imageFile.name.split(".").pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("hospital-images")
+        .upload(fileName, imageFile, {
+          contentType: imageFile.type,
+          upsert: true,
+        });
+      if (uploadError) throw uploadError;
+      imagePath = fileName;
+    } else if (typeof imageFile === "string") {
+      imagePath = imageFile;
+    }
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
     }
 
-    // 1) Create user in doctor_users table (if email exists, return 409)
     // We generate a simple uuid for user id.
     const userId = uuidv4();
 
@@ -62,8 +76,7 @@ export async function POST(req: Request) {
           whatsapp_number,
           locations,
           payment_id,
-          image: image || null,
-          agreement_image: agreementImage || null,
+          image: imagePath,
           status: "pending",
           country,
           origin_country,
@@ -84,37 +97,65 @@ export async function POST(req: Request) {
   }
 }
 
+
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
-    const {
-      id,
-      name,
-      email,
-      whatsapp_number,
-      password,
-      image,
-      agreementImage,
-      payment_id,
-      country,
-      origin_country,
-      hospital_plans,
-      coverage_summary,
-      claim_process,
-      partner_hospitals,
-      partner_pharmacies,
-      contact_details,
-      locations,
-      available_services,
-      available_blood_types,
-      medical_equipment,
-      service_summary,
-      admission_process,
-      partner_insurances,
-    } = body;
+    const formData: any = await req.formData();
+    const id = formData.get("id") as string;
 
     if (!id) {
       return NextResponse.json({ error: "Application ID is required" }, { status: 400 });
+    }
+
+    // Define allowed fields for partial updates
+    const allowedFields = [
+      "name",
+      "email",
+      "whatsapp_number",
+      "password",
+      "image",
+      "payment_id",
+      "country",
+      "origin_country",
+      "hospital_plans",
+      "coverage_summary",
+      "claim_process",
+      "partner_hospitals",
+      "partner_pharmacies",
+      "contact_details",
+      "locations",
+      "available_services",
+      "available_blood_types",
+      "medical_equipment",
+      "service_summary",
+      "admission_process",
+      "partner_insurances"
+    ];
+
+    const updates: any = {};
+
+    // Only add fields to updates if they exist in formData
+    for (const field of allowedFields) {
+      if (formData.has(field)) {
+        updates[field] = formData.get(field);
+      }
+    }
+
+    // Handle image separately
+    const imageFile = formData.get("image");
+    if (imageFile && imageFile instanceof File) {
+      const fileExt = imageFile.name.split(".").pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("hospital-images")
+        .upload(fileName, imageFile, {
+          contentType: imageFile.type,
+          upsert: true,
+        });
+      if (uploadError) throw uploadError;
+      updates.image = fileName;
+    } else if (typeof imageFile === "string" && imageFile) {
+      updates.image = imageFile;
     }
 
     const { data: currentApp } = await supabaseAdmin
@@ -123,57 +164,36 @@ export async function PUT(req: Request) {
       .eq("id", id)
       .maybeSingle();
 
-    const updates: any = {
-      name,
-      email,
-      whatsapp_number,
-      payment_id,
-      image,
-      agreement_image: agreementImage,
-      country,
-      origin_country,
-      hospital_plans,
-      coverage_summary,
-      claim_process,
-      partner_hospitals,
-      partner_pharmacies,
-      partner_insurances,
-      contact_details,
-      locations: locations,
-      available_services,
-      available_blood_types,
-      medical_equipment,
-      service_summary,
-      admission_process,
-    };
-
     if (currentApp?.status === "rejected") {
       updates.status = "pending";
       updates.rejection_reason = null;
     }
 
-    if (password) {
-      updates.password = password;
+    // Handle User Table Updates (Email/Password)
+    const userUpdates: any = {};
+    if (formData.has("email")) userUpdates.email = formData.get("email");
+    if (formData.has("password")) {
+      const pwd = formData.get("password") as string;
+      if (pwd) userUpdates.password_hash = pwd;
+    }
 
+    if (Object.keys(userUpdates).length > 0) {
       const { error: userErr } = await supabaseAdmin
         .from("hospital_users")
-        .update({ email, password_hash: password })
-        .eq("id", id);
-      if (userErr) throw userErr;
-    } else {
-      const { error: userErr } = await supabaseAdmin
-        .from("hospital_users")
-        .update({ email })
+        .update(userUpdates)
         .eq("id", id);
       if (userErr) throw userErr;
     }
 
-    const { error } = await supabaseAdmin
-      .from("hospital_applications")
-      .update(updates)
-      .eq("id", id);
+    // Only perform application update if there are changes
+    if (Object.keys(updates).length > 0) {
+      const { error } = await supabaseAdmin
+        .from("hospital_applications")
+        .update(updates)
+        .eq("id", id);
 
-    if (error) throw error;
+      if (error) throw error;
+    }
 
     return NextResponse.json({ ok: true, message: "Application updated" });
   } catch (err: any) {
@@ -201,3 +221,8 @@ export async function GET(req: Request) {
   }
   return NextResponse.json(data);
 }
+
+
+
+
+      

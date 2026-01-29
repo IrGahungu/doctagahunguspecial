@@ -4,30 +4,29 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const formData: any = await req.formData();
+ 
     // Extract form data
-    const {
-      name,
-      email,
-      password,
-      specialty,
-      bio,
-      booking_type,
-      country,
-      whatsapp_number,
-      consultation_fee_online,
-      consultation_fee_offline,
-      availability,
-      location,
-      payment_id, // Renamed from 'payment' to match the form state
-      image, // This is now a URL string
-      agreementImage, // This is now a URL string
-      originCountry,
-      idImage,
-      medicalDegreeImage,
-      medicalLicenceImage,
-      proofOfPracticeImage,
-    } = body;
+    const name = formData.get("name")?.toString() || "";
+    const email = formData.get("email")?.toString() || "";
+    const password = formData.get("password")?.toString() || "";
+    const specialty = formData.get("specialty")?.toString() || "";
+    const bio = formData.get("bio")?.toString() || "";
+    const booking_type = formData.get("booking_type")?.toString() || "";
+    const country = formData.get("country")?.toString() || "";
+    const whatsapp_number = formData.get("whatsapp_number")?.toString() || "";
+    const consultation_fee_online = formData.get("consultation_fee_online") ? Number(formData.get("consultation_fee_online")?.toString()) : null;
+    const consultation_fee_offline = formData.get("consultation_fee_offline") ? Number(formData.get("consultation_fee_offline")?.toString()) : null;
+    
+    const availabilityRaw = formData.get("availability")?.toString();
+    const availability = availabilityRaw ? JSON.parse(availabilityRaw) : null;
+    
+    const location = formData.get("location")?.toString() || "";
+    const payment_id = formData.get("payment_id")?.toString() || "";
+    const originCountry = formData.get("originCountry")?.toString() || "";
+
+    // Extract images
+    const image = formData.get("image") as File | null;
 
     // Check if user exists
     const { data: existingUser } = await supabaseAdmin
@@ -42,6 +41,25 @@ export async function POST(req: Request) {
 
     // Create user
     const userId = uuidv4();
+
+    // Helper to upload file and return path
+    const uploadFile = async (file: File | null, folder: string) => {
+      if (!file || typeof file === "string") return null;
+      
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileName = `${folder}/${uuidv4()}-${file.name}`;
+      
+      const { data, error } = await supabaseAdmin.storage
+        .from("doctor-images") // Ensure this bucket exists in Supabase
+        .upload(fileName, buffer, { contentType: file.type, upsert: true });
+        
+      if (error) throw error;
+      return data.path;
+    };
+
+    // Upload images and get paths
+    const imagePath = await uploadFile(image, "profiles");
+
     const { error: userInsertError } = await supabaseAdmin
       .from("doctor_users")
       .insert([{  
@@ -60,13 +78,8 @@ export async function POST(req: Request) {
         availability,
         location,
         payment_id,
-        image,
-        agreement_image: agreementImage,
+        image: imagePath,
         origin_country: originCountry,
-        id_image: idImage,
-        medical_degree_image: medicalDegreeImage,
-        medical_licence_image: medicalLicenceImage,
-        proof_of_practice_image: proofOfPracticeImage,
       }]);
     if (userInsertError) throw userInsertError;
 
@@ -87,15 +100,10 @@ export async function POST(req: Request) {
         consultation_fee_offline,
         availability,
         location,
-        image: image, // Use the URL from the body
-        agreement_image: agreementImage, // Use the URL from the body
+        image: imagePath,
         status: "pending",
         payment_id, // Use the correct field name
         origin_country: originCountry,
-        id_image: idImage,
-        medical_degree_image: medicalDegreeImage,
-        medical_licence_image: medicalLicenceImage,
-        proof_of_practice_image: proofOfPracticeImage,
       }]);
 
     if (appInsertError) {

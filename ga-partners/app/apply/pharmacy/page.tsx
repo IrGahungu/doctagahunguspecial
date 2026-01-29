@@ -16,7 +16,6 @@ type Pharmacy = {
   payment_id?: string;
   status?: string;
   rejection_reason?: string;
-  agreement_image?: string;
 };
 
 type PharmacyForm = {
@@ -28,7 +27,6 @@ type PharmacyForm = {
   originCountry: string;
   whatsapp_number: string;
   password?: string;
-  agreementImage: string;
   payment_id: string;
 };
 
@@ -56,7 +54,6 @@ export default function PharmacyPage() {
     originCountry: "",
     whatsapp_number: "",
     password: "",
-    agreementImage: "",
     payment_id: "",
   });
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -64,8 +61,8 @@ export default function PharmacyPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [isUploadingAgreement, setIsUploadingAgreement] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [files, setFiles] = useState<{ image?: File }>({});
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -96,7 +93,6 @@ export default function PharmacyPage() {
         country: editingPharmacy.country || "Burundi",
         originCountry: editingPharmacy.origin_country || "",
         whatsapp_number: editingPharmacy.whatsapp_number || "",
-        agreementImage: editingPharmacy.agreement_image || (editingPharmacy as any).agreementImage || "",
         password: "", // Don't populate password for edits
         payment_id: editingPharmacy.payment_id || "",
       });
@@ -109,7 +105,6 @@ export default function PharmacyPage() {
         originCountry: "",
         whatsapp_number: "",
         password: "",
-        agreementImage: "",
         payment_id: "",
       });
     }
@@ -130,82 +125,17 @@ export default function PharmacyPage() {
     }
   }
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
-    setFormError(null);
+    setFiles((prev) => ({ ...prev, image: file }));
+    setPharmacyForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "pharmacy-images");
-
-    try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const text = await res.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Server error (${res.status}): Invalid JSON response`);
-      }
-
-      if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
-      }
-
-      setPharmacyForm((prev) => ({ ...prev, image: result.publicUrl }));
-      if (errors.image) {
-        const newErrors = { ...errors };
-        delete newErrors.image;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "An unknown error occurred during upload.";
-      setFormError(message);
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  async function handleAgreementImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingAgreement(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "pharmacy-agreement-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const text = await res.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Server error (${res.status}): Invalid JSON response`);
-      }
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setPharmacyForm((prev) => ({ ...prev, agreementImage: result.publicUrl }));
-      if (errors.agreementImage) {
-        const newErrors = { ...errors };
-        delete newErrors.agreementImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingAgreement(false);
+    if (errors.image) {
+      const newErrors = { ...errors };
+      delete newErrors.image;
+      setErrors(newErrors);
     }
   }
 
@@ -225,11 +155,17 @@ export default function PharmacyPage() {
     if (!pharmacyForm.payment_id) newErrors.payment_id = "Payment ID is required";
     if (!editingPharmacy && !pharmacyForm.password) newErrors.password = "Password is required";
     if (pharmacyForm.password && pharmacyForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
-    if (!pharmacyForm.image) newErrors.image = "Pharmacy image is required";    if (!pharmacyForm.agreementImage) newErrors.agreementImage = "Agreement image is required";
+    if (!pharmacyForm.image) newErrors.image = "Pharmacy image is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   }
+
+  const getImageUrl = (path: string) => {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("blob:")) return path;
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/pharmacy-images/${path}`;
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -245,17 +181,26 @@ export default function PharmacyPage() {
     try {
       const url = "/api/pharmacy/apply";
       const method = editingPharmacy ? "PUT" : "POST";
-      const body = editingPharmacy ? { ...pharmacyForm, id: editingPharmacy.id } : { ...pharmacyForm };
       
-      // If editing and password is empty, remove it so we don't overwrite with empty string
-      if (editingPharmacy && !body.password) delete (body as any).password;
+      const formData = new FormData();
+      formData.append("name", pharmacyForm.name);
+      formData.append("email", pharmacyForm.email);
+      formData.append("whatsapp_number", pharmacyForm.whatsapp_number);
+      formData.append("country", pharmacyForm.country);
+      formData.append("originCountry", pharmacyForm.originCountry);
+      formData.append("payment_id", pharmacyForm.payment_id);
+      if (pharmacyForm.password) formData.append("password", pharmacyForm.password);
+
+      if (editingPharmacy) {
+        formData.append("id", editingPharmacy.id);
+      }
+
+      if (files.image) formData.append("image", files.image);
+      else if (pharmacyForm.image) formData.append("image", pharmacyForm.image);
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          body
-        ),
+        body: formData,
       });
 
       const text = await res.text();
@@ -439,27 +384,7 @@ export default function PharmacyPage() {
               </label>
               {pharmacyForm.image && (
                 <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={pharmacyForm.image} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Agreement Image upload */}
-          <div>
-            <FieldLabel required>Upload Agreement Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.agreementImage ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingAgreement ? "Uploading..." : "Choose agreement"}</span>
-                <input type="file" accept="image/*" onChange={handleAgreementImageUpload} className="hidden" />
-              </label>
-
-              {pharmacyForm.agreementImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={pharmacyForm.agreementImage} alt="Agreement Preview" className="w-full h-full object-cover" />
+                  <img src={getImageUrl(pharmacyForm.image)} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
@@ -492,7 +417,7 @@ export default function PharmacyPage() {
                 type="submit"
                 form="pharmacy-form"
                 className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-linear-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isSubmitting || isUploading || isUploadingAgreement || !agreedToTerms}
+                disabled={isSubmitting || isUploading || !agreedToTerms}
               >
                 {isSubmitting ? "Submitting..." : "Submit Form"}
               </button>

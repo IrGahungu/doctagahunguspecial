@@ -15,7 +15,6 @@ export async function POST(req: Request) {
       locations,
       payment_id, // Renamed from 'payment' to match the form state
       image, // This is now a URL string
-      agreementImage, // This is now a URL string
       originCountry,
     } = body;
 
@@ -45,7 +44,6 @@ export async function POST(req: Request) {
         locations,
         payment_id,
         image,
-        agreement_image: agreementImage,
         origin_country: originCountry,
       }]);
     if (userInsertError) throw userInsertError;
@@ -62,7 +60,6 @@ export async function POST(req: Request) {
         whatsapp_number,
         locations,
         image: image, // Use the URL from the body
-        agreement_image: agreementImage, // Use the URL from the body
         status: "pending",
         payment_id, // Use the correct field name
         origin_country: originCountry,

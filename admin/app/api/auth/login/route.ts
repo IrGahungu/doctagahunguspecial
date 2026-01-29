@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import bcrypt from "bcrypt";
 import { signToken } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
@@ -18,7 +17,7 @@ export async function POST(req: Request) {
     console.log("Querying database for user...");
     const { data, error } = await supabaseAdmin
       .from("users")
-      .select("id, fullname, password_hash, role, whatsapp_number, country, gender")
+      .select("id, fullname, password, role, whatsapp_number, country, gender")
       .eq("whatsapp_number", whatsapp_number)
       .limit(1)
       .single();
@@ -30,8 +29,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const match = await bcrypt.compare(password, data.password_hash);
-    if (!match) {
+    if (password !== data.password) {
       console.warn("Password does not match for user with whatsapp_number:", whatsapp_number);
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }

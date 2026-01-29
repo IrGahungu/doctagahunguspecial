@@ -91,6 +91,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [openingHours, setOpeningHours] = useState<{ day: string; open: string; close: string; isClosed: boolean; is24Hours?: boolean }[]>([]);
   const [location, setlocation] = useState<{ city: string; address: string; latitude: string; longitude: string; phone: string }[]>([]);
   const [insurancesList, setInsurancesList] = useState<string[]>([]);
@@ -98,8 +99,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isStockLoading, setIsStockLoading] = useState(false);
   const [isAddingStock, setIsAddingStock] = useState(false);
-  const [isUploadingStockImage, setIsUploadingStockImage] = useState(false);
-  const [stockForm, setStockForm] = useState({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "", insurances: [] as string[] });
+  const [stockImageFile, setStockImageFile] = useState<File | null>(null);
+  const [stockForm, setStockForm] = useState({ name: "", price: "", original_price: "", quantity: "", description: "Dosage to be given by the approved Doctor.", category: "", image: "", insurances: [] as string[] });
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -131,11 +132,26 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [chartData, setChartData] = useState<{ date: string; revenue: number; orders: number; views: number }[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [showDeleteStockConfirm, setShowDeleteStockConfirm] = useState(false);
+  const [stockToDeleteId, setStockToDeleteId] = useState<string | null>(null);
+  const [isDeletingStock, setIsDeletingStock] = useState(false);
 
   const statusColorMap = {
     pending: "text-yellow-500",
     approved: "text-green-500",
     rejected: "text-red-500",
+  };
+
+  const getImageUrl = (path: string | null | undefined) => {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("blob:")) return path;
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/pharmacy-images/${path}`;
+  };
+
+  const getStockImageUrl = (path: string | null | undefined) => {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("blob:")) return path;
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/medicine-images/${path}`;
   };
 
   async function handleLogout() {
@@ -452,50 +468,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
   }
 
-  async function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingProfileImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "pharmacy-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setProfileForm((prev) => ({ ...prev, image: result.publicUrl }));
-    } catch (err) {
-      console.error(err);
-      toast.error("Image upload failed");
-    } finally {
-      setIsUploadingProfileImage(false);
-    }
+    setProfileImageFile(file);
+    setProfileForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
   }
 
-  async function handleStockImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleStockImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingStockImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "medicine-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setStockForm((prev) => ({ ...prev, image: result.publicUrl }));
-    } catch (err) {
-      console.error(err);
-      toast.error("Image upload failed");
-    } finally {
-      setIsUploadingStockImage(false);
-    }
+    setStockImageFile(file);
+    setStockForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
   }
 
   async function handleSaveProfile() {
@@ -527,11 +511,27 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
     delete (updateData as any).confirmPassword;
 
+    const formData = new FormData();
+    formData.append("id", app.id);
+    formData.append("name", updateData.name);
+    formData.append("email", updateData.email);
+    formData.append("whatsapp_number", updateData.whatsapp_number);
+    formData.append("country", updateData.country);
+    formData.append("payment_id", updateData.payment_id);
+    formData.append("contact_email", updateData.contact_email);
+    formData.append("contact_phone", updateData.contact_phone);
+    formData.append("contact_office", updateData.contact_office);
+    formData.append("contact_website", updateData.contact_website);
+    formData.append("opening_hours", updateData.opening_hours);
+    formData.append("location", updateData.location);
+    formData.append("accepted_insurances", updateData.accepted_insurances);
+    if (profileImageFile) formData.append("image", profileImageFile);
+    else if (updateData.image) formData.append("image", updateData.image);
+
     try {
       const res = await fetch(`/api/pharmacy/apply?id=${app.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
+        body: formData,
       });
       if (!res.ok) throw new Error("Failed to update profile");
       toast.success("Profile updated successfully!");
@@ -568,7 +568,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const updateLocation = (index: number, field: keyof typeof location[0], value: string) => {
     const newlocation = location.map((loc, i) => {
-      if (i === index) return { ...loc, [field]: value };
+      if (i === index) {
+        if (field === "city" || field === "address") {
+          return { ...loc, [field]: value.toUpperCase() };
+        }
+        return { ...loc, [field]: value };
+      }
       return loc;
     });
     setlocation(newlocation);
@@ -644,16 +649,25 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       
       const currentItem = editingStockId ? stockItems.find(i => i.id === editingStockId) : null;
 
+      const formData = new FormData();
+      formData.append("name", stockForm.name);
+      formData.append("price", stockForm.price);
+      formData.append("original_price", stockForm.original_price);
+      formData.append("quantity", stockForm.quantity);
+      formData.append("description", stockForm.description);
+      formData.append("category", stockForm.category);
+      formData.append("pharmacy_id", app.id);
+      formData.append("in_stock", String(Number(stockForm.quantity) > 0));
+      formData.append("insurances", JSON.stringify(stockForm.insurances));
+      
+      if (editingStockId) formData.append("id", editingStockId);
+
+      if (stockImageFile) formData.append("image", stockImageFile);
+      else if (stockForm.image && !stockForm.image.startsWith("blob:")) formData.append("image", stockForm.image);
+
       const res = await fetch(url, {
         method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          ...stockForm, 
-          pharmacy_id: app.id, 
-          in_stock: Number(stockForm.quantity) > 0,
-          id: editingStockId,
-          insurances: stockForm.insurances
-        }),
+        body: formData,
       });
       if (res.ok) {
         const savedItem = await res.json();
@@ -664,7 +678,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           setStockItems((prev) => [...prev, savedItem]);
           toast.success("Stock item added");
         }
-        setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "", insurances: [] });
+        setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "Dosage to be given by the approved Doctor", category: "", image: "", insurances: [] });
+        setStockImageFile(null);
         setEditingStockId(null);
       } else {
         toast.error("Failed to save item");
@@ -693,20 +708,33 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   }
 
   function handleCancelEdit() {
-    setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "", category: "", image: "", insurances: [] });
+    setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "Dosage to be given by the approved Doctor", category: "", image: "", insurances: [] });
     setEditingStockId(null);
+    setStockImageFile(null);
   }
 
-  async function handleDeleteStock(id: string) {
-    if (!confirm("Delete this item?")) return;
+  function handleDeleteStock(id: string) {
+    setStockToDeleteId(id);
+    setShowDeleteStockConfirm(true);
+  }
+
+  async function confirmDeleteStock() {
+    if (!stockToDeleteId) return;
+    setIsDeletingStock(true);
     try {
-      const res = await fetch(`/api/pharmacy/stock?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/pharmacy/stock?id=${stockToDeleteId}`, { method: "DELETE" });
       if (res.ok) {
-        setStockItems((prev) => prev.filter((item) => item.id !== id));
+        setStockItems((prev) => prev.filter((item) => item.id !== stockToDeleteId));
         toast.success("Item deleted");
+      } else {
+        toast.error("Failed to delete");
       }
     } catch (e) {
       toast.error("Failed to delete");
+    } finally {
+      setIsDeletingStock(false);
+      setShowDeleteStockConfirm(false);
+      setStockToDeleteId(null);
     }
   }
 
@@ -822,7 +850,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="mb-6 flex flex-col items-center justify-center">
           <div className="h-10 w-10 md:h-20 md:w-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm mb-3 overflow-hidden transition-all duration-300">
             {app.image ? (
-              <img src={app.image} alt={app.name} className="h-full w-full object-cover" />
+              <img src={getImageUrl(app.image)} alt={app.name} className="h-full w-full object-cover" />
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1204,13 +1232,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm font-medium text-gray-700 w-full justify-center">
-                        {isUploadingStockImage ? "Uploading..." : stockForm.image ? "Change Image" : "Upload Image"}
-                        <input type="file" accept="image/*" onChange={handleStockImageUpload} className="hidden" disabled={isUploadingStockImage} />
+                        {stockForm.image ? "Change Image" : "Upload Image"}
+                        <input type="file" accept="image/*" onChange={handleStockImageUpload} className="hidden" />
                       </label>
                     </div>
                     {stockForm.image && (
                       <div className="h-32 w-32 rounded overflow-hidden border border-gray-200">
-                        <img src={stockForm.image} alt="Preview" className="h-full w-full object-cover" />
+                        <img src={getStockImageUrl(stockForm.image)} alt="Preview" className="h-full w-full object-cover" />
                       </div>
                     )}
                     {editingStockId && (
@@ -1275,7 +1303,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <tr key={item.id} className="hover:bg-gray-50 transition">
                               <td className="p-3">
                                 {item.image ? (
-                                  <img src={item.image} alt={item.name} className="h-24 w-24 rounded object-cover border border-gray-200" />
+                                  <img src={getStockImageUrl(item.image)} alt={item.name} className="h-24 w-24 rounded object-cover border border-gray-200" />
                                 ) : (
                                   <div className="h-24 w-24 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No Img</div>
                                 )}
@@ -1482,7 +1510,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex items-center gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
-                            <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                            <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
                           ) : (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1603,7 +1631,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="flex items-center gap-6">
                       <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200">
                         {profileForm.image ? (
-                          <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                          <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
                         ) : (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1636,8 +1664,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <input
                           type="text"
                           value={profileForm.name}
-                          onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
-                          className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                          disabled
+                          className="w-full border rounded-lg px-4 py-2 bg-gray-50 text-gray-500 cursor-not-allowed"
                         />
                       </div>
                       <div>
@@ -1664,7 +1692,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <input
                           type="text"
                           value={profileForm.country}
-                          onChange={(e) => setProfileForm(prev => ({ ...prev, country: e.target.value }))}
+                          onChange={(e) => setProfileForm(prev => ({ ...prev, country: e.target.value.toUpperCase() }))}
                           className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                         />
                       </div>
@@ -1705,7 +1733,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           <input
                             type="text"
                             value={profileForm.contact_office}
-                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value }))}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value.toUpperCase() }))}
                             className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                           />
                         </div>
@@ -2093,6 +2121,34 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           Logging out...
                         </>
                       ) : "Logout"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showDeleteStockConfirm && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
+                <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Deletion</h3>
+                  <p className="text-gray-600 mb-6">Are you sure you want to delete this stock item? This action cannot be undone.</p>
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowDeleteStockConfirm(false);
+                        setStockToDeleteId(null);
+                      }}
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      disabled={isDeletingStock}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmDeleteStock}
+                      disabled={isDeletingStock}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400"
+                    >
+                      {isDeletingStock ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </div>

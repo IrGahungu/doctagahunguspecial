@@ -92,7 +92,7 @@ export default function AllDoctorsScreen() {
           source={
             item.image
               ? { uri: item.image }
-              : require('@/assets/images/Doctor1.jpg')
+              : require('@/assets/images/two.jpg')
           }
           style={styles.image}
           resizeMode="cover"

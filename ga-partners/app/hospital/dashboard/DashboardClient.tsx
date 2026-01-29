@@ -40,8 +40,15 @@ const getCurrencyForCountry = (country: string) => {
   return "USD";
 };
 
+const getImageUrl = (path: string | null | undefined) => {
+  if (!path) return "";
+  if (path.startsWith("http") || path.startsWith("blob:")) return path;
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hospital-images/${path}`;
+};
+
 export default function DashboardClient({ app }: DashboardClientProps) {
-  const [showStatus, setShowStatus] = useState(false);
+  const [displayApp, setDisplayApp] = useState(app);
+ const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const [activeTab, setActiveTab] = useState("");
@@ -53,6 +60,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [recentActivities, setRecentActivities] = useState<{ id: string; title: string; date: string; icon: any }[]>([]);
   const [chartData, setChartData] = useState<{ date: string; views: number }[]>([]);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [sidebarImageError, setSidebarImageError] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
     name: "",
@@ -75,6 +83,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   });
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [insurancesList, setInsurancesList] = useState<string[]>([]);
   const [pharmaciesList, setPharmaciesList] = useState<string[]>([]);
@@ -153,13 +162,21 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       }
 
   const handleNavClick = (tab: string) => {
-    if (app.status !== "approved" && tab !== "status") {
-      alert("You have to get approved first");
+    if (displayApp.status !== "approved" && tab !== "status") {
+      toast.error("You have to get approved first");
       return;
     }
     setActiveTab(tab);
     if (tab === "status") setShowStatus(true);
   };
+
+  useEffect(() => {
+    setDisplayApp(app);
+  }, [app]);
+
+  useEffect(() => {
+    setSidebarImageError(false);
+  }, [displayApp.image]);
 
   useEffect(() => {
     if (activeTab === "dashboard" && app.id) {
@@ -175,7 +192,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             {
               id: "submission",
               title: "Application Submitted",
-              date: app.created_at,
+              date: displayApp.created_at,
               icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -184,7 +201,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             }
           ];
 
-          if (data.updated_at && new Date(data.updated_at).getTime() > new Date(app.created_at).getTime()) {
+          if (data.updated_at && new Date(data.updated_at).getTime() > new Date(displayApp.created_at).getTime()) {
             activities.unshift({
               id: "update",
               title: "Profile Updated",
@@ -318,74 +335,56 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         .catch((err) => console.error("Failed to load profile", err))
         .finally(() => setIsProfileLoading(false));
     }
-  }, [activeTab, app.id]);
+  }, [activeTab, app]);
 
   async function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingProfileImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "hospital-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setProfileForm((prev) => ({ ...prev, image: result.publicUrl }));
-    } catch (err) {
-      console.error(err);
-      alert("Image upload failed");
-    } finally {
-      setIsUploadingProfileImage(false);
-    }
+    setProfileImageFile(file);
+    setProfileForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
   }
-
   async function handleSaveProfile() {
     setIsSavingProfile(true);
 
     if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match!");
       setIsSavingProfile(false);
       return;
     }
 
-    const contactJson = JSON.stringify({
-      email: profileForm.contact_email,
-      phone: profileForm.contact_phone,
-      office: profileForm.contact_office,
-      website: profileForm.contact_website
-    });
+    const formData = new FormData();
+    formData.append("id", displayApp.id);
+    formData.append("name", profileForm.name);
+    formData.append("email", profileForm.email);
+    formData.append("whatsapp_number", profileForm.whatsapp_number);
+    formData.append("country", profileForm.country);
+    formData.append("origin_country", profileForm.origin_country);
+    formData.append("payment_id", profileForm.payment_id);
 
-    const updateData = { ...profileForm, id: app.id, contact_details: contactJson };
-    if (!updateData.password) {
-      delete (updateData as any).password;
+    if (profileForm.password) {
+      formData.append("password", profileForm.password);
     }
-    delete (updateData as any).confirmPassword;
-    delete (updateData as any).contact_email;
-    delete (updateData as any).contact_phone;
-    delete (updateData as any).contact_office;
-    delete (updateData as any).contact_website;
-    delete (updateData as any).service_summary;
-    delete (updateData as any).admission_process;
-    delete (updateData as any).partner_insurances;
-    delete (updateData as any).partner_pharmacies;
+
+    if (profileImageFile) {
+      formData.append("image", profileImageFile);
+    } else if (profileForm.image && !profileForm.image.startsWith("blob:")) {
+      formData.append("image", profileForm.image);
+    }
 
     try {
       const res = await fetch(`/api/hospital/apply`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
+        body: formData,
       });
       if (!res.ok) throw new Error("Failed to update profile");
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
+      setDisplayApp(prev => ({ ...prev, name: profileForm.name, image: profileForm.image }));
+      setProfileImageFile(null);
       router.refresh();
       setIsEditingProfile(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Error updating profile");
+      toast.error(e.message || "Error updating profile");
     } finally {
       setIsSavingProfile(false);
     }
@@ -442,7 +441,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   function handleUseCurrentLocation(index: number) {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      toast.error("Geolocation is not supported by your browser");
       return;
     }
     navigator.geolocation.getCurrentPosition((position) => {
@@ -453,7 +452,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         longitude: position.coords.longitude.toFixed(6)
       };
       setLocations(list);
-    }, (err) => alert("Could not retrieve location: " + err.message));
+    }, (err) => toast.error("Could not retrieve location: " + err.message));
   }
 
   async function handlePasteCoordinates(index: number) {
@@ -469,10 +468,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         };
         setLocations(list);
       } else {
-        alert("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
-      alert("Failed to read clipboard.");
+      toast.error("Failed to read clipboard.");
     }
   }
 
@@ -503,57 +502,35 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   async function handleSaveUpdates() {
     setIsSavingProfile(true);
 
-    const insurancesJson = JSON.stringify(insurancesList);
-    const pharmaciesJson = JSON.stringify(pharmaciesList);
-    const locationsJson = JSON.stringify(Locations);
-    const servicesJson = JSON.stringify(availableServices);
-    const bloodTypesJson = JSON.stringify(availableBloodTypes);
-    const equipmentJson = JSON.stringify(medicalEquipment);
-    const contactJson = JSON.stringify({
+    const formData = new FormData();
+    formData.append("id", displayApp.id);
+    formData.append("service_summary", profileForm.service_summary);
+    formData.append("admission_process", profileForm.admission_process);
+    formData.append("partner_insurances", JSON.stringify(insurancesList));
+    formData.append("partner_pharmacies", JSON.stringify(pharmaciesList));
+    formData.append("locations", JSON.stringify(Locations));
+    formData.append("available_services", JSON.stringify(availableServices));
+    formData.append("available_blood_types", JSON.stringify(availableBloodTypes));
+    formData.append("medical_equipment", JSON.stringify(medicalEquipment));
+    formData.append("contact_details", JSON.stringify({
       email: profileForm.contact_email,
       phone: profileForm.contact_phone,
       office: profileForm.contact_office,
       website: profileForm.contact_website
-    });
-
-    const updateData = {
-      ...profileForm,
-      id: app.id,
-      contact_details: contactJson,
-      partner_insurances: insurancesJson,
-      partner_pharmacies: pharmaciesJson,
-      locations: locationsJson,
-      available_services: servicesJson,
-      available_blood_types: bloodTypesJson,
-      medical_equipment: equipmentJson
-    };
-    delete (updateData as any).password;
-    delete (updateData as any).confirmPassword;
-    delete (updateData as any).contact_email;
-    delete (updateData as any).contact_phone;
-    delete (updateData as any).contact_office;
-    delete (updateData as any).contact_website;
-    delete (updateData as any).name;
-    delete (updateData as any).email;
-    delete (updateData as any).whatsapp_number;
-    delete (updateData as any).country;
-    delete (updateData as any).origin_country;
-    delete (updateData as any).payment_id;
-    delete (updateData as any).image;
+    }));
 
     try {
       const res = await fetch(`/api/hospital/apply`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
+        body: formData,
       });
       if (!res.ok) throw new Error("Failed to update information");
-      alert("Information updated successfully!");
+      toast.success("Information updated successfully!");
       router.refresh();
       setIsEditingUpdates(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Error updating information");
+      toast.error(e.message || "Error updating information");
     } finally {
       setIsSavingProfile(false);
     }
@@ -561,19 +538,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
       {/* Sidebar */}
       <div className="w-20 md:w-64 bg-white shadow-lg p-4 md:p-6 flex flex-col space-y-4 border-r border-gray-200 overflow-y-auto transition-all duration-300">
         <div className="mb-6 flex flex-col items-center justify-center">
           <div className="h-10 w-10 md:h-20 md:w-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm mb-3 overflow-hidden transition-all duration-300">
             {app.image ? (
-              <img src={app.image} alt={app.name} className="h-full w-full object-cover" />
+              <img src={getImageUrl(app.image)} alt={app.name} className="h-full w-full object-cover" />
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             )}
           </div>
-          <div className="text-sm text-gray-500 font-medium break-all text-center px-2 hidden md:block transition-opacity duration-300">{app.email}</div>
+          <div className="text-sm text-gray-500 font-medium break-all text-center px-2 hidden md:block transition-opacity duration-300">{displayApp.email}</div>
         </div>
         <div className="relative">
           <button
@@ -666,7 +644,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white shadow-sm border-b border-gray-200 px-4 md:px-8 py-5">
           <h2 className="text-center text-xl font-semibold text-gray-800">
-            Greetings and welcome dear {app.name} on Dr. Gahungu Platform.
+            Greetings and welcome dear {displayApp.name} on Dr. Gahungu Platform.
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -732,30 +710,30 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               <div className="flex flex-col items-center">
                 <div className="text-center">
                   <p>
-                    <strong>Status:</strong> <span className={`${statusColorMap[app.status]} font-bold`}>{app.status}</span>
+                    <strong>Status:</strong> <span className={`${statusColorMap[displayApp.status]} font-bold`}>{displayApp.status}</span>
                   </p>
-                  <p><strong>Submitted:</strong> {new Date(app.created_at).toLocaleString()}</p>
-                  {app.status === "pending" && (
+                  <p><strong>Submitted:</strong> {new Date(displayApp.created_at).toLocaleString()}</p>
+                  {displayApp.status === "pending" && (
                     <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-2xl">
                       <p className="font-bold">Under Review</p>
                       <p>Your application is currently being reviewed by our team.</p>
                     </div>
                   )}
-                  {app.status === "approved" && (
+                  {displayApp.status === "approved" && (
                     <div className="mt-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-2xl">
                       <p className="font-bold">Approved</p>
                       <p>Congratulations! Your application has been approved.</p>
                     </div>
                   )}
-                  {app.status === "rejected" && (
+                  {displayApp.status === "rejected" && (
                     <div className="mt-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-2xl">
                       <p className="font-bold">Rejected</p>
-                      <p>Unfortunately, your application was rejected. Reason: {app.rejection_reason || "No reason provided"}</p>
+                      <p>Unfortunately, your application was rejected. Reason: {displayApp.rejection_reason || "No reason provided"}</p>
                       <button
                         onClick={() => {
                           setIsNavigating(true);
                           // navigate to the apply page with the application id so the form can prefill
-                          router.push(`/apply/hospital?id=${app.id}`);
+                          router.push(`/apply/hospital?id=${displayApp.id}`);
                         }}
                         disabled={isNavigating}
                         className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
@@ -1135,7 +1113,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 onClick={() => {
                                   const query = `${loc.address} ${loc.city}`.trim();
-                                  if (!query) return alert("Please enter an address or city to search.");
+                                  if (!query) return toast.error("Please enter an address or city to search.");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
                                 className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
@@ -1209,7 +1187,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           <input
                             type="text"
                             value={profileForm.contact_office}
-                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value }))}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value.toUpperCase() }))}
                             className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             placeholder="City, Country"
                           />
@@ -1264,7 +1242,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex items-center gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
-                            <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                            <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
                           ) : (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1313,7 +1291,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="flex items-center gap-6">
                       <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200">
                         {profileForm.image ? (
-                          <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                          <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
                         ) : (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

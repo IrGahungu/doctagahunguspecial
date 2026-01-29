@@ -21,7 +21,7 @@ import { Link, useRouter } from "expo-router";
 import { API_BASE_URL } from "@/config";
 import CountryPicker from "@/components/CountryPicker";
 
-const backgroundImage = require("@/assets/images/Doctor5.jpg");
+const backgroundImage = require("@/assets/images/two.jpg");
 
 const COUNTRIES = [
   "Burundi",

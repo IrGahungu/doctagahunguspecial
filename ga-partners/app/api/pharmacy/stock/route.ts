@@ -1,20 +1,13 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
+import { v4 as uuidv4 } from "uuid";
 
-/**
- * GET stock items by pharmacy
- * /api/stock?pharmacy_id=UUID
- */
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
   const pharmacy_id = searchParams.get("pharmacy_id");
 
   if (!pharmacy_id) {
-    return NextResponse.json(
-      { error: "Pharmacy ID is required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Pharmacy ID is required" }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin
@@ -24,153 +17,138 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("GET stock error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json(data);
 }
 
-/**
- * POST create new stock item
- */
-export async function POST(request: Request) {
-  // Debug: Check if cookies are actually reaching the server
-  const cookieStore = await cookies();
-  const token = cookieStore.get("pharmacyToken")?.value;
-
-  if (!token) {
-    console.error("POST stock: Auth failed. No pharmacyToken found.");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  console.log("POST stock: User authenticated via cookie", token);
-
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    console.log("POST stock: Received body", body);
+    const formData: any = await req.formData();
+    
+    const name = formData.get("name") as string;
+    const price = parseFloat(formData.get("price") as string);
+    const original_price = parseFloat(formData.get("original_price") as string);
+    const quantity = parseInt(formData.get("quantity") as string);
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
+    const pharmacy_id = formData.get("pharmacy_id") as string;
+    const in_stock = formData.get("in_stock") === "true";
+    const insurancesRaw = formData.get("insurances") as string;
+    const insurances = insurancesRaw ? JSON.parse(insurancesRaw) : [];
+    
+    const image = formData.get("image") as File | null;
 
-    if (!body.pharmacy_id || !body.name || !body.price || !body.category) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    // Upload image if exists
+    let imagePath = null;
+    if (image && typeof image !== "string") {
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const fileName = `stock/${uuidv4()}-${image.name}`;
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from("medicine-images")
+        .upload(fileName, buffer, { contentType: image.type, upsert: true });
+      
+      if (uploadError) throw uploadError;
+      imagePath = uploadData.path;
     }
 
     const { data, error } = await supabaseAdmin
       .from("stock")
-      .insert([
-        {
-          pharmacy_id: body.pharmacy_id,
-          name: body.name,
-          price: Number(body.price),
-          original_price: body.original_price
-            ? Number(body.original_price)
-            : null,
-          quantity: Number(body.quantity) || 0,
-          description: body.description || null,
-          category: body.category,
-          image: body.image || null,
-          in_stock: body.in_stock ?? true,
-          insurances: body.insurances || null,
-        },
-      ])
+      .insert([{
+        name,
+        price,
+        original_price,
+        quantity,
+        description,
+        category,
+        pharmacy_id,
+        in_stock,
+        insurances,
+        image: imagePath
+      }])
       .select()
       .single();
 
-    if (error) {
-      console.error("POST stock: Database insert error", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) throw error;
 
-    return NextResponse.json(data, { status: 201 });
-  } catch (err) {
-    console.error("POST stock parse error:", err);
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
-    );
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error("Error creating stock:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-/**
- * PUT update stock item
- * /api/stock?id=UUID
- */
-export async function PUT(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
-  }
-
-  const cookieStore = await cookies();
-  const token = cookieStore.get("pharmacyToken")?.value;
-
-  if (!token) {
-    console.error("PUT stock: Auth failed. No pharmacyToken found.");
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function PUT(req: Request) {
   try {
-    const body = await request.json();
+    const formData: any = await req.formData();
+    
+    const id = formData.get("id") as string;
+    const name = formData.get("name") as string;
+    const price = parseFloat(formData.get("price") as string);
+    const original_price = parseFloat(formData.get("original_price") as string);
+    const quantity = parseInt(formData.get("quantity") as string);
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
+    const in_stock = formData.get("in_stock") === "true";
+    const insurancesRaw = formData.get("insurances") as string;
+    const insurances = insurancesRaw ? JSON.parse(insurancesRaw) : [];
+    
+    const image = formData.get("image") as File | null;
+
+    if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
+
+    const updates: any = {
+      name,
+      price,
+      original_price,
+      quantity,
+      description,
+      category,
+      in_stock,
+      insurances
+    };
+
+    // Upload image if exists
+    if (image && typeof image !== "string") {
+      const buffer = Buffer.from(await image.arrayBuffer());
+      const fileName = `stock/${uuidv4()}-${image.name}`;
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from("medicine-images")
+        .upload(fileName, buffer, { contentType: image.type, upsert: true });
+      
+      if (uploadError) throw uploadError;
+      updates.image = uploadData.path;
+    }
 
     const { data, error } = await supabaseAdmin
       .from("stock")
-      .update({
-        name: body.name,
-        price: Number(body.price),
-        original_price: body.original_price
-          ? Number(body.original_price)
-          : null,
-        quantity: Number(body.quantity) || 0,
-        description: body.description || null,
-        category: body.category,
-        image: body.image || null,
-        in_stock: body.in_stock,
-        insurances: body.insurances,
-      })
+      .update(updates)
       .eq("id", id)
       .select()
       .single();
 
-    if (error) {
-      console.error("PUT stock: Database update error", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    if (error) throw error;
 
     return NextResponse.json(data);
-  } catch (err) {
-    console.error("PUT stock parse error:", err);
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
-    );
+  } catch (error: any) {
+    console.error("Error updating stock:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-/**
- * DELETE stock item
- * /api/stock?id=UUID
- */
-export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
+export async function DELETE(req: Request) {
+  const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
 
-  if (!id) {
-    return NextResponse.json(
-      { error: "Item ID is required" },
-      { status: 400 }
-    );
-  }
+  if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
-  const { error } = await supabaseAdmin.from("stock").delete().eq("id", id);
+  const { error } = await supabaseAdmin
+    .from("stock")
+    .delete()
+    .eq("id", id);
 
-  if (error) {
-    console.error("DELETE stock error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ success: true });
 }

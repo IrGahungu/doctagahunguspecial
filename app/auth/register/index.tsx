@@ -22,7 +22,7 @@ import * as SecureStore from "expo-secure-store";
 import DropDownPicker, { ItemType } from "react-native-dropdown-picker";
 import { countries } from "@/constants/countries"; // Now expects [{ name: '...', code: '...' }]
 
-const backgroundImage = require("@/assets/images/Doctor5.jpg");
+const backgroundImage = require("@/assets/images/two.jpg");
 
 const RegisterScreen = () => {
   const insets = useSafeAreaInsets();

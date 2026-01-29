@@ -10,6 +10,7 @@ import {
 import { DealOfTheDay } from '@/types';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const SkeletonCard = () => (
   <View style={styles.dealCard}>
@@ -25,11 +26,13 @@ const SkeletonCard = () => (
 interface DealSectionProps {
   title: string;
   viewAllLink?: string;
+  baseUrl?: string;
 }
 
 const DealSection: React.FC<DealSectionProps> = ({ 
   title, 
   viewAllLink, 
+  baseUrl = "",
 }) => {
   const [deals, setDeals] = useState<DealOfTheDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +104,18 @@ const DealSection: React.FC<DealSectionProps> = ({
       >
         {deals.map((deal) => (
           <TouchableOpacity key={deal.id} style={styles.dealCard}>
-            <Image source={{ uri: deal.image }} style={styles.dealImage} />
+            {deal.image ? (
+              <Image 
+                source={{ 
+                  uri: deal.image && !deal.image.startsWith('http') ? `${baseUrl}${deal.image}` : deal.image 
+                }} 
+                style={styles.dealImage} 
+              />
+            ) : (
+              <View style={[styles.dealImage, styles.placeholderImage]}>
+                <Icon name="local-offer" size={40} color="#ccc" />
+              </View>
+            )}
             <View style={styles.dealInfo}>
               <Text style={styles.dealTitle}>{deal.title}</Text>
               <Text style={styles.dealDiscount}>{deal.discount}</Text>
@@ -152,6 +166,11 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 12,
     marginBottom: 8,
+  },
+  placeholderImage: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dealInfo: {
     alignItems: 'center',

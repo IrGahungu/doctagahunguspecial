@@ -16,7 +16,6 @@ type Hospital = {
   whatsapp_number: string;
   password?: string;
   payment_id?: string;
-  agreement_image?: string;
 };
 
 type HospitalForm = {
@@ -28,7 +27,6 @@ type HospitalForm = {
   email: string;
   whatsapp_number: string;
   password?: string;
-  agreementImage: string;
   payment_id: string;
 };
 
@@ -44,6 +42,12 @@ const supportedCountries = [
   //"Somalia",
 ];
 
+const getImageUrl = (path: string | null | undefined) => {
+  if (!path) return "";
+  if (path.startsWith("http") || path.startsWith("blob:")) return path;
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hospital-images/${path}`;
+};
+
 export default function HospitalPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -56,15 +60,14 @@ export default function HospitalPage() {
     email: "",
     whatsapp_number: "",
     password: "",
-    agreementImage: "",
     payment_id: "",
   });
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [isUploadingAgreement, setIsUploadingAgreement] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -102,7 +105,6 @@ export default function HospitalPage() {
         email: editingHospital.email || "",
         whatsapp_number: editingHospital.whatsapp_number || "",
         password: "", // Always clear password on load
-        agreementImage: editingHospital.agreement_image || (editingHospital as any).agreementImage || "",
         payment_id: editingHospital.payment_id || "",
       });
     } else {
@@ -114,7 +116,6 @@ export default function HospitalPage() {
         email: "", 
         whatsapp_number: "", 
         password: "", 
-        agreementImage: "", 
         payment_id: ""
     });
     }
@@ -136,77 +137,12 @@ export default function HospitalPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "hospital-images"); // Specify the target bucket
-
-    try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const text = await res.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Server error (${res.status}): Invalid JSON response`);
-      }
-
-      if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
-      }
-
-      setHospitalForm((prev) => ({ ...prev, image: result.publicUrl }));
-      if (errors.image) {
-        const newErrors = { ...errors };
-        delete newErrors.image;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "An unknown error occurred during upload.";
-      setFormError(message);
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  async function handleAgreementImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingAgreement(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "hospital-agreement-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const text = await res.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Server error (${res.status}): Invalid JSON response`);
-      }
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setHospitalForm((prev) => ({ ...prev, agreementImage: result.publicUrl }));
-      if (errors.agreementImage) {
-        const newErrors = { ...errors };
-        delete newErrors.agreementImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingAgreement(false);
+    setImageFile(file);
+    setHospitalForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
+    if (errors.image) {
+      const newErrors = { ...errors };
+      delete newErrors.image;
+      setErrors(newErrors);
     }
   }
 
@@ -228,7 +164,6 @@ export default function HospitalPage() {
     if (!editingHospital && !hospitalForm.password) newErrors.password = "Password is required";
     if (!editingHospital && hospitalForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!hospitalForm.image) newErrors.image = "Hospital image is required";
-    if (!hospitalForm.agreementImage) newErrors.agreementImage = "Agreement image is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -245,43 +180,54 @@ export default function HospitalPage() {
 
     setIsSubmitting(true);
     
-    try {
-    const url = "/api/hospital/apply";
-      const method = editingHospital ? "PUT" : "POST";
-      const body = editingHospital ? { ...hospitalForm, id: editingHospital.id } : hospitalForm;
-      
-      // If editing and password is empty, remove it so we don't overwrite with empty string
-      if (editingHospital && !body.password) delete (body as any).password;
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          body
-        ),
-      });
-
-      const text = await res.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        throw new Error(`Server error (${res.status}): Invalid JSON response`);
-      }
-      if (!res.ok) throw new Error(result.error || "Failed to save Hospital");
-
-      toast.success(editingHospital 
-        ? "Application resubmitted successfully, please login to check the status" 
-        : "Application Submitted Successfully, please login to check the status");
-      setTimeout(() => {
-        router.push("/login");
-      }, 4000);
-    } catch (err:any) {
-      console.error(err);
-      setFormError(err instanceof Error ? err.message : "Failed to save hospital");
-    } finally {
-      setIsSubmitting(false);
-    }
+   try {
+         const url = "/api/hospital/apply";
+         const method = editingHospital ? "PUT" : "POST";
+         
+         const formData = new FormData();
+         if (editingHospital) formData.append("id", editingHospital.id);
+         formData.append("name", hospitalForm.name);
+         formData.append("country", hospitalForm.country);
+         formData.append("origin_country", hospitalForm.origin_country);
+         formData.append("email", hospitalForm.email);
+         formData.append("whatsapp_number", hospitalForm.whatsapp_number);
+         formData.append("payment_id", hospitalForm.payment_id);
+         if (hospitalForm.password) formData.append("password", hospitalForm.password);
+   
+         if (imageFile) formData.append("image", imageFile);
+         else if (hospitalForm.image && !hospitalForm.image.startsWith("blob:")) formData.append("image", hospitalForm.image);
+   
+         const res = await fetch(url, {
+           method,
+           body: formData,
+         });
+   
+         const text = await res.text();
+         let result;
+         try {
+           result = JSON.parse(text);
+         } catch (e) {
+           if (!res.ok) {
+             // The response was not ok and not valid JSON, so the text itself is likely the error.
+             throw new Error(text || `Server error (${res.status})`);
+           }
+           // The response was ok but not valid JSON.
+           throw new Error(`Server error (${res.status}): Invalid JSON response`);
+         }
+         if (!res.ok) throw new Error(result.error || "Failed to save Hospital");
+   
+         toast.success(editingHospital 
+           ? "Application resubmitted successfully, please login to check the status" 
+           : "Application Submitted Successfully, please login to check the status");
+         setTimeout(() => {
+           router.push("/login");
+         }, 4000);
+         } catch (err:any) {
+         console.error(err);
+         setFormError(err instanceof Error ? err.message : "Failed to save hospital");
+         } finally {
+         setIsSubmitting(false);
+       }
   }
 
   return (
@@ -328,7 +274,7 @@ export default function HospitalPage() {
                   <dt className="text-sm font-medium text-gray-500">Image</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                     {editingHospital.image && (
-                      <img src={editingHospital.image} alt="Hospital" className="h-24 w-24 object-cover rounded-lg border border-gray-200" />
+                      <img src={getImageUrl(editingHospital.image)} alt="Hospital" className="h-24 w-24 object-cover rounded-lg border border-gray-200" />
                     )}
                   </dd>
                 </div>
@@ -351,18 +297,6 @@ export default function HospitalPage() {
                 <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Password</dt>
                   <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">********</dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Agreement Image</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {(editingHospital.agreement_image || (editingHospital as any).agreementImage) && (
-                      <img 
-                        src={editingHospital.agreement_image || (editingHospital as any).agreementImage} 
-                        alt="Agreement" 
-                        className="h-24 w-24 object-cover rounded-lg border border-gray-200" 
-                      />
-                    )}
-                  </dd>
                 </div>
                 <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-gray-500">Payment ID</dt>
@@ -488,30 +422,12 @@ export default function HospitalPage() {
             <div className="flex items-center gap-4">
               <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.image ? 'ring-red-500' : 'ring-transparent'}`}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                <span>{isUploading ? "Uploading..." : "Choose image"}</span>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={isUploading} />
+                <span>Choose image</span>
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
               </label>
               {hospitalForm.image && (
                 <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={hospitalForm.image} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <FieldLabel required>Upload Agreement Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.agreementImage ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingAgreement ? "Uploading..." : "Choose agreement"}</span>
-                <input type="file" accept="image/*" onChange={handleAgreementImageUpload} className="hidden" />
-              </label>
-              {hospitalForm.agreementImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={hospitalForm.agreementImage} alt="Agreement Preview" className="w-full h-full object-cover" />
+                  <img src={getImageUrl(hospitalForm.image)} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
@@ -542,7 +458,7 @@ export default function HospitalPage() {
                 type="submit"
                 form="hospital-form"
                 className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-linear-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isSubmitting || isUploading || isUploadingAgreement || !agreedToTerms}
+                disabled={isSubmitting || isUploading || !agreedToTerms}
               >
                 {isSubmitting ? "Submitting..." : "Submit Form"}
               </button>

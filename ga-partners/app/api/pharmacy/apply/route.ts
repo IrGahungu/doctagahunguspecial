@@ -5,20 +5,18 @@ import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const formData: any = await req.formData();
 
-    const {
-      name,
-      email,
-      whatsapp_number,
-      location,
-      password,
-      image,
-      agreementImage,
-      payment_id,
-      country,
-      originCountry,
-    } = body;
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const whatsapp_number = formData.get("whatsapp_number") as string;
+    const location = formData.get("location") as string;
+    const password = formData.get("password") as string;
+    const payment_id = formData.get("payment_id") as string;
+    const country = formData.get("country") as string;
+    const originCountry = formData.get("originCountry") as string;
+    
+    const image = formData.get("image") as File | null;
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
@@ -61,6 +59,23 @@ export async function POST(req: Request) {
 
     const nameWithSequence = `${name} DMJKG${String(sequenceNumber).padStart(4, "0")}`;
 
+    // Helper to upload file and return path
+    const uploadFile = async (file: File | null, folder: string) => {
+      if (!file || typeof file === "string") return null;
+      
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileName = `${folder}/${uuidv4()}-${file.name}`;
+      
+      const { data, error } = await supabaseAdmin.storage
+        .from("pharmacy-images")
+        .upload(fileName, buffer, { contentType: file.type, upsert: true });
+        
+      if (error) throw error;
+      return data.path;
+    };
+
+    const imagePath = await uploadFile(image, "profiles");
+
     // 2) Insert application record linked to userId
     const { error: insertAppErr } = await supabaseAdmin
       .from("pharmacy_applications")
@@ -73,8 +88,7 @@ export async function POST(req: Request) {
           whatsapp_number,
           location,
           payment_id,
-          image: image || null,
-          agreement_image: agreementImage || null,
+          image: imagePath,
           status: "pending",
           country,
           origin_country: originCountry,
@@ -97,26 +111,25 @@ export async function POST(req: Request) {
 
 export async function PUT(req: Request) {
   try {
-    const body = await req.json();
-    const {
-      id,
-      name,
-      email,
-      whatsapp_number,
-      password,
-      image,
-      agreementImage,
-      payment_id,
-      country,
-      location,
-      originCountry,
-      opening_hours,
-      contact_email,
-      contact_phone,
-      contact_office,
-      contact_website,
-      accepted_insurances,
-    } = body;
+    const formData: any = await req.formData();
+    
+    const id = formData.get("id") as string;
+    const name = formData.get("name") as string;
+    const email = formData.get("email") as string;
+    const whatsapp_number = formData.get("whatsapp_number") as string;
+    const password = formData.get("password") as string;
+    const payment_id = formData.get("payment_id") as string;
+    const country = formData.get("country") as string;
+    const location = formData.get("location") as string;
+    const originCountry = formData.get("originCountry") as string;
+    const opening_hours = formData.get("opening_hours") as string;
+    const contact_email = formData.get("contact_email") as string;
+    const contact_phone = formData.get("contact_phone") as string;
+    const contact_office = formData.get("contact_office") as string;
+    const contact_website = formData.get("contact_website") as string;
+    const accepted_insurances = formData.get("accepted_insurances") as string;
+
+    const image = formData.get("image") as File | null;
 
     if (!id) {
       return NextResponse.json({ error: "Application ID is required" }, { status: 400 });
@@ -128,8 +141,6 @@ export async function PUT(req: Request) {
       whatsapp_number,
       payment_id,
       location,
-      image,
-      agreement_image: agreementImage,
       country,
       origin_country: originCountry,
       opening_hours,
@@ -139,6 +150,26 @@ export async function PUT(req: Request) {
       contact_website,
       accepted_insurances,
     };
+
+    // Helper to upload file and return path
+    const uploadFile = async (file: File | null, folder: string) => {
+      if (!file || typeof file === "string") return null;
+      
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileName = `${folder}/${uuidv4()}-${file.name}`;
+      
+      const { data, error } = await supabaseAdmin.storage
+        .from("pharmacy-images")
+        .upload(fileName, buffer, { contentType: file.type, upsert: true });
+        
+      if (error) throw error;
+      return data.path;
+    };
+
+    const imagePath = await uploadFile(image, "profiles");
+    if (imagePath) {
+      updates.image = imagePath;
+    }
 
     if (password) {
       await supabaseAdmin

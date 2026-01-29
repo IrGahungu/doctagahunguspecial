@@ -96,6 +96,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
 
   const [availabilityForm, setAvailabilityForm] = useState({
     availability: [] as Availability[],
@@ -160,6 +161,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     if (!error && count !== null) {
       setPendingBookingsCount(count);
     }
+  };
+
+  const getImageUrl = (path: string | null | undefined) => {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("blob:")) return path;
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/doctor-images/${path}`;
   };
 
   useEffect(() => {
@@ -628,37 +635,36 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
   }
 
-  async function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingProfileImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "doctor-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setProfileForm((prev) => ({ ...prev, image: result.publicUrl }));
-    } catch (err) {
-      console.error(err);
-      toast.error("Image upload failed");
-    } finally {
-      setIsUploadingProfileImage(false);
-    }
+    setProfileImageFile(file);
+    setProfileForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
   }
 
   async function handleSaveProfile() {
     setIsSavingProfile(true);
 
     try {
+      const formData = new FormData();
+      formData.append("name", profileForm.name);
+      formData.append("email", profileForm.email);
+      formData.append("specialty", profileForm.specialty);
+      formData.append("bio", profileForm.bio);
+      formData.append("whatsapp_number", profileForm.whatsapp_number);
+      formData.append("country", profileForm.country);
+      formData.append("originCountry", profileForm.origin_country);
+      formData.append("payment_id", profileForm.payment_id);
+      
+      if (profileImageFile) {
+        formData.append("image", profileImageFile);
+      } else if (profileForm.image && !profileForm.image.startsWith("blob:")) {
+        formData.append("image", profileForm.image);
+      }
+
       const res = await fetch(`/api/doctor-applications/${app.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profileForm),
+        body: formData,
       });
       if (!res.ok) throw new Error("Failed to update profile");
       toast.success("Profile updated successfully!");
@@ -820,6 +826,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   }
 
   const handleNavClick = (tab: string) => {
+    if (tab !== "status" && app.status !== "approved") {
+      toast.error("Not yet approved");
+      return;
+    }
+
     setActiveTab(tab);
     setLoadingTab(tab);
 
@@ -848,7 +859,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="mb-6 flex flex-col items-center justify-center">
           <div className="h-10 w-10 md:h-20 md:w-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm mb-3 overflow-hidden transition-all duration-300">
             {app.image ? (
-              <img src={app.image} alt={app.name} className="h-full w-full object-cover" />
+              <img 
+                src={getImageUrl(app.image)} 
+                alt={app.name} 
+                className="h-full w-full object-cover" 
+                onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(app.name || 'User')}&background=random`; }}
+              />
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1210,7 +1226,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex items-center gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
-                            <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                            <img 
+                              src={getImageUrl(profileForm.image)} 
+                              alt="Profile" 
+                              className="h-full w-full object-cover" 
+                              onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileForm.name || 'User')}&background=random`; }}
+                            />
                           ) : (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1267,7 +1288,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="flex items-center gap-6">
                       <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200">
                         {profileForm.image ? (
-                          <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                          <img 
+                            src={getImageUrl(profileForm.image)} 
+                            alt="Profile" 
+                            className="h-full w-full object-cover" 
+                            onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profileForm.name || 'User')}&background=random`; }}
+                          />
                         ) : (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

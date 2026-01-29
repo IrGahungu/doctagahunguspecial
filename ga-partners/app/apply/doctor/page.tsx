@@ -20,13 +20,8 @@ type Doctor = {
   booking_type?: "online" | "in-office" | "both";
   availability: Availability[];
   image?: string;
-  agreementImage?: string;
   country: string;
   originCountry?: string; // New field
-  idImage?: string; // New field
-  medicalDegreeImage?: string; // New field
-  medicalLicenceImage?: string; // New field
-  proofOfPracticeImage?: string; // New field
   whatsapp_number: string;
   password?: string;
   payment_id?: string;
@@ -74,13 +69,8 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
     booking_type: "online",
     availability: [],
     image: "",
-    agreementImage: "",
     country: "Burundi",
     originCountry: "",
-    idImage: "",
-    medicalDegreeImage: "",
-    medicalLicenceImage: "",
-    proofOfPracticeImage: "",
     whatsapp_number: "",
     password: "",
     payment_id: "",
@@ -92,12 +82,9 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isUploadingAgreement, setIsUploadingAgreement] = useState(false);
-  const [isUploadingIdImage, setIsUploadingIdImage] = useState(false);
-  const [isUploadingMedicalDegree, setIsUploadingMedicalDegree] = useState(false);
-  const [isUploadingMedicalLicence, setIsUploadingMedicalLicence] = useState(false);
-  const [isUploadingProofOfPractice, setIsUploadingProofOfPractice] = useState(false);
+  const [files, setFiles] = useState<{
+    image?: File;
+  }>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -130,12 +117,6 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
             // Normalize field names so nothing becomes undefined
             originCountry: data.originCountry || data.origin_country || "",
             image: data.image || "",
-            agreementImage: data.agreementImage || data.agreement_image || "",
-
-            idImage: data.idImage || data.id_image || "",
-            medicalDegreeImage: data.medicalDegreeImage || data.medical_degree_image || "",
-            medicalLicenceImage: data.medicalLicenceImage || data.medical_licence_image || "",
-            proofOfPracticeImage: data.proofOfPracticeImage || data.proof_of_practice_image || "",
           });
 
 
@@ -164,11 +145,6 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
           location: data.location || [],
           originCountry: data.originCountry || data.origin_country || "",
           image: data.image || "",
-          agreementImage: data.agreementImage || data.agreement_image || "",
-          idImage: data.idImage || data.id_image || "",
-          medicalDegreeImage: data.medicalDegreeImage || data.medical_degree_image || "",
-          medicalLicenceImage: data.medicalLicenceImage || data.medical_licence_image || "",
-          proofOfPracticeImage: data.proofOfPracticeImage || data.proof_of_practice_image || "",
         });
 
         setIsEditing(true);
@@ -197,183 +173,17 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
     }
   }
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsUploading(true);
-    setFormError(null);
+    setFiles((prev) => ({ ...prev, image: file }));
+    setDoctorForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "doctor-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setDoctorForm((prev) => ({ ...prev, image: result.publicUrl }));
-      if (errors.image) {
-        const newErrors = { ...errors };
-        delete newErrors.image;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploading(false);
-    }
-  }
-
-  async function handleIdImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingIdImage(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "id-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setDoctorForm((prev) => ({ ...prev, idImage: result.publicUrl }));
-      if (errors.idImage) {
-        const newErrors = { ...errors };
-        delete newErrors.idImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingIdImage(false);
-    }
-  }
-
-  async function handleMedicalDegreeImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingMedicalDegree(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "degree-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setDoctorForm((prev) => ({ ...prev, medicalDegreeImage: result.publicUrl }));
-      if (errors.medicalDegreeImage) {
-        const newErrors = { ...errors };
-        delete newErrors.medicalDegreeImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingMedicalDegree(false);
-    }
-  }
-
-  async function handleMedicalLicenceImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingMedicalLicence(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "licence-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setDoctorForm((prev) => ({ ...prev, medicalLicenceImage: result.publicUrl }));
-      if (errors.medicalLicenceImage) {
-        const newErrors = { ...errors };
-        delete newErrors.medicalLicenceImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingMedicalLicence(false);
-    }
-  }
-
-  async function handleProofOfPracticeImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingProofOfPractice(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "proof-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setDoctorForm((prev) => ({ ...prev, proofOfPracticeImage: result.publicUrl }));
-      if (errors.proofOfPracticeImage) {
-        const newErrors = { ...errors };
-        delete newErrors.proofOfPracticeImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingProofOfPractice(false);
-    }
-  }
-
-  async function handleAgreementImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    console.log("Agreement image upload started for file:", file.name);
-
-    setIsUploadingAgreement(true);
-    setFormError(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "agreement-images"); // Use a different bucket
-
-    try {
-      console.log("Sending request to /api/upload for agreement image...");
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      console.log("Received response from /api/upload:", { status: res.status, ok: res.ok, body: result });
-
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      console.log("Setting agreement image URL:", result.publicUrl);
-      setDoctorForm((prev) => ({ ...prev, agreementImage: result.publicUrl }));
-      if (errors.agreementImage) {
-        const newErrors = { ...errors };
-        delete newErrors.agreementImage;
-        setErrors(newErrors);
-      }
-    } catch (err) {
-      console.error("Error during agreement image upload:", err);
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
-    } finally {
-      setIsUploadingAgreement(false);
+    if (errors.image) {
+      const newErrors = { ...errors };
+      delete newErrors.image;
+      setErrors(newErrors);
     }
   }
 
@@ -435,12 +245,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
     if (!isEditing && !doctorForm.password) newErrors.password = "Password is required";
     if (!isEditing && doctorForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!doctorForm.image) newErrors.image = "Doctor image is required";
-    if (!doctorForm.agreementImage) newErrors.agreementImage = "Agreement image is required";
     if (!doctorForm.originCountry) newErrors.originCountry = "Country of origin is required";
-    if (!doctorForm.idImage) newErrors.idImage = "ID image is required";
-    if (!doctorForm.medicalDegreeImage) newErrors.medicalDegreeImage = "Medical Degree image is required";
-    if (!doctorForm.medicalLicenceImage) newErrors.medicalLicenceImage = "Medical Licence image is required";
-    if (!doctorForm.proofOfPracticeImage) newErrors.proofOfPracticeImage = "Proof of Practice image is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -461,18 +266,41 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
     try {
       const endpoint = isEditing ? `/api/doctor-applications/status` : "/api/doctor-applications";
       const method = isEditing ? "PUT" : "POST";
-      const payload = {
-        ...doctorForm,
-        id: isEditing ? doctorForm.id : undefined,
-        status: isEditing ? "pending" : undefined, // Reset status to pending on resubmission
+      
+      const formData = new FormData();
+      
+      // Append basic fields
+      formData.append("name", doctorForm.name);
+      formData.append("email", doctorForm.email);
+      if (doctorForm.password) formData.append("password", doctorForm.password);
+      formData.append("specialty", doctorForm.specialty || "");
+      formData.append("bio", doctorForm.bio || "");
+      formData.append("booking_type", doctorForm.booking_type || "");
+      formData.append("country", doctorForm.country);
+      formData.append("whatsapp_number", doctorForm.whatsapp_number);
+      if (doctorForm.consultation_fee_online) formData.append("consultation_fee_online", doctorForm.consultation_fee_online);
+      if (doctorForm.consultation_fee_offline) formData.append("consultation_fee_offline", doctorForm.consultation_fee_offline);
+      formData.append("location", JSON.stringify(doctorForm.location.filter((loc) => loc.trim() !== "")));
+      formData.append("availability", JSON.stringify(doctorForm.availability));
+      formData.append("payment_id", doctorForm.payment_id || "");
+      formData.append("originCountry", doctorForm.originCountry || "");
+      
+      if (isEditing && doctorForm.id) {
+          formData.append("id", doctorForm.id);
+          formData.append("status", "pending");
+      }
+
+      // Append images (File if new, URL string if existing)
+      const appendImage = (key: string, file: File | undefined, currentUrl: string | undefined) => {
+          if (file) formData.append(key, file);
+          else if (currentUrl) formData.append(key, currentUrl);
       };
 
-      payload.location = payload.location.filter((loc) => loc.trim() !== "");
+      appendImage("image", files.image, doctorForm.image);
 
       const res = await fetch(endpoint, {
         method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (!res.ok) {
@@ -511,6 +339,12 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
       {required && <span className="text-red-500 ml-1">*</span>}
     </label>
   );
+
+  const getImageUrl = (path: string) => {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("blob:")) return path;
+    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/doctor-images/${path}`;
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -698,113 +532,18 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <span>{isUploading ? "Uploading..." : "Choose image"}</span>
+                <span>Choose image</span>
                 <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
               </label>
 
               {doctorForm.image && (
                 <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={doctorForm.image} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Id upload */}
-          <div>
-            <FieldLabel required>Id Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.image ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingIdImage ? "Uploading..." : "Choose image"}</span>
-                <input type="file" accept="image/*" onChange={handleIdImageUpload} className="hidden" />
-              </label>
-
-              {doctorForm.idImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={doctorForm.idImage} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* MedicalDegree upload */}
-          <div>
-            <FieldLabel required>Medical Degree Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.image ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingMedicalDegree ? "Uploading..." : "Choose image"}</span>
-                <input type="file" accept="image/*" onChange={handleMedicalDegreeImageUpload} className="hidden" />
-              </label>
-
-              {doctorForm.medicalDegreeImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={doctorForm.medicalDegreeImage} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Licence upload */}
-          <div>
-            <FieldLabel required>Medical Licence Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.image ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingMedicalLicence ? "Uploading..." : "Choose image"}</span>
-                <input type="file" accept="image/*" onChange={handleMedicalLicenceImageUpload} className="hidden" />
-              </label>
-
-              {doctorForm.medicalLicenceImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={doctorForm.medicalLicenceImage} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Proof upload */}
-          <div>
-            <FieldLabel required>Proof Of Practice Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.image ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingProofOfPractice ? "Uploading..." : "Choose image"}</span>
-                <input type="file" accept="image/*" onChange={handleProofOfPracticeImageUpload} className="hidden" />
-              </label>
-
-              {doctorForm.proofOfPracticeImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={doctorForm.proofOfPracticeImage} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Agreement Image upload */}
-          <div>
-            <FieldLabel required>Agreement Image</FieldLabel>
-            <div className="flex items-center gap-4">
-              <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.agreementImage ? 'ring-red-500' : 'ring-transparent'}`}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{isUploadingAgreement ? "Uploading..." : "Choose image"}</span>
-                <input type="file" accept="image/*" onChange={handleAgreementImageUpload} className="hidden" />
-              </label>
-
-              {doctorForm.agreementImage && (
-                <div className="w-28 h-28 rounded-lg overflow-hidden border border-slate-100 shadow-sm">
-                  <img src={doctorForm.agreementImage} alt="Preview" className="w-full h-full object-cover" />
+                  <img 
+                    src={getImageUrl(doctorForm.image)} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(doctorForm.name || 'User')}&background=random`; }}
+                  />
                 </div>
               )}
             </div>
@@ -845,7 +584,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
             <button
               type="submit"
               form="doctor-form"
-              disabled={isSubmitting || isUploading || isUploadingAgreement || isUploadingIdImage || isUploadingMedicalDegree || isUploadingMedicalLicence || isUploadingProofOfPractice || !agreedToTerms}
+              disabled={isSubmitting || !agreedToTerms}
               className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-md hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (

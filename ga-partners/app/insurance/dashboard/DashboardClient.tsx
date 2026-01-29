@@ -39,6 +39,12 @@ const getCurrencyForCountry = (country: string) => {
   return "USD";
 };
 
+const getImageUrl = (path: string | null | undefined) => {
+  if (!path) return "";
+  if (path.startsWith("http") || path.startsWith("blob:")) return path;
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/insurance-images/${path}`;
+};
+
 export default function DashboardClient({ app }: DashboardClientProps) {
   const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
@@ -73,7 +79,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     });
     const [isProfileLoading, setIsProfileLoading] = useState(false);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
-    const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
+    const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
     const [plansList, setPlansList] = useState<{ title: string; description: string; price: string; currency: string }[]>([]);
     const [hospitalsList, setHospitalsList] = useState<string[]>([]);
     const [pharmaciesList, setPharmaciesList] = useState<string[]>([]);
@@ -264,31 +270,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   async function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingProfileImage(true);
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("bucket", "insurance-images");
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
-
-      setProfileForm((prev) => ({ ...prev, image: result.publicUrl }));
-    } catch (err) {
-      console.error(err);
-      alert("Image upload failed");
-    } finally {
-      setIsUploadingProfileImage(false);
-    }
+    setProfileImageFile(file);
+    setProfileForm((prev) => ({ ...prev, image: URL.createObjectURL(file) }));
   }
 
   async function handleSaveProfile() {
     setIsSavingProfile(true);
 
     if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-      alert("Passwords do not match!");
+      toast.error("Passwords do not match!");
       setIsSavingProfile(false);
       return;
     }
@@ -300,34 +290,31 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       website: profileForm.contact_website
     });
 
-    const updateData = { ...profileForm, id: app.id, contact_details: contactJson };
-    if (!updateData.password) {
-      delete (updateData as any).password;
-    }
-    delete (updateData as any).confirmPassword;
-    delete (updateData as any).contact_email;
-    delete (updateData as any).contact_phone;
-    delete (updateData as any).contact_office;
-    delete (updateData as any).contact_website;
-    delete (updateData as any).insurance_plans;
-    delete (updateData as any).coverage_summary;
-    delete (updateData as any).claim_process;
-    delete (updateData as any).partner_hospitals;
-    delete (updateData as any).partner_pharmacies;
+    const formData = new FormData();
+    formData.append("id", app.id);
+    formData.append("name", profileForm.name);
+    formData.append("email", profileForm.email);
+    formData.append("whatsapp_number", profileForm.whatsapp_number);
+    formData.append("country", profileForm.country);
+    formData.append("origin_country", profileForm.origin_country);
+    formData.append("payment_id", profileForm.payment_id);
+    formData.append("contact_details", contactJson);
+
+    if (profileImageFile) formData.append("image", profileImageFile);
+    else if (profileForm.image && !profileForm.image.startsWith("blob:")) formData.append("image", profileForm.image);
 
     try {
       const res = await fetch(`/api/insurance/apply`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
+        body: formData,
       });
       if (!res.ok) throw new Error("Failed to update profile");
-      alert("Profile updated successfully!");
+      toast.success("Profile updated successfully!");
       router.refresh();
       setIsEditingProfile(false);
     } catch (e) {
       console.error(e);
-      alert("Error updating profile");
+      toast.error("Error updating profile");
     } finally {
       setIsSavingProfile(false);
     }
@@ -399,7 +386,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   function handleUseCurrentLocation(index: number) {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      toast.error("Geolocation is not supported by your browser");
       return;
     }
     navigator.geolocation.getCurrentPosition((position) => {
@@ -407,7 +394,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       list[index].latitude = position.coords.latitude.toFixed(6);
       list[index].longitude = position.coords.longitude.toFixed(6);
       setOfficeLocations(list);
-    }, (err) => alert("Could not retrieve location: " + err.message));
+    }, (err) => toast.error("Could not retrieve location: " + err.message));
   }
 
   async function handlePasteCoordinates(index: number) {
@@ -420,10 +407,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         list[index].longitude = matches[1];
         setOfficeLocations(list);
       } else {
-        alert("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
-      alert("Failed to read clipboard.");
+      toast.error("Failed to read clipboard.");
     }
   }
 
@@ -441,42 +428,37 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       website: profileForm.contact_website
     });
 
-    const updateData = { 
-      ...profileForm, 
-      id: app.id, 
-      contact_details: contactJson, 
-      insurance_plans: plansJson,
-      partner_hospitals: hospitalsJson,
-      partner_pharmacies: pharmaciesJson,
-      office_locations: locationsJson
-    };
-    delete (updateData as any).password;
-    delete (updateData as any).confirmPassword;
-    delete (updateData as any).contact_email;
-    delete (updateData as any).contact_phone;
-    delete (updateData as any).contact_office;
-    delete (updateData as any).contact_website;
-    delete (updateData as any).name;
-    delete (updateData as any).email;
-    delete (updateData as any).whatsapp_number;
-    delete (updateData as any).country;
-    delete (updateData as any).origin_country;
-    delete (updateData as any).payment_id;
-    delete (updateData as any).image;
+    const formData = new FormData();
+    formData.append("id", app.id);
+    formData.append("name", profileForm.name);
+    formData.append("email", profileForm.email);
+    formData.append("whatsapp_number", profileForm.whatsapp_number);
+    formData.append("payment_id", profileForm.payment_id);
+    formData.append("country", profileForm.country);
+    formData.append("origin_country", profileForm.origin_country);
+    formData.append("contact_details", contactJson);
+    formData.append("insurance_plans", plansJson);
+    formData.append("partner_hospitals", hospitalsJson);
+    formData.append("partner_pharmacies", pharmaciesJson);
+    formData.append("office_locations", locationsJson);
+    formData.append("coverage_summary", profileForm.coverage_summary);
+    formData.append("claim_process", profileForm.claim_process);
 
     try {
       const res = await fetch(`/api/insurance/apply`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
+        body: formData,
       });
-      if (!res.ok) throw new Error("Failed to update information");
-      alert("Information updated successfully!");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to update information");
+      }
+      toast.success("Information updated successfully!");
       router.refresh();
       setIsEditingUpdates(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Error updating information");
+      toast.error(e.message || "Error updating information");
     } finally {
       setIsSavingProfile(false);
     }
@@ -490,7 +472,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="mb-6 flex flex-col items-center justify-center">
           <div className="h-10 w-10 md:h-20 md:w-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm mb-3 overflow-hidden transition-all duration-300">
             {app.image ? (
-              <img src={app.image} alt={app.name} className="h-full w-full object-cover" />
+              <img src={getImageUrl(app.image)} alt={app.name} className="h-full w-full object-cover" />
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -972,7 +954,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 onClick={() => {
                                   const query = `${loc.address} ${loc.city}`.trim();
-                                  if (!query) return alert("Please enter an address or city to search.");
+                                  if (!query) return toast.error("Please enter an address or city to search.");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
                                 className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
@@ -1046,7 +1028,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           <input
                             type="text"
                             value={profileForm.contact_office}
-                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value }))}
+                            onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value.toUpperCase() }))}
                             className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             placeholder="City, Country"
                           />
@@ -1101,7 +1083,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex items-center gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
-                            <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                            <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
                           ) : (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1150,7 +1132,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="flex items-center gap-6">
                       <div className="h-24 w-24 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200">
                         {profileForm.image ? (
-                          <img src={profileForm.image} alt="Profile" className="h-full w-full object-cover" />
+                          <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
                         ) : (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -1159,20 +1141,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       </div>
                       <div>
                         <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-100 transition text-sm font-medium">
-                          {isUploadingProfileImage ? (
-                            <>
-                              <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                              </svg>
-                              Change Photo
-                            </>
-                          )}
-                          <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" disabled={isUploadingProfileImage} />
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                          </svg>
+                          Change Photo
+                          <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" />
                         </label>
                       </div>
                     </div>

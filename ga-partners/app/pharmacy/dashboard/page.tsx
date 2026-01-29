@@ -1,4 +1,4 @@
-// ga-partners/app/doctor/dashboard/page.tsx
+// ga-partners/app/pharmacy/dashboard/page.tsx
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "@/lib/supabase";
 import Link from "next/link";
