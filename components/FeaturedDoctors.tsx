@@ -15,6 +15,7 @@ interface Props {
   title: string;
   items?: Doctor[];
   onViewAll?: () => void;
+  baseUrl?: string;
 }
 
 const SkeletonCard = () => (
@@ -29,7 +30,7 @@ const SkeletonCard = () => (
   </View>
 );
 
-export default function FeaturedDoctors({ title, items: itemsProp, onViewAll }: Props) {
+export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, baseUrl = "" }: Props) {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,7 +138,7 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll }: 
               <Image
                 source={
                   doctor.image
-                    ? { uri: doctor.image }
+                    ? { uri: doctor.image && !doctor.image.startsWith('http') ? `${baseUrl}${doctor.image}` : doctor.image }
                     : require('@/assets/images/two.jpg')
                 }
                 style={styles.image}

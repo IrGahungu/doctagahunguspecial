@@ -63,6 +63,8 @@ const getCurrencyForCountry = (country: string | null) => {
   return "USD";
 };
 
+const HOSPITAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/hospital-images/";
+
 export default function HospitalDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -356,7 +358,7 @@ export default function HospitalDetailScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {hospital.image ? (
-          <Image source={{ uri: hospital.image }} style={styles.hospitalImage} resizeMode="cover" />
+          <Image source={{ uri: hospital.image && !hospital.image.startsWith('http') ? `${HOSPITAL_URL_PREFIX}${hospital.image}` : hospital.image }} style={styles.hospitalImage} resizeMode="cover" />
         ) : (
           <View style={styles.placeholderImage}>
             <Text style={styles.placeholderText}>No Image Available</Text>

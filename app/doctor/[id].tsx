@@ -44,6 +44,8 @@ const getCurrency = (country: string | null): string => {
   return country ? currencyMap[country] || 'USD' : 'USD';
 };
 
+const DOCTOR_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/doctor-images/";
+
 type Availability = {
   date: string;
   times: string[];
@@ -549,7 +551,11 @@ export default function DoctorDetailScreen() {
       >
         {doctor.image ? (
           <Image
-            source={{ uri: doctor.image }}
+            source={{ 
+              uri: doctor.image && !doctor.image.startsWith('http') 
+                ? `${DOCTOR_URL_PREFIX}${doctor.image}` 
+                : doctor.image 
+            }}
             style={styles.doctorImage}
             resizeMode="cover"
           />

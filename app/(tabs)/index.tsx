@@ -94,6 +94,11 @@ type SearchResultsState = {
 
 const BANNER_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/banner-images/";
 const DEAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/deal-images/";
+const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
+const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
+const HOSPITAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/hospital-images/";
+const DOCTOR_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/doctor-images/";
+const INSURANCE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/insurance-images/";
 
 //
 // =======================
@@ -311,11 +316,11 @@ const renderMainContent = () => (
     <Carousel baseUrl={BANNER_URL_PREFIX} />
     <CategorySlider />
     <DealSection title="Deals of the Day" baseUrl={DEAL_URL_PREFIX} />
-    <ProductGrid title="Recommended for You" />
-    <FeaturedPharmacies title="Featured Pharmacies" />
-    <FeaturedHospitals />
-    <FeaturedDoctors title="Featured Doctors" />
-    <FeaturedInsurances />
+    <ProductGrid title="Recommended for You" baseUrl={MEDICINE_URL_PREFIX} />
+    <FeaturedPharmacies title="Featured Pharmacies" baseUrl={PHARMACY_URL_PREFIX} />
+    <FeaturedHospitals baseUrl={HOSPITAL_URL_PREFIX} />
+    <FeaturedDoctors title="Featured Doctors" baseUrl={DOCTOR_URL_PREFIX} />
+    <FeaturedInsurances baseUrl={INSURANCE_URL_PREFIX} />
     <View style={{ height: 20 }} />
   </View>
 );

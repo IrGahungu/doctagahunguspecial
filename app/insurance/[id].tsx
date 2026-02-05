@@ -60,6 +60,8 @@ const getCurrencyForCountry = (country: string | null) => {
   return "USD";
 };
 
+const INSURANCE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/insurance-images/";
+
 export default function InsuranceDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -338,7 +340,7 @@ export default function InsuranceDetailScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {insurance.image ? (
-          <Image source={{ uri: insurance.image }} style={styles.insuranceImage} resizeMode="cover" />
+          <Image source={{ uri: insurance.image && !insurance.image.startsWith('http') ? `${INSURANCE_URL_PREFIX}${insurance.image}` : insurance.image }} style={styles.insuranceImage} resizeMode="cover" />
         ) : (
           <View style={styles.placeholderImage}>
             <Text style={styles.placeholderText}>No Image Available</Text>

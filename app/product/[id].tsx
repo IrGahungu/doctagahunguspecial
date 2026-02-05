@@ -42,6 +42,9 @@ const getCurrency = (country: string | null): string => {
   return country ? currencyMap[country] || 'USD' : 'USD';
 };
 
+const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
+const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
+
 export default function ProductDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -446,7 +449,7 @@ export default function ProductDetailScreen() {
 
         {product.image ? (
           <Image
-            source={{ uri: product.image as string }}
+            source={{ uri: product.image && !product.image.toString().startsWith('http') ? `${MEDICINE_URL_PREFIX}${product.image}` : product.image.toString() }}
             style={styles.productImage}
             resizeMode="cover"
           />
@@ -505,7 +508,7 @@ export default function ProductDetailScreen() {
                     <View style={styles.pharmacyHeader}>
                       {pharmacy.image ? (
                         <Image
-                          source={{ uri: pharmacy.image as string }}
+                          source={{ uri: pharmacy.image && !pharmacy.image.toString().startsWith('http') ? `${PHARMACY_URL_PREFIX}${pharmacy.image}` : pharmacy.image.toString() }}
                           style={styles.pharmacyImage}
                           resizeMode="cover"
                         />

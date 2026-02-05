@@ -55,6 +55,8 @@ type Pharmacy = {
   contact_website: string | null;
 };
 
+const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
+
 export default function PharmacyDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams();
@@ -383,7 +385,7 @@ export default function PharmacyDetailScreen() {
           </View>
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             {pharmacy.image ? (
-              <Image source={{ uri: pharmacy.image }} style={styles.pharmacyImage} resizeMode="cover" />
+              <Image source={{ uri: pharmacy.image && !pharmacy.image.startsWith('http') ? `${PHARMACY_URL_PREFIX}${pharmacy.image}` : pharmacy.image }} style={styles.pharmacyImage} resizeMode="cover" />
             ) : (
               <View style={styles.placeholderImage}>
                 <Text style={styles.placeholderText}>No Image Available</Text>

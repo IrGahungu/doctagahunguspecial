@@ -22,6 +22,7 @@ interface ProductGridProps {
   title?: string;
   products?: Product[];
   scrollEnabled?: boolean;
+  baseUrl?: string;
 }
 
 const currencyMap: { [country: string]: string } = {
@@ -38,7 +39,7 @@ const getCurrency = (country: string | null): string => {
   return country ? currencyMap[country] || 'USD' : 'USD';
 };
 
-const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp, scrollEnabled = false }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp, scrollEnabled = false, baseUrl = "" }) => {
   const [products, setProducts] = useState<Product[]>(productsProp || []);
   const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,7 +133,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
       >
         {item.image ? (
           <Image
-            source={{ uri: item.image as string }}
+            source={{ uri: item.image && !item.image.toString().startsWith('http') ? `${baseUrl}${item.image}` : item.image.toString() }}
             style={styles.productImage}
             resizeMode="cover"
           />

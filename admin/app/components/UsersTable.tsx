@@ -189,8 +189,8 @@ export default function UsersTable() {
         <div className="flex items-baseline gap-3">
           <h2 className="text-2xl font-bold text-gray-800">Users Overview</h2>
           {!loading && totalUserCount > 0 && (
-            <span className="text-base font-medium text-gray-800">
-              ({searchQuery ? `${filteredUserCount} of ${totalUserCount}` : totalUserCount})
+            <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+              {searchQuery ? `${filteredUserCount}/${totalUserCount}` : totalUserCount}
             </span>
           )}
         </div>
@@ -212,33 +212,33 @@ export default function UsersTable() {
         </div>
       )}
 
-      {loading ? (
+      {loading ? ( 
         <p>Loading users...</p>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="w-full text-left min-w-[640px]">
-            <thead className="bg-gray-100">
+        <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[70vh]">
+          <table className="w-full text-left min-w-[640px] border-collapse border border-gray-200">
+            <thead className="bg-gray-100 sticky top-0 z-10">
               <tr>
-                <th className="p-3 text-sm font-semibold text-gray-600">Full Name</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">WhatsApp Number</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Country</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Gender</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Secret Answer</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Wallet (BIF)</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Verified</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Role</th>
-                <th className="p-3 text-sm font-semibold text-gray-600">Actions</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Full Name</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">WhatsApp Number</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Country</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Gender</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Secret Answer</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Wallet (BIF)</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Verified</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Role</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((u) => (
-                <tr key={u.id} className="border-t align-top">
-                  <td className="p-3 text-sm text-gray-800">{u.fullname || "—"}</td>
-                  <td className="p-3 text-sm text-gray-800">{u.whatsapp_number || "—"}</td>
-                  <td className="p-3 text-sm text-gray-800">{u.country || "—"}</td>
-                  <td className="p-3 text-sm text-gray-800">{u.gender || "—"}</td>
-                  <td className="p-3 text-sm text-gray-800">{u.secret_answer || "—"}</td>
-                  <td className="p-3 text-sm text-gray-800">
+                <tr key={u.id} className="align-top">
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.fullname || "—"}</td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.whatsapp_number || "—"}</td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.country || "—"}</td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.gender || "—"}</td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.secret_answer || "—"}</td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">
                     {editingUserId === u.id ? (
                       <input
                         type="number"
@@ -252,7 +252,7 @@ export default function UsersTable() {
                       </span>
                     )}
                   </td>
-                  <td className="p-3 text-sm text-gray-800">
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">
                     <button
                       onClick={() => handleToggleVerified(u.id, u.is_verified)}
                       disabled={isSubmitting || editingUserId === u.id}
@@ -265,7 +265,7 @@ export default function UsersTable() {
                       />
                     </button>
                   </td>
-                  <td className="p-3 text-sm text-gray-800">
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200">
                     {editingUserId === u.id ? (
                       <select
                         value={selectedRole}
@@ -281,20 +281,22 @@ export default function UsersTable() {
                       </span>
                     )}
                   </td>
-                  <td className="p-3 space-x-2 whitespace-nowrap">
-                    {editingUserId === u.id ? (
-                      <>
-                        <button onClick={() => handleUpdate(u.id)} disabled={isSubmitting} className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm disabled:bg-green-300">Save</button>
-                        <button onClick={handleCancelClick} disabled={isSubmitting} className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm disabled:bg-gray-300">Cancel</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => handleEditClick(u)} disabled={isSubmitting} className="px-3 py-1 text-blue-600 hover:underline text-sm disabled:text-gray-400 disabled:cursor-not-allowed">Edit</button>
-                        <button onClick={() => handleDelete(u.id)} disabled={isSubmitting} className="px-3 py-1 text-red-600 hover:underline text-sm disabled:text-gray-400 disabled:cursor-not-allowed">
-                          Delete
-                        </button>
-                      </>
-                    )}
+                  <td className="p-3 whitespace-nowrap border border-gray-200">
+                    <div className="flex flex-col gap-2">
+                      {editingUserId === u.id ? (
+                        <>
+                          <button onClick={() => handleUpdate(u.id)} disabled={isSubmitting} className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm disabled:bg-green-300">Save</button>
+                          <button onClick={handleCancelClick} disabled={isSubmitting} className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm disabled:bg-gray-300">Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => handleEditClick(u)} disabled={isSubmitting} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:bg-blue-300">Edit</button>
+                          <button onClick={() => handleDelete(u.id)} disabled={isSubmitting} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm disabled:bg-red-300">
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -8,6 +8,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from "expo-secure-store";
 
+const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
+
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 16 padding on each side, 16 gap
 
@@ -112,7 +114,7 @@ export default function CategoryDetailScreen() {
       return <Text style={styles.noProducts}>No medicines found for this category.</Text>;
     }
 
-    return <ProductGrid products={products} scrollEnabled={true} />;
+    return <ProductGrid products={products} scrollEnabled={true} baseUrl={MEDICINE_URL_PREFIX} />;
   };
 
   return (

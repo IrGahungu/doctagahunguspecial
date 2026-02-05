@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, ShoppingCart, User, Blocks } from 'lucide-react-native';
+import { Home, ShoppingCart, User, Blocks, Compass } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useCartStore } from '@/stores/cartStore';
 
@@ -43,6 +43,13 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Explore',
+          tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
         }}
       />
       <Tabs.Screen

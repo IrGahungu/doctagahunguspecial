@@ -23,7 +23,11 @@ const SkeletonCard = () => (
   </View>
 );
 
-export default function FeaturedInsurances() {
+interface Props {
+  baseUrl?: string;
+}
+
+export default function FeaturedInsurances({ baseUrl = "" }: Props) {
   const [insurances, setInsurances] = useState<FeaturedInsurance[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
@@ -95,7 +99,7 @@ export default function FeaturedInsurances() {
       }}
     >
       {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image }} style={styles.image} resizeMode="cover" />
       ) : (
         <View style={[styles.image, styles.placeholderImage]}>
           <Icon name="shield" size={40} color="#ccc" />

@@ -124,6 +124,7 @@ export default function AdminDashboard() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [activeView, setActiveView] = useState<string | null>(null);
+  const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
@@ -614,25 +615,43 @@ export default function AdminDashboard() {
         <nav className="flex-1 p-4 space-y-2">
           <button
             onClick={() => setActiveView("users")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-blue-500 text-white rounded-lg transition-all ${activeView === 'users' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-blue-500 text-white rounded-lg transition-all ${activeView === 'users' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Users
           </button>
           <button
             onClick={() => setActiveView("orders")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-gray-500 text-white rounded-lg transition-all ${activeView === 'orders' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-gray-500 text-white rounded-lg transition-all ${activeView === 'orders' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Orders
           </button>
           <button
-            onClick={() => setActiveView("applications")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-pink-500 text-white rounded-lg transition-all ${activeView === 'applications' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            onClick={() => { setActiveView("applications"); setApplicationType("doctor"); }}
+            className={`w-full text-left p-3 text-xs font-semibold bg-pink-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'doctor' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
-            Manage Applications
+            Manage Doctor Applications
+          </button>
+          <button
+            onClick={() => { setActiveView("applications"); setApplicationType("pharmacy"); }}
+            className={`w-full text-left p-3 text-xs font-semibold bg-purple-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'pharmacy' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Pharma Applications
+          </button>
+          <button
+            onClick={() => { setActiveView("applications"); setApplicationType("hospital"); }}
+            className={`w-full text-left p-3 text-xs font-semibold bg-green-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'hospital' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Hospitals Applications
+          </button>
+          <button
+            onClick={() => { setActiveView("applications"); setApplicationType("insurance"); }}
+            className={`w-full text-left p-3 text-xs font-semibold bg-teal-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'insurance' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Insu Applications
           </button>
           <button
             onClick={() => setActiveView("medicines")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "medicines"
+            className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "medicines"
                 ? "ring-2 ring-offset-2 ring-black"
                 : ""
               }`}
@@ -641,50 +660,50 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => setActiveView("categories")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-yellow-500 text-white rounded-lg transition-all ${activeView === 'categories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-yellow-500 text-white rounded-lg transition-all ${activeView === 'categories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Categories
           </button>
           <button
             onClick={() => setActiveView("pharmacies")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-purple-500 text-white rounded-lg transition-all ${activeView === 'pharmacies' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-purple-500 text-white rounded-lg transition-all ${activeView === 'pharmacies' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Pharmacies
           </button>
           <button
             onClick={() => setActiveView("hospitals")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-green-500 text-white rounded-lg transition-all ${activeView === 'hospitals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-green-500 text-white rounded-lg transition-all ${activeView === 'hospitals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Hospitals
           </button>
           <button
             onClick={() => setActiveView("insurances")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-teal-500 text-white rounded-lg transition-all ${activeView === 'insurances' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-teal-500 text-white rounded-lg transition-all ${activeView === 'insurances' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Insurances
           </button>
           <button
             onClick={() => setActiveView("banners")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-red-500 text-white rounded-lg transition-all ${activeView === 'banners' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-red-500 text-white rounded-lg transition-all ${activeView === 'banners' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Banners
           </button>
           <button
             onClick={() => setActiveView("deals")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-orange-500 text-white rounded-lg transition-all ${activeView === 'deals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-orange-500 text-white rounded-lg transition-all ${activeView === 'deals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Deals
           </button>
           <button
             onClick={() => setActiveView("doctors")}
-            className={`w-full text-left p-3 text-sm font-semibold bg-cyan-500 text-white rounded-lg transition-all ${activeView === 'doctors' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-cyan-500 text-white rounded-lg transition-all ${activeView === 'doctors' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Doctors
           </button>
         </nav>
 
         <div className="p-4 border-t">
-          <button onClick={handleSignOut} disabled={isSigningOut} className="w-full p-3 text-center bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors font-semibold flex items-center justify-center gap-2">
+          <button onClick={handleSignOut} disabled={isSigningOut} className="w-full p-3 text-center bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors text-xs font-semibold flex items-center justify-center gap-2">
             {isSigningOut ? <Spinner /> : (
               <>
                 <span>Sign Out</span>
@@ -722,13 +741,6 @@ export default function AdminDashboard() {
         {activeView === "orders" && (
           <div className="overflow-x-auto">
             <OrdersTable />
-          </div>
-        )}
-
-        {/* Applications */}
-        {activeView === "applications" && (
-          <div className="overflow-x-auto">
-            <ApplicationsTable />
           </div>
         )}
 

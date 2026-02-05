@@ -8,6 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 interface Props {
   title: string;
   onViewAll?: () => void;
+  baseUrl?: string;
 }
 
 // This component only needs a subset of the full pharmacy data.
@@ -28,7 +29,7 @@ const SkeletonCard = () => (
   </View>
 );
 
-export default function FeaturedPharmacies({ title, onViewAll }: Props) {
+export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: Props) {
   const [items, setItems] = useState<SimplePharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
@@ -118,7 +119,7 @@ export default function FeaturedPharmacies({ title, onViewAll }: Props) {
                 }}
               >
                 {item.image ? (
-                  <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+                  <Image source={{ uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image }} style={styles.image} resizeMode="cover" />
                 ) : (
                   <View style={[styles.image, styles.placeholderImage]}>
                     <Icon name="local-pharmacy" size={40} color="#ccc" />
