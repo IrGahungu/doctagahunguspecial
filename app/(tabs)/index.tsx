@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Keyboard,
-  TouchableWithoutFeedback,
-  FlatList,
-  RefreshControl,
-} from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback, FlatList, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-
 import Header from '@/components/Header';
 import Carousel from '@/components/Carousel';
 import CategorySlider from '@/components/CategorySlider';
@@ -22,8 +12,8 @@ import FeaturedPharmacies from '@/components/FeaturedPharmacies';
 import FeaturedHospitals from '@/components/FeaturedHospitals';
 import FeaturedInsurances from '@/components/FeaturedInsurances';
 import SearchResults from '@/components/SearchResults';
-
 import { supabase } from '@/lib/supabase';
+import { useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
 //
@@ -128,10 +118,33 @@ export default function MainScreen() {
   useEffect(() => {
     const fetchCountry = async () => {
       const storedCountry = await SecureStore.getItemAsync('user_country');
+      console.log(`[MainScreen] contentKey: ${contentKey} | Stored Country: ${storedCountry}`);
       setCountry(storedCountry);
     };
     fetchCountry();
   }, [contentKey]);
+
+  //
+  // 🔥 Auto-refresh every 2 minutes
+  //
+  useFocusEffect(
+    useCallback(() => {
+    const REFRESH_INTERVAL = 60 * 60 * 1000; // 2 minutes
+    console.log(`[MainScreen] 🟢 Screen focused. Starting auto-refresh timer (${REFRESH_INTERVAL}ms).`);
+
+    const intervalId = setInterval(() => {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(`[MainScreen] 🔄 AUTO-REFRESH TRIGGERED at ${timestamp}. Incrementing key...`);
+      
+      setContentKey((k) => k + 1);
+    }, REFRESH_INTERVAL);
+
+    return () => {
+      console.log('[MainScreen] Screen blurred. Clearing auto-refresh interval.');
+      clearInterval(intervalId);
+    };
+    }, [])
+  );
 
   //
   // Debounced search
@@ -314,7 +327,7 @@ const hasSearchResults = Object.values(searchResults).some(
 const renderMainContent = () => (
   <View key={contentKey}>
     <Carousel baseUrl={BANNER_URL_PREFIX} />
-    <CategorySlider />
+    <CategorySlider/>
     <DealSection title="Deals of the Day" baseUrl={DEAL_URL_PREFIX} />
     <ProductGrid title="Recommended for You" baseUrl={MEDICINE_URL_PREFIX} />
     <FeaturedPharmacies title="Featured Pharmacies" baseUrl={PHARMACY_URL_PREFIX} />

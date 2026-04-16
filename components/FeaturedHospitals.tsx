@@ -106,7 +106,10 @@ export default function FeaturedHospitalss({ baseUrl = "" }: Props) {
         </View>
       )}
       <View style={styles.details}>
-        <Text style={styles.title} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
+        <View style={styles.detailsButton}>
+          <Text style={styles.detailsButtonText}>See Details</Text>
+        </View>
       </View>
     </Pressable>
   );
@@ -189,6 +192,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#212121',
     textAlign: 'center',
+  },
+  detailsButton: {
+    marginTop: 8,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Roboto-Medium',
   },
   placeholderImage: {
     backgroundColor: '#f0f0f0',

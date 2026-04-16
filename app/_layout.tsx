@@ -59,6 +59,9 @@ export default function RootLayout() {
         <Stack.Screen
           name="insurance/[id]"
         />
+        <Stack.Screen name="bus-results" options={{ headerShown: false }} />
+        <Stack.Screen name="bus-seat-selection" options={{ headerShown: false }} />
+        <Stack.Screen name="bus-checkout" options={{ headerShown: false }} />
         <Stack.Screen name="orders" options={{ headerShown: false }} />
         <Stack.Screen name="order/[id]" options={{ headerShown: false }} />
 

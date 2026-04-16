@@ -82,6 +82,7 @@ export default function CategoriesScreen() {
   }, []);
 
   const handleCategoryPress = (category: Category) => {
+    console.log('[CategoriesScreen] Navigating to category:', category.name, 'with ID:', category.id);
     router.push({
       pathname: '/category/[id]',
       params: { id: category.id, name: category.name }

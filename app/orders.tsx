@@ -1,13 +1,5 @@
 import { useState, useEffect,useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextStyle,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextStyle, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronRight, ArrowLeft } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';

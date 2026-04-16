@@ -652,7 +652,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "dashboard" && (
               <div>
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Dashboard Overview</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Dashboard Overview</h3>
                 {isDashboardLoading ? (
                   <div className="text-center py-10">Loading stats...</div>
                 ) : (
@@ -756,11 +756,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "updates" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Hospital Updates</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Hospital Updates</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading updates...</div>
                 ) : !isEditingUpdates ? (
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6">
 
                       <div className="border-t border-gray-200 pt-4">
@@ -1233,13 +1233,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "profile" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">My Hospital</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Hospital</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading profile...</div>
                 ) : !isEditingProfile ? (
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200">
-                      <div className="flex items-center gap-6 mb-8">
+                      <div className="flex flex-col items-center md:flex-row md:items-center gap-4 md:gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
                             <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
@@ -1249,26 +1249,26 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </svg>
                           )}
                         </div>
-                        <div>
-                          <h4 className="text-2xl font-bold text-gray-900">{profileForm.name}</h4>
-                          <p className="text-gray-500 text-sm mt-1">{profileForm.email}</p>
+                        <div className="min-w-0 flex-1 overflow-hidden w-full text-center md:text-left">
+                          <h4 className="text-lg md:text-2xl font-bold text-gray-900 truncate">{profileForm.name}</h4>
+                          <p className="text-gray-500 text-sm mt-1 truncate">{profileForm.email}</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">WhatsApp</h5>
                           <p className="text-gray-900 font-medium">{profileForm.whatsapp_number || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment ID</h5>
                           <p className="text-gray-900 font-medium">{profileForm.payment_id || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Country</h5>
                           <p className="text-gray-900 font-medium">{profileForm.country || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Origin Country</h5>
                           <p className="text-gray-900 font-medium">{profileForm.origin_country || "Not set"}</p>
                         </div>
@@ -1404,7 +1404,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "settings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Settings</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Settings</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading settings...</div>
                 ) : (

@@ -39,6 +39,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
     }
 
+    // Password strength check: 8+ chars, 1 capital, 1 special, 3+ numbers
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return NextResponse.json({
+        error: "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers"
+      }, { status: 400 });
+    }
+
     // We generate a simple uuid for user id.
     const userId = uuidv4();
 
@@ -174,7 +182,15 @@ export async function PUT(req: Request) {
     if (formData.has("email")) userUpdates.email = formData.get("email");
     if (formData.has("password")) {
       const pwd = formData.get("password") as string;
-      if (pwd) userUpdates.password_hash = pwd;
+      if (pwd) {
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
+        if (!passwordRegex.test(pwd)) {
+          return NextResponse.json({
+            error: "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers"
+          }, { status: 400 });
+        }
+        userUpdates.password_hash = pwd;
+      }
     }
 
     if (Object.keys(userUpdates).length > 0) {

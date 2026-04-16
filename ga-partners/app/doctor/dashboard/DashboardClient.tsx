@@ -1063,7 +1063,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "dashboard" && (
               <div>
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Dashboard Overview</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Dashboard Overview</h3>
                 {isDashboardLoading ? (
                   <div className="text-center py-10">Loading stats...</div>
                 ) : (
@@ -1217,13 +1217,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "profile" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">My Profile</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Profile</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading profile...</div>
                 ) : !isEditingProfile ? (
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200">
-                      <div className="flex items-center gap-6 mb-8">
+                      <div className="flex flex-col items-center md:flex-row md:items-center gap-4 md:gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
                             <img 
@@ -1238,35 +1238,35 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </svg>
                           )}
                         </div>
-                        <div>
-                          <h4 className="text-2xl font-bold text-gray-900">{profileForm.name}</h4>
-                          <p className="text-indigo-600 font-medium">{profileForm.specialty}</p>
-                          <p className="text-gray-500 text-sm mt-1">{profileForm.email}</p>
+                        <div className="min-w-0 flex-1 overflow-hidden w-full text-center md:text-left">
+                      <h4 className="text-lg md:text-2xl font-bold text-gray-900 truncate">{profileForm.name}</h4>
+                      <p className="text-indigo-600 font-medium truncate">{profileForm.specialty}</p>
+                      <p className="text-gray-500 text-sm mt-1 truncate">{profileForm.email}</p>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-center">
+                        <div className="flex flex-col items-center">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">WhatsApp</h5>
                           <p className="text-gray-900 font-medium">{profileForm.whatsapp_number || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="flex flex-col items-center">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment ID</h5>
                           <p className="text-gray-900 font-medium">{profileForm.payment_id || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="flex flex-col items-center">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Country</h5>
                           <p className="text-gray-900 font-medium">{profileForm.country || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="flex flex-col items-center">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Origin Country</h5>
                           <p className="text-gray-900 font-medium">{profileForm.origin_country || "Not set"}</p>
                         </div>
                       </div>
 
-                      <div>
+                      <div className="text-center">
                         <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Bio</h5>
-                        <div className="bg-white p-4 rounded-lg border border-gray-200 text-gray-700 whitespace-pre-wrap">
+                        <div className="bg-white p-4 rounded-lg border border-gray-200 text-gray-700 whitespace-pre-wrap text-center">
                           {profileForm.bio || "No bio provided."}
                         </div>
                       </div>
@@ -1424,7 +1424,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "settings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Settings</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Settings</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading settings...</div>
                 ) : (
@@ -1549,7 +1549,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "bookings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">My Bookings</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Bookings</h3>
                 {isBookingsLoading ? (
                   <div className="text-center py-10">Loading bookings...</div>
                 ) : bookings.length > 0 ? (
@@ -1661,24 +1661,24 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "availability" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Manage Availability & Fees</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Manage Availability & Fees</h3>
 
                 {app.status !== "approved" ? (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800">
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-center">
                     You can only manage your availability and fees once your application has been approved.
                   </div>
                 ) : isAvailabilityLoading ? (
                   <div className="text-center py-10">Loading details...</div>
                 ) : !isEditingAvailability ? (
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex flex-col gap-6 items-center">
                     <div className="flex-1 w-full">
-                      <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6">
+                      <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6 text-center">
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Locations</h4>
+                          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 text-center">Locations</h4>
                           {Locations.length > 0 ? (
                             <div className="space-y-3">
                               {Locations.map((loc, i) => (
-                                <div key={i} className="text-sm text-gray-600 bg-white p-3 rounded border border-gray-100">
+                                <div key={i} className="text-sm text-gray-600 bg-white p-3 rounded border border-gray-100 text-center">
                                   <p className="font-bold text-gray-800">{loc.type} - {loc.city}</p>
                                   <p>{loc.address}</p>
                                   {loc.phone && <p>📞 {loc.phone}</p>}
@@ -1691,11 +1691,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Availability Slots</h4>
+                          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 text-center">Availability Slots</h4>
                           {availabilityForm.availability.length > 0 ? (
                             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
                               {availabilityForm.availability.map((slot, idx) => (
-                                <div key={idx} className="bg-white p-3 rounded border border-gray-200 shadow-sm">
+                                <div key={idx} className="bg-white p-3 rounded border border-gray-200 shadow-sm text-center">
                                   <div className="font-bold text-indigo-600 mb-1">{slot.date}</div>
                                   <div className="text-sm text-gray-600">{slot.times.join(", ")}</div>
                                 </div>
@@ -1939,7 +1939,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "schedule" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Manage Working Days & Hours</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Manage Working Days & Hours</h3>
                 {isScheduleLoading ? (
                   <div className="text-center py-10">Loading schedule...</div>
                 ) : !isEditingSchedule ? (

@@ -89,6 +89,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
   const [errors, setErrors] = useState<FormErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0); // State for password strength
 
   useEffect(() => {
     async function fetchByIdOrStatus() {
@@ -110,7 +111,6 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
             // Base the form on fetched data, providing defaults for all fields
             ...data,
             password: "",
-            confirmPassword: "",
             country: data.country || "Burundi", // Explicitly set country to prevent it from being cleared
             location: data.location || [],
 
@@ -119,46 +119,46 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
             image: data.image || "",
           });
 
-
+          setConfirmPassword("");
           setIsEditing(true);
           setRejectionReason(data.rejection_reason);
           setApplicationStatus(data.status);
           return;
-        } else {
-          console.log("Application not found for id:", id);
         }
       }
 
-      // OTHERWISE FETCH STATUS API
-      const res = await fetch("/api/doctor-applications/status");
-      console.log("Fetch status API:", res.status);
-
-      if (res.ok) {
-        const data = await res.json();
-        console.log("Loaded existing application:", data);
-
-        setDoctorForm({
-          ...data,
-          // Ensure all optional fields have a default value to prevent controlled/uncontrolled input errors.
-          password: "",
-          country: data.country || "Burundi",
-          location: data.location || [],
-          originCountry: data.originCountry || data.origin_country || "",
-          image: data.image || "",
-        });
-
-        setIsEditing(true);
-        setApplicationStatus(data.status);
-        return;
-      }
-
-      console.log("No existing application, creating new...");
-      setIsEditing(false);
+      // If no ID in URL, or if ID fetch failed, ensure it's a new application form
+      console.log("No ID in URL, or ID not found. Creating new application form.");
+      setIsEditing(false); // Ensure we are in "new application" mode
+      setApplicationStatus(null); // Clear any previous status
+      setRejectionReason(null); // Clear any previous rejection reason
+      setDoctorForm({ // Reset form to initial state for new application
+        name: "", email: "", specialty: "", location: [], bio: "", booking_type: "online", availability: [], image: "", country: "Burundi", originCountry: "", whatsapp_number: "", password: "", payment_id: "", consultation_fee_online: "", consultation_fee_offline: "", id: undefined,
+      });
+      setConfirmPassword("");
+      setPasswordStrength(0); // Reset password strength for new application
     }
 
     fetchByIdOrStatus();
   }, []);
 
+  const passwordRequirements = [
+    { label: "At least 8 characters", met: (doctorForm.password || "").length >= 8 },
+    { label: "1 capital letter", met: /[A-Z]/.test(doctorForm.password || "") },
+    { label: "1 special character (!@#$)", met: /[!@#$%^&*(),.?":{}|<>]/.test(doctorForm.password || "") },
+    { label: "At least 3 numbers", met: ((doctorForm.password || "").match(/\d/g) || []).length >= 3 },
+  ];
+
+  const getPasswordStrengthScore = (password: string) => {
+    let score = 0;
+    if (password.length === 0) return 0;
+
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++;
+    if ((password.match(/\d/g) || []).length >= 3) score++;
+    return score;
+  };
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -170,6 +170,10 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
       const newErrors = { ...errors };
       delete newErrors[name as keyof DoctorForm];
       setErrors(newErrors);
+    }
+
+    if (name === "password") {
+      setPasswordStrength(getPasswordStrengthScore(value));
     }
   }
 
@@ -242,7 +246,16 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
     if (!doctorForm.whatsapp_number) newErrors.whatsapp_number = "WhatsApp number is required";
     if (!doctorForm.bio) newErrors.bio = "Bio is required";
     if (!doctorForm.payment_id) newErrors.payment_id = "Payment ID is required";
-    if (!isEditing && !doctorForm.password) newErrors.password = "Password is required";
+    if (!isEditing) {
+      if (!doctorForm.password) {
+        newErrors.password = "Password is required";
+      } else {
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
+        if (!passwordRegex.test(doctorForm.password)) {
+          newErrors.password = "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers";
+        }
+      }
+    }
     if (!isEditing && doctorForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!doctorForm.image) newErrors.image = "Doctor image is required";
     if (!doctorForm.originCountry) newErrors.originCountry = "Country of origin is required";
@@ -462,7 +475,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
               <input
                 type="text"
                 name="whatsapp_number"
-                placeholder="+1234567890"
+                placeholder="Start by your country code like +12345678"
                 value={doctorForm.whatsapp_number}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.whatsapp_number ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
@@ -491,6 +504,35 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
                       )}
                     </button>
                   </div>
+                  {/* Password Strength Meter */}
+                  {!isEditing && doctorForm.password && (
+                    <div className="mt-2 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300 ease-in-out"
+                        style={{
+                          width: `${(passwordStrength / 4) * 100}%`, // Max score is 4
+                          backgroundColor:
+                            passwordStrength === 0 ? 'transparent' :
+                            passwordStrength <= 1 ? '#ef4444' : // Red for weak
+                            passwordStrength <= 2 ? '#f97316' : // Orange for medium
+                            passwordStrength <= 3 ? '#eab308' : // Yellow for good
+                            '#22c55e', // Green for strong
+                        }}
+                      ></div>
+                    </div>
+                  )}
+                  {!isEditing && doctorForm.password && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4">
+                      {passwordRequirements.map((req, i) => (
+                        <div key={i} className={`flex items-center text-[11px] transition-colors duration-200 ${req.met ? 'text-green-600 font-medium' : 'text-slate-400'}`}>
+                          <div className={`mr-2 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${req.met ? 'bg-green-100 border-green-500 text-green-600' : 'border-slate-200 text-transparent'}`}>
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          </div>
+                          {req.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>

@@ -9,6 +9,14 @@ import * as SecureStore from 'expo-secure-store';
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
 
+const HOSPITAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/hospital-images/";
+
+const getFullImageUrl = (imagePath: any) => {
+  if (!imagePath) return '';
+  const path = String(imagePath);
+  return path.startsWith('http') ? path : `${HOSPITAL_URL_PREFIX}${path}`;
+};
+
 type Hospital = {
     id: string;
     name: string | null;
@@ -90,14 +98,14 @@ export default function AllHospitalsScreen() {
           params: {
             id: item.id,
             name: item.name || '',
-            image: item.image || '',
+            image: getFullImageUrl(item.image),
             locations: JSON.stringify(item.locations || []),
           },
         });
       }}
     >
       {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: getFullImageUrl(item.image) }} style={styles.image} resizeMode="cover" />
       ) : (
         <View style={[styles.image, styles.placeholderImage]}>
           <Icon name="local-hospital" size={40} color="#ccc" />

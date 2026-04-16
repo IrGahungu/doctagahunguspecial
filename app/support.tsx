@@ -2,9 +2,16 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mail, Phone, Facebook, Instagram } from 'lucide-react-native';
+import { ArrowLeft, Mail, Phone, Facebook, Instagram, MessageCircle } from 'lucide-react-native';
 
 const supportItems = [
+  {
+    icon: MessageCircle,
+    label: 'Forgot PIN',
+    value: 'Contact the Admin on WhatsApp: +25777990118',
+    action: 'https://wa.me/25777990118',
+    needsAlert: true,
+  },
   {
     icon: Mail,
     label: 'Email',
@@ -37,12 +44,22 @@ export default function SupportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const handlePress = async (action: string, fallback?: string) => {
-    const supported = await Linking.canOpenURL(action);
-    if (supported) {
-      await Linking.openURL(action);
+  const handlePress = async (action: string, fallback?: string, needsAlert?: boolean) => {
+    const execute = async () => {
+      const supported = await Linking.canOpenURL(action);
+      if (supported) {
+        await Linking.openURL(action);
+      } else if (fallback) {
+        await Linking.openURL(fallback);
+      } else {
+        Alert.alert(`Don't know how to open this URL: ${action}`);
+      }
+    };
+
+    if (needsAlert) {
+      Alert.alert("Leave App", "You are about to leave the app to open WhatsApp. Do you want to continue?", [{ text: "No", style: "cancel" }, { text: "Yes", onPress: execute }]);
     } else {
-      Alert.alert(`Don't know how to open this URL: ${action}`);
+      await execute();
     }
   };
 
@@ -65,7 +82,7 @@ export default function SupportScreen() {
             <TouchableOpacity
               key={index}
               style={styles.supportItem}
-              onPress={() => handlePress(item.action, (item as any).fallback)}
+              onPress={() => handlePress(item.action, (item as any).fallback, (item as any).needsAlert)}
             >
               <View style={styles.iconContainer}>
                 <item.icon size={24} color="#4CAF50" />

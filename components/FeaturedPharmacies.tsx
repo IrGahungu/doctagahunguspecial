@@ -56,7 +56,7 @@ export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: P
       const { data, error } = await supabase
         .from('pharmacy_applications')
         .select('id, name, image')
-        .eq('country', country)
+        .ilike('country', country.trim())
         .order('created_at', { ascending: false })
         .limit(4);
 
@@ -125,7 +125,12 @@ export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: P
                     <Icon name="local-pharmacy" size={40} color="#ccc" />
                   </View>
                 )}
-                <View style={styles.details}><Text style={styles.name} numberOfLines={2}>{item.name}</Text></View>
+                <View style={styles.details}>
+                  <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+                  <View style={styles.detailsButton}>
+                    <Text style={styles.detailsButtonText}>See Details</Text>
+                  </View>
+                </View>
               </Pressable>
             ))}
           </View>
@@ -167,7 +172,6 @@ const styles = StyleSheet.create({
   },
   cardBase: { 
     width: '48%', 
-    marginHorizontal: 4, 
     marginBottom: 16, 
     borderRadius: 12, 
     backgroundColor: 'white', 
@@ -179,7 +183,7 @@ const styles = StyleSheet.create({
     overflow: Platform.OS === 'ios' ? 'visible' : 'hidden' 
   },
   defaultCard: { 
-    height: 200 
+    height: 220 
   },
   image: { 
     width: '100%', 
@@ -205,6 +209,18 @@ const styles = StyleSheet.create({
     fontWeight: '500', 
     textAlign: 'center', 
     color: '#212121' 
+  },
+  detailsButton: {
+    marginTop: 8,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Roboto-Medium',
   },
   noDataText: {
     textAlign: 'center',

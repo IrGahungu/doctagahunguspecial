@@ -1,15 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextStyle,
-  Image,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextStyle, Image, ActivityIndicator, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -19,6 +9,8 @@ import QRCode from "react-native-qrcode-svg";
 import { supabase } from "@/lib/supabase";
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+
+const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
 
 type OrderStatus = "Pending" | "Accepted" | "Cancelled" | "Packed" | "On the way" | "Delivered";
 
@@ -55,11 +47,11 @@ export default function OrderDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchOrderDetails = useCallback(async () => {
+  const fetchOrderDetails = useCallback(async (isSilent = false) => {
     if (!id) return;
 
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
 
       const token = await SecureStore.getItemAsync("token");
       if (!token) {
@@ -174,9 +166,7 @@ export default function OrderDetailsScreen() {
         },
         (payload) => {
           console.log("Real-time order update:", payload.new);
-          setOrder((current) =>
-            current ? { ...current, ...(payload.new as Partial<Order>) } : current
-          );
+          fetchOrderDetails(true);
         }
       )
 
@@ -191,17 +181,7 @@ export default function OrderDetailsScreen() {
         },
         (payload) => {
           console.log("Real-time order item update:", payload.new);
-          setOrder((current) => {
-            if (!current || !current.items) return current;
-
-            const updatedItems = current.items.map((item) =>
-              item.id === payload.new.id
-                ? { ...item, status: payload.new.status }
-                : item
-            );
-
-            return { ...current, items: updatedItems };
-          });
+          fetchOrderDetails(true);
         }
       )
       .subscribe();
@@ -318,7 +298,7 @@ const getStatusStyle = (status: OrderStatus): TextStyle => {
 
 if (loading) {
   return (
-    <SafeAreaView style={styles.centered}>
+    <SafeAreaView style={[styles.container, styles.centered]}>
       <ActivityIndicator size="large" color="#4CAF50" />
     </SafeAreaView>
   );
@@ -383,7 +363,14 @@ return (
         {order.items && order.items[0] !== null ? (
           order.items.map((item) => (
             <View key={item.id} style={styles.itemRow}>
-              <Image source={{ uri: item.product_image_url }} style={styles.itemImage} />
+              <Image 
+                source={{ 
+                  uri: item.product_image_url?.startsWith('http') 
+                    ? item.product_image_url 
+                    : `${MEDICINE_URL_PREFIX}${item.product_image_url}` 
+                }} 
+                style={styles.itemImage} 
+              />
               <View style={styles.itemDetails}>
                 <Text style={styles.itemName}>{item.product_name}</Text>
                 {item.pharmacy && (

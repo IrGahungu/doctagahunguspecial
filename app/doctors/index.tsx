@@ -10,6 +10,14 @@ import type { Doctor } from '@/types';
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // padding included
 
+const DOCTOR_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/doctor-images/";
+
+const getFullImageUrl = (imagePath: any) => {
+  if (!imagePath) return '';
+  const path = String(imagePath);
+  return path.startsWith('http') ? path : `${DOCTOR_URL_PREFIX}${path}`;
+};
+
 const SkeletonCard = () => (
   <View style={{ width: cardWidth }}>
     <View style={styles.cardBase}>
@@ -78,7 +86,7 @@ export default function AllDoctorsScreen() {
           params: { 
             id: item.id,
             name: item.name || '',
-            image: String(item.image || ''),
+            image: getFullImageUrl(item.image),
             specialty: item.specialty || '',
             location: JSON.stringify(item.location || []),
           },
@@ -90,8 +98,8 @@ export default function AllDoctorsScreen() {
         {/* Image */}
         <Image
           source={
-            item.image
-              ? { uri: item.image }
+            item.image 
+              ? { uri: getFullImageUrl(item.image) }
               : require('@/assets/images/two.jpg')
           }
           style={styles.image}

@@ -1,20 +1,5 @@
 import React, { useEffect, useState, useRef} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  Pressable,
-  Modal,
-  ActivityIndicator,
-  TextInput,
-  Animated,
-  Linking,
-  Dimensions,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Pressable, Modal, ActivityIndicator, TextInput, Animated, Linking, Dimensions, Platform } from 'react-native';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -73,38 +58,6 @@ export default function HospitalDetailScreen() {
   const insets = useSafeAreaInsets();
   const showToast = useToastStore((state) => state.showToast);
 
-  // State for the lock mechanism
-  const [showDetails, setShowDetails] = useState(false);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
-  const VIEW_FEE = 500;
-  const [pinCode, setPinCode] = useState('');
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [showConfetti, setShowConfetti] = useState(false);
-
-  useEffect(() => {
-    if (!showDetails) {
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulse.start();
-      return () => pulse.stop();
-    }
-  }, [showDetails]);
-
   useEffect(() => {
     if (id) {
       supabase.rpc('increment_hospital_views', { row_id: id }).then(({ error }) => {
@@ -148,125 +101,10 @@ export default function HospitalDetailScreen() {
     };
   }, [id, navigation]);
 
-  // Lock modal handler
-  const handleLockPress = async () => {
-    setIsModalVisible(true);
-    setIsBalanceLoading(true);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        showToast("Please log in to view details.");
-        router.push('/auth');
-        setIsModalVisible(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE_URL}/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setWalletBalance(data.wallet_balance || 0);
-        setWalletBalance(Number(data.wallet_balance) || 0);
-      } else {
-        showToast("Could not fetch wallet balance.");
-        setIsModalVisible(false);
-      }
-    } catch (error) {
-      console.error("Failed to fetch wallet balance:", error);
-      showToast("An error occurred.");
-      setIsModalVisible(false);
-    } finally {
-      setIsBalanceLoading(false);
-    }
-  };
-
-  // Handle payment to view
-  const handleConfirmViewPayment = async () => {
-    console.log("Starting payment process...");
-    if (walletBalance === null || walletBalance < VIEW_FEE) {
-      showToast("Insufficient wallet balance.");
-      return;
-    }
-    if (!pinCode) {
-      showToast("Please enter your PIN code.");
-      return;
-    }
-
-    setIsPaying(true);
-    console.log(`Attempting to pay ${VIEW_FEE} with PIN: ${pinCode}`);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        showToast("Authentication error. Please log in again.");
-        router.push('/auth');
-        return;
-      }
-
-      // Step 1: Verify the PIN first
-      console.log("Step 1: Verifying PIN...");
-      const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ pin_code: pinCode }),
-      });
-
-      if (!verifyRes.ok) {
-        const errorData = await verifyRes.json();
-        throw new Error(errorData.error || "Incorrect PIN.");
-      }
-
-      console.log("PIN verification successful.");
-
-      // Step 2: If PIN is correct, proceed with deduction
-      const deductionPayload = { amount: VIEW_FEE, reason: `View doctor ${id} details`, pin: pinCode };
-      console.log("Step 2: Proceeding with deduction. Payload:", JSON.stringify(deductionPayload));
-      const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(deductionPayload),
-      });
-
-      if (!deductRes.ok) {
-        console.error("Deduction failed. Status:", deductRes.status);
-        const errorData = await deductRes.json();
-        console.error("Deduction error response:", errorData);
-        throw new Error(errorData.error || "Payment failed after PIN verification.");
-      }
-
-      // Success!
-      setShowDetails(true);
-      setShowConfetti(true);
-      console.log("Payment successful! Unlocking details.");
-      showToast("Payment successful!");
-      handleModalClose();
-    } catch (error: unknown) {
-      let errorMessage = "An error occurred during payment.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      console.error("An error occurred during payment:", errorMessage);
-      Alert.alert("Payment Failed", errorMessage);
-    } finally {
-      setIsPaying(false);
-    }
-  };
-
-  // Modal close handler
-  const handleModalClose = () => {
-    setIsModalVisible(false);
-    setPinCode(''); // Clear PIN on modal close
-  };
-
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 50 }}>Loading...</Text>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
       </View>
     );
   }
@@ -365,25 +203,9 @@ export default function HospitalDetailScreen() {
           </View>
         )}
         <View style={styles.detailsContainer}>
-          {showDetails && (
-            <Text style={styles.hospitalName}>{hospital.name || 'Unknown Hospital'}</Text>
-          )}
+          <Text style={styles.hospitalName}>{hospital.name || 'Unknown Hospital'}</Text>
           {/* Locked Section */}
           <View style={styles.section}>
-            <View style={styles.lockHeader}>
-              {!showDetails && (
-                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
-                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <Icon name="visibility" size={40} color="#4CAF50" />
-                  </Animated.View>
-                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
-                    Click here to pay and view the doctor's details
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {showDetails && (
               <View>
 
                 {/* Service Summary */}
@@ -575,71 +397,24 @@ export default function HospitalDetailScreen() {
                   </View>
                 </View>
               </View>
-            )}
           </View>
+          {/* New "Get a visit jeton" button */}
+          <Pressable
+            style={styles.visitJetonButton}
+            onPress={() => showToast('Dr. IR. Gahungu ariko arabikora!', 1500)} // Placeholder action
+          >
+            <Text style={styles.visitJetonButtonText}>Get a visit jeton</Text>
+          </Pressable>
+
           <Pressable
             style={styles.carButton}
             onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
           >
             <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
           </Pressable>
+          
         </View>
       </ScrollView>
-      {/* Lock Modal */}
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleModalClose}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.closeIcon} onPress={handleModalClose}>
-              <Icon name="close" size={24} color="#212121" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Unlock Information</Text>
-            {isBalanceLoading ? (
-              <ActivityIndicator size="large" color="#4CAF50" />
-            ) : (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.modalText}>
-                  Pay <Text style={{ fontWeight: 'bold' }}>{VIEW_FEE} FBU</Text> to view with Gahungu Wallet.
-                </Text>
-                <Text style={styles.balanceText}>
-                  Your balance: {walletBalance?.toLocaleString() ?? '...'} FBU
-                </Text>
-                <TextInput
-                  style={styles.pinCodeInput}
-                  placeholder="Enter your PIN code"
-                  keyboardType="number-pad"
-                  secureTextEntry={true}
-                  value={pinCode}
-                  onChangeText={setPinCode}
-                />
-                <View style={styles.modalActions}>
-                  <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handleModalClose} disabled={isPaying}>
-                    <Text style={[styles.modalButtonText, { color: '#212121' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, (isPaying || (walletBalance !== null && walletBalance < VIEW_FEE)) && styles.disabledButton]}
-                    onPress={handleConfirmViewPayment}
-                    disabled={isPaying || (walletBalance !== null && walletBalance < VIEW_FEE)}
-                  >
-                    {isPaying ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalButtonText}>Pay</Text>}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-      {showConfetti && (
-        <ConfettiCannon
-          count={200}
-          origin={{ x: Dimensions.get('window').width / 2, y: 0 }}
-          onAnimationEnd={() => setShowConfetti(false)}
-        />
-      )}
       <Toast />
     </View>
   );
@@ -649,6 +424,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#E0F7FA'
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -817,6 +597,22 @@ const styles = StyleSheet.create({
     borderColor: 'green'
   },
   carButtonText: {
+    fontSize: 14,
+    fontFamily: 'Roboto-Medium',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  visitJetonButton: {
+    marginTop: 10, // Added margin to separate from the carButton
+    flex: 1,
+    backgroundColor: '#007BFF', // A different color to distinguish
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderColor: '#0056b3', // Darker blue border
+    borderWidth: 1,
+  },
+  visitJetonButtonText: {
     fontSize: 14,
     fontFamily: 'Roboto-Medium',
     color: '#fff',

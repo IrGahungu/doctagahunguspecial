@@ -230,7 +230,7 @@ export default function CheckoutScreen() {
             <Text style={styles.summaryValue}>BIF {parseFloat(subtotal).toFixed(2)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Service Fee</Text>
+            <Text style={styles.summaryLabel}>Medicine Service Fee</Text>
             <Text style={styles.summaryValue}>BIF {parseFloat(serviceFee).toFixed(2)}</Text>
           </View>
           <View style={styles.totalRow}>

@@ -72,6 +72,7 @@ export default function HospitalPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
   const applicationStatus = editingHospital?.status;
   const rejectionReason = editingHospital?.rejection_reason;
@@ -121,7 +122,25 @@ export default function HospitalPage() {
     }
     setConfirmPassword("");
     setFormError(null);
+    setPasswordStrength(0);
   }, [editingHospital]);
+
+  const passwordRequirements = [
+    { label: "At least 8 characters", met: (hospitalForm.password || "").length >= 8 },
+    { label: "1 capital letter", met: /[A-Z]/.test(hospitalForm.password || "") },
+    { label: "1 special character (!@#$)", met: /[!@#$%^&*(),.?":{}|<>]/.test(hospitalForm.password || "") },
+    { label: "At least 3 numbers", met: ((hospitalForm.password || "").match(/\d/g) || []).length >= 3 },
+  ];
+
+  const getPasswordStrengthScore = (password: string) => {
+    let score = 0;
+    if (password.length === 0) return 0;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++;
+    if ((password.match(/\d/g) || []).length >= 3) score++;
+    return score;
+  };
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target;
@@ -130,6 +149,10 @@ export default function HospitalPage() {
       const newErrors = { ...errors } as FormErrors;
       delete newErrors[name as keyof FormErrors];
       setErrors(newErrors);
+    }
+
+    if (name === "password") {
+      setPasswordStrength(getPasswordStrengthScore(value));
     }
   }
 
@@ -161,7 +184,16 @@ export default function HospitalPage() {
     if (!hospitalForm.email) newErrors.email = "Email is required";
     if (!hospitalForm.whatsapp_number) newErrors.whatsapp_number = "WhatsApp number is required";
     if (!hospitalForm.payment_id) newErrors.payment_id = "Payment ID is required";
-    if (!editingHospital && !hospitalForm.password) newErrors.password = "Password is required";
+    if (!editingHospital) {
+      if (!hospitalForm.password) {
+        newErrors.password = "Password is required";
+      } else {
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
+        if (!passwordRegex.test(hospitalForm.password)) {
+          newErrors.password = "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers";
+        }
+      }
+    }
     if (!editingHospital && hospitalForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!hospitalForm.image) newErrors.image = "Hospital image is required";
 
@@ -386,6 +418,35 @@ export default function HospitalPage() {
                     )}
                   </button>
                 </div>
+                  {/* Password Strength Meter */}
+                  {!editingHospital && hospitalForm.password && (
+                    <div className="mt-2 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300 ease-in-out"
+                        style={{
+                          width: `${(passwordStrength / 4) * 100}%`,
+                          backgroundColor:
+                            passwordStrength === 0 ? 'transparent' :
+                            passwordStrength <= 1 ? '#ef4444' : // Red for weak
+                            passwordStrength <= 2 ? '#f97316' : // Orange for medium
+                            passwordStrength <= 3 ? '#eab308' : // Yellow for good
+                            '#22c55e', // Green for strong
+                        }}
+                      ></div>
+                    </div>
+                  )}
+                  {!editingHospital && hospitalForm.password && (
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4">
+                      {passwordRequirements.map((req, i) => (
+                        <div key={i} className={`flex items-center text-[11px] transition-colors duration-200 ${req.met ? 'text-green-600 font-medium' : 'text-slate-400'}`}>
+                          <div className={`mr-2 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${req.met ? 'bg-green-100 border-green-500 text-green-600' : 'border-slate-200 text-transparent'}`}>
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          </div>
+                          {req.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </div>
               <div>
                 <FieldLabel required>Confirm Password</FieldLabel>

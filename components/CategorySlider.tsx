@@ -1,24 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableWithoutFeedback,
-  Animated,
-} from 'react-native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 type Category = {
   id: string;
   name: string;
-  icon?: string; // emoji from 'image' column
+  icon?: string;
 };
 
 const CategoryItem = ({ category }: { category: Category }) => {
-  // useRef is used to persist the animated value across re-renders
-  const scale = React.useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () => {
     Animated.spring(scale, {
@@ -63,44 +57,90 @@ const CategorySlider: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Use a ref for country to avoid stale closures in real-time callbacks
+  const countryRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    countryRef.current = country;
+  }, [country]);
+
+  //
+  // Fetch Country
+  //
   useEffect(() => {
     const fetchCountry = async () => {
       const storedCountry = await SecureStore.getItemAsync("user_country");
       setCountry(storedCountry);
     };
-
     fetchCountry();
   }, []);
 
-  const fetchCategories = async () => {
-    if (!country) return;
-    setLoading(true);
+  //
+  // Fetch Categories Function (Reusable)
+  //
+  const fetchCategories = useCallback(async (isSilent: any = false) => {
+    const currentCountry = countryRef.current;
+    if (!currentCountry) return;
+
+    console.log(`[CategorySlider] Fetching categories for: ${currentCountry} (Silent: ${!!isSilent})`);
+
+    // When triggered by real-time, isSilent receives the payload object. 
+    // We ensure it remains silent unless explicitly called with false.
+    // If isSilent is an object (Supabase payload), we treat it as a silent refresh.
+    const silent = (typeof isSilent === 'boolean' ? isSilent : (typeof isSilent === 'object' && isSilent !== null));
+    if (!silent) setLoading(true);
 
     const { data, error } = await supabase
       .from('categories')
       .select('id, name, image')
-      .eq('country', country)
+      .eq('country', currentCountry)
       .order('created_at', { ascending: true })
-      .limit(8); // Fetch only up to 8 categories
+      .limit(8);
 
     if (error) {
-      console.error('Error fetching categories:', error);
+      console.error('[CategorySlider] Error fetching:', error);
+      setLoading(false);
       return;
     }
-    const formatted = data.map((cat: any) => ({ id: cat.id, name: cat.name, icon: cat.image }));
-    setCategories(formatted || []);
+
+    const formatted = (data || []).map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      icon: cat.image,
+    }));
+
+    setCategories(formatted);
     setLoading(false);
-  };
+  }, []);
 
+  //
+  // Initial Fetch
+  //
   useEffect(() => {
-    fetchCategories();
-  }, [country]);
+    if (country) {
+      console.log("[CategorySlider] Component mounted/updated. Fetching categories for:", country);
+      fetchCategories();
+    }
+  }, [country, fetchCategories]);
 
+  //
+  // 🔥 Realtime Refresh
+  //
+  useRealtimeRefresh('categories', () => {
+    console.log("[CategorySlider] Real-time event detected on 'categories' table.");
+    fetchCategories(true);
+  });
+
+  //
+  // Empty State
+  //
   if (!loading && categories.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.noDataText}>No categories available, Coming Soon</Text>
+        <Text style={styles.noDataText}>
+          No categories available, Coming Soon
+        </Text>
       </View>
     );
   }
@@ -121,12 +161,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     marginTop: 8,
     borderRadius: 20,
   },
   categoryItem: {
-    width: '23%',
+    width: '25%',
     marginBottom: 16,
     alignItems: 'center',
   },
@@ -153,7 +193,6 @@ const styles = StyleSheet.create({
     width: '100%',
     textAlign: 'center',
     color: '#757575',
-    fontFamily: 'Roboto-Regular',
     fontSize: 14,
   },
 });

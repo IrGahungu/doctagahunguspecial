@@ -1,14 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  Image,
-  TouchableOpacity,
-  Dimensions,
-  Platform,
-} from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { Product } from '@/types';
 import { supabase } from '@/lib/supabase';
@@ -43,18 +34,31 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
   const [products, setProducts] = useState<Product[]>(productsProp || []);
   const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pharmacyIds, setPharmacyIds] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchCountry = async () => {
       const storedCountry = await SecureStore.getItemAsync("user_country");
       setCountry(storedCountry);
+
+      if (storedCountry) {
+        // Pre-fetch pharmacy IDs for this country once to optimize real-time refreshes
+        const { data: pharmacies } = await supabase
+          .from('pharmacy_applications')
+          .select('id')
+          .eq('country', storedCountry);
+
+        if (pharmacies) {
+          setPharmacyIds(pharmacies.map((p) => p.id));
+        }
+      }
     };
 
     fetchCountry();
   }, []);
 
-  useEffect(() => {
-    if (productsProp) {
+  const fetchProducts = useCallback(async (isSilent = false) => {
+    if (productsProp && !isSilent) {
       setProducts(productsProp);
       setLoading(false);
       return;
@@ -62,50 +66,75 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
 
     if (!country) return;
 
-    const fetchProducts = async () => {
-      setLoading(true);
+    if (!isSilent) setLoading(true);
 
-      // First fetch pharmacies in the user's country
+    let currentPharmacyIds = pharmacyIds;
+
+    // If state is empty, fetch them now
+    if (currentPharmacyIds.length === 0) {
       const { data: pharmacies } = await supabase
         .from('pharmacy_applications')
         .select('id')
         .eq('country', country);
+      currentPharmacyIds = pharmacies?.map((p) => p.id) || [];
+      setPharmacyIds(currentPharmacyIds);
+    }
 
-      const pharmacyIds = pharmacies?.map((p) => p.id) || [];
-
-      if (pharmacyIds.length === 0) {
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('stock')
-        .select('*')
-        .in('pharmacy_id', pharmacyIds)
-        .order('created_at', { ascending: false })
-        .limit(6);
-
-      if (error) {
-        console.error('Error fetching products:', error.message);
-      } else if (data) {
-        // Map snake_case from DB to camelCase for the component
-        const productsData = data.map((p) => ({
-          ...p,
-          originalPrice: p.original_price,
-        }));
-        setProducts(productsData as Product[]);
-      } else {
-        setProducts([]);
-      }
+    if (currentPharmacyIds.length === 0) {
+      setProducts([]);
       setLoading(false);
-    };
+      return;
+    }
 
+    const { data, error } = await supabase
+      .from('stock')
+      .select('*')
+      .in('pharmacy_id', currentPharmacyIds)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    if (error) {
+      console.error('Error fetching products:', error.message);
+    } else if (data) {
+      // Map snake_case from DB to camelCase for the component
+      const productsData = data.map((p) => ({
+        ...p,
+        originalPrice: p.original_price,
+      }));
+      setProducts(productsData as Product[]);
+    } else {
+      setProducts([]);
+    }
+    setLoading(false);
+  }, [country, productsProp, pharmacyIds]);
+
+  useEffect(() => {
     fetchProducts();
+  }, [fetchProducts]);
 
-    // Real-time updates are handled by the parent `index.tsx` screen,
-    // which will re-mount this component when a change is detected.
-  }, [productsProp, country]);
+  // Internal real-time subscription for stock changes
+  useEffect(() => {
+    if (!country) return;
+
+    const channel = supabase
+      .channel(`public:stock:country=${country}`)
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'stock' }, 
+        (payload: any) => {
+        console.log(`[ProductGrid] Real-time ${payload.eventType} detected on stock.`, payload.new?.id);
+        fetchProducts(true);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[ProductGrid] Subscribed to real-time stock updates');
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [country, fetchProducts]);
 
   const handleProductPress = (product: Product) => {
     router.push({
@@ -147,7 +176,9 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
           <Text numberOfLines={2} style={styles.productTitle}>
             {item.title || item.name} {/* Fallback to name if title is empty */}
           </Text>
-
+          <View style={styles.detailsButton}>
+            <Text style={styles.detailsButtonText}>See Details</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -255,6 +286,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     height: 40,
     textAlign: 'center'
+  },
+  detailsButton: {
+    marginTop: 4,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'Roboto-Medium',
   },
   priceContainer: {
     flexDirection: 'row',

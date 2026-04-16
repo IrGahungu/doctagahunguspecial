@@ -9,6 +9,14 @@ import * as SecureStore from 'expo-secure-store';
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
 
+const INSURANCE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/insurance-images/";
+
+const getFullImageUrl = (imagePath: any) => {
+  if (!imagePath) return '';
+  const path = String(imagePath);
+  return path.startsWith('http') ? path : `${INSURANCE_URL_PREFIX}${path}`;
+};
+
 type Insurance = {
   id: string;
   name: string | null;
@@ -82,13 +90,13 @@ export default function AllInsurancesScreen() {
           params: {
             id: item.id,
             name: item.name || '',
-            image: item.image || '',
+            image: getFullImageUrl(item.image),
           },
         });
       }}
     >
       {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: getFullImageUrl(item.image) }} style={styles.image} resizeMode="cover" />
       ) : (
         <View style={[styles.image, styles.placeholderImage]}>
           <Icon name="shield" size={40} color="#ccc" />

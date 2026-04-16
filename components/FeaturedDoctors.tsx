@@ -149,6 +149,9 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
                 {doctor.specialty && (
                   <Text style={styles.specialty}>{doctor.specialty}</Text>
                 )}
+                <View style={styles.detailsButton}>
+                  <Text style={styles.detailsButtonText}>See Details</Text>
+                </View>
               </View>
             </Pressable>
           ))}
@@ -224,6 +227,19 @@ const styles = StyleSheet.create({
     color: '#388E3C',
     textAlign: 'center',
     marginTop: 2,
+    fontFamily: 'Roboto-Medium',
+  },
+  detailsButton: {
+    marginTop: 8,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  detailsButtonText: {
+    color: 'white',
+    fontSize: 12,
     fontFamily: 'Roboto-Medium',
   },
   noDataText: {

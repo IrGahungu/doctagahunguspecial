@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -160,31 +160,35 @@ export default function AppointmentsScreen() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     try {
-      let userId = null;
+      let currentUserId = userId;
       
-      // 1. Try to get Supabase user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        userId = user.id;
-      } else {
-        // 2. If not, try to get Custom Backend user
-        const token = await SecureStore.getItemAsync("token");
-        if (token) {
-           const res = await fetch(`${API_BASE_URL}/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            userId = data.id || data._id || data.user_id;
+      if (!currentUserId) {
+        // 1. Try to get Supabase user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          currentUserId = user.id;
+        } else {
+          // 2. If not, try to get Custom Backend user
+          const token = await SecureStore.getItemAsync("token");
+          if (token) {
+             const res = await fetch(`${API_BASE_URL}/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              currentUserId = data.id || data._id || data.user_id;
+            }
           }
         }
+        if (currentUserId) setUserId(currentUserId);
       }
 
-      if (!userId) {
+      if (!currentUserId) {
         setLoading(false);
         return;
       }
@@ -192,7 +196,7 @@ export default function AppointmentsScreen() {
       const { data, error } = await supabase
         .from('bookings')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', currentUserId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -206,11 +210,36 @@ export default function AppointmentsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     fetchBookings();
-  }, []);
+  }, [fetchBookings]);
+
+  // Real-time subscription for booking updates
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('user-appointments-channel')
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'bookings', 
+          filter: `user_id=eq.${userId}` 
+        },
+        (payload) => {
+          console.log('Appointment update received!', payload);
+          fetchBookings();
+        }
+      ).subscribe();
+
+    return () => { 
+      supabase.removeChannel(channel); 
+    };
+  }, [userId, fetchBookings]);
 
   const onRefresh = () => {
     setRefreshing(true);

@@ -262,9 +262,11 @@ export default function Header() {
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.welcomeText}>
-              Murahawe ikaze kwa Dr. Gahungu
-            </Text>
+            <>
+              <Text style={styles.welcomeText}>
+                Murahawe ikaze kwa Dr. Gahungu
+              </Text>
+            </>
           )}
         </View>
         {isLoggedIn && country && (

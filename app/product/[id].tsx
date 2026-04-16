@@ -51,17 +51,8 @@ export default function ProductDetailScreen() {
   const insets = useSafeAreaInsets();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [isPaying, setIsPaying] = useState(false);
-  const VIEW_FEE = 500;
-  const [pinCode, setPinCode] = useState('');
   const [country, setCountry] = useState<string | null>(null);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   const showToast = useToastStore(state => state.showToast);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,27 +63,6 @@ export default function ProductDetailScreen() {
 
     fetchCountry();
   }, []);
-
-  useEffect(() => {
-    if (!showDetails) {
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      pulse.start();
-      return () => pulse.stop();
-    }
-  }, [showDetails]);
 
   useEffect(() => {
     if (!id) {
@@ -209,120 +179,6 @@ export default function ProductDetailScreen() {
     };
   }, [id, navigation]);
 
-  // Lock modal handler
-  const handleLockPress = async () => {
-    setIsModalVisible(true);
-    setIsBalanceLoading(true);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        showToast("Please log in to view details.");
-        router.push('/auth');
-        setIsModalVisible(false);
-        return;
-      }
-      const res = await fetch(`${API_BASE_URL}/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setWalletBalance(Number(data.wallet_balance) || 0);
-      } else {
-        showToast("Could not fetch wallet balance.");
-        setIsModalVisible(false);
-      }
-    } catch (error) {
-      console.error("Failed to fetch wallet balance:", error);
-      showToast("An error occurred.");
-      setIsModalVisible(false);
-    } finally {
-      setIsBalanceLoading(false);
-    }
-  };
-
-  // Handle payment to view
-  const handleConfirmViewPayment = async () => {
-    console.log("Starting payment process...");
-    if (walletBalance === null || walletBalance < VIEW_FEE) {
-      showToast(walletBalance === null ? "Unable to verify wallet balance." : "Insufficient wallet balance.");
-      return;
-    }
-    if (!pinCode) {
-      showToast("Please enter your PIN code.");
-      return;
-    }
-
-    setIsPaying(true);
-    console.log(`Attempting to pay ${VIEW_FEE} with PIN: ${pinCode}`);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        showToast("Authentication error. Please log in again.");
-        router.push('/auth');
-        return;
-      }
-
-      // Step 1: Verify the PIN first
-      console.log("Step 1: Verifying PIN...");
-      const verifyRes = await fetch(`${API_BASE_URL}/verify-pin`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ pin_code: pinCode }),
-      });
-
-      if (!verifyRes.ok) {
-        const errorData = await verifyRes.json();
-        throw new Error(errorData.error || "Incorrect PIN.");
-      }
-
-      console.log("PIN verification successful.");
-
-      // Step 2: If PIN is correct, proceed with deduction
-      const deductionPayload = { amount: VIEW_FEE, reason: `View product ${id} details`, pin: pinCode };
-      console.log("Step 2: Proceeding with deduction. Payload:", JSON.stringify(deductionPayload));
-      const deductRes = await fetch(`${API_BASE_URL}/wallet/deduct`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(deductionPayload),
-      });
-
-      if (!deductRes.ok) {
-        console.error("Deduction failed. Status:", deductRes.status);
-        const errorData = await deductRes.json();
-        console.error("Deduction error response:", errorData);
-        throw new Error(errorData.error || "Payment failed after PIN verification.");
-      }
-
-      // Success!
-      setShowDetails(true);
-      setShowConfetti(true);
-      console.log("Payment successful! Unlocking details.");
-      showToast("Payment successful!");
-      handleModalClose();
-    } catch (error: unknown) {
-      let errorMessage = "An error occurred during payment.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      console.error("An error occurred during payment:", errorMessage);
-      Alert.alert("Payment Failed", errorMessage);
-    } finally {
-      setIsPaying(false);
-    }
-  };
-
-  // Modal close handler
-  const handleModalClose = () => {
-    setIsModalVisible(false);
-    setPinCode(''); // Clear PIN on modal close
-  };
-
   const [quantity, setQuantity] = useState(1);
 
   // Animation state
@@ -388,8 +244,9 @@ export default function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 50 }}>Loading...</Text>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -462,34 +319,16 @@ export default function ProductDetailScreen() {
 
 
         <View style={styles.detailsContainer}>
-          {showDetails ? (
-            <>
-              <Text style={styles.productName}>{product.name}</Text>
-              <Text style={styles.description}>{product.description}</Text>
-            </>
-          ) : (
-            null
-          )}
+          <Text style={styles.productName}>{product.name}</Text>
+          <Text style={styles.description}>{product.description}</Text>
 
           {/* Available At Lock */}
           <View style={styles.section}>
-            <View style={styles.lockHeader}>
-              {!showDetails && (
-                <TouchableOpacity onPress={handleLockPress} style={{ alignItems: 'center', width: '100%', paddingVertical: 20 }}>
-                  <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                    <Icon name="visibility" size={40} color="#4CAF50" />
-                  </Animated.View>
-                  <Text style={{ marginTop: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', fontSize: 16, textAlign: 'center' }}>
-                    Click here to pay and view the medecine's details
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            {showDetails && (
-              product.pharmacies && product.pharmacies.length > 0 ? (
-                product.pharmacies.map((pharmacy) => (
-                  <View key={pharmacy.id} style={styles.pharmacyRow}>
-                    <TouchableOpacity
+          <Text style={styles.sectionTitle}>Available At</Text>
+            {product.pharmacies && product.pharmacies.length > 0 ? (
+              product.pharmacies.map((pharmacy) => (
+                <View key={pharmacy.id} style={styles.pharmacyRow}>
+                  <TouchableOpacity
                       style={styles.selectionContainer}
                       onPress={() => setSelectedPharmacyId(pharmacy.id)}
                     >
@@ -566,36 +405,30 @@ export default function ProductDetailScreen() {
                       )}
                     </View>
                   </TouchableOpacity>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.noDataText}>No pharmacies listed</Text>
-              )
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No pharmacies listed</Text>
             )}
           </View>
           <Pressable
-              style={styles.carButton}
-              onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
-            >
-              <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
-            </Pressable>
+            style={styles.carButton}
+            onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
+          >
+            <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
+          </Pressable>
         </View>
 
-        {showDetails && (
-          <>
-
-            <View ref={addToCartBtnRef}>
-              <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
-                <Text style={styles.addToCartText}>
-                  Add to Cart
-                  {selectedPharmacyId && product?.pharmacies?.find(p => p.id === selectedPharmacyId)
-                    ? ` - ${(product.pharmacies.find(p => p.id === selectedPharmacyId) as any).price.toLocaleString()} ${getCurrency(country)}`
-                    : ''}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+        <View ref={addToCartBtnRef}>
+          <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
+            <Text style={styles.addToCartText}>
+              Add to Cart
+              {selectedPharmacyId && product?.pharmacies?.find(p => p.id === selectedPharmacyId)
+                ? ` - ${(product.pharmacies.find(p => p.id === selectedPharmacyId) as any).price.toLocaleString()} ${getCurrency(country)}`
+                : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView >
       {/* Animation component */}
       {
@@ -615,75 +448,6 @@ export default function ProductDetailScreen() {
           </Animated.View>
         )
       }
-      {/* Lock Modal */}
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleModalClose}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.closeIcon} onPress={handleModalClose}>
-              <Icon name="close" size={24} color="#212121" />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Unlock Information</Text>
-
-            {isBalanceLoading ? (
-              <ActivityIndicator size="large" color="#4CAF50" />
-            ) : (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.modalText}>
-                  Pay <Text style={{ fontWeight: 'bold' }}>{VIEW_FEE} {getCurrency(country)}</Text> to view with Gahungu Wallet.
-                </Text>
-                <Text style={styles.balanceText}>
-                  Your balance: {walletBalance?.toLocaleString() ?? '...'} {getCurrency(country)}
-                </Text>
-
-                <TextInput
-                  style={styles.pinCodeInput}
-                  placeholder="Enter your PIN code"
-                  keyboardType="number-pad"
-                  secureTextEntry={true}
-                  value={pinCode}
-                  onChangeText={setPinCode}
-                />
-
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={handleModalClose}
-                    disabled={isPaying}
-                  >
-                    <Text style={[styles.modalButtonText, { color: '#212121' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.modalButton,
-                      (isPaying || (walletBalance !== null && walletBalance < VIEW_FEE)) && styles.disabledButton
-                    ]}
-                    onPress={handleConfirmViewPayment}
-                    disabled={isPaying}
-                  >
-                    {isPaying ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.modalButtonText}>Pay</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-      {showConfetti && (
-        <ConfettiCannon
-          count={200}
-          origin={{ x: Dimensions.get('window').width / 2, y: 0 }}
-          onAnimationEnd={() => setShowConfetti(false)}
-        />
-      )}
 
       <Toast />
     </View >
@@ -1064,5 +828,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#616161',
+    fontFamily: 'Roboto-Medium',
   },
 });

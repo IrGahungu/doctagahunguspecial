@@ -1,13 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ShoppingCart, ArrowLeft, Plus, Minus, CreditCard, Wallet } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -15,6 +7,9 @@ import { useCartStore } from '@/stores/cartStore';
 import Toast from 'react-native-toast-message';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
+import { supabase } from '@/lib/supabase';
+
+const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
 
 const currencyMap: { [country: string]: string } = {
   Burundi: 'FBU',
@@ -30,21 +25,6 @@ const getCurrency = (country: string | null): string => {
   return country ? currencyMap[country] || 'USD' : 'USD';
 };
 
-const serviceFeeMap: { [country: string]: number } = {
-  Burundi: 1000,
-  Rwanda: 500,
-  Tanzania: 300,
-  Kenya: 200,
-  Sudan: 5000,
-  Congo: 10000,
-  Somalia: 5000,
-  Somaliya: 5000, // Handle variation
-};
-
-const getServiceFee = (country: string | null): number => {
-  return country ? serviceFeeMap[country] || 500 : 500; // Default fee
-};
-
 export default function CartScreen() {
   const router = useRouter();
   const items = useCartStore(state => state.items);
@@ -58,6 +38,7 @@ export default function CartScreen() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
+  const [serviceFee, setServiceFee] = useState<number>(500);
 
   // ✅ Fetch wallet balance from /me
   useEffect(() => {
@@ -84,6 +65,20 @@ export default function CartScreen() {
         } else {
           console.error('❌ Failed to fetch balance:', data.error || data);
         }
+
+        // Fetch dynamic service fee for medicine
+        if (storedCountry) {
+          const { data: feeData, error: feeError } = await supabase
+            .from('service_fees')
+            .select('fee')
+            .eq('country', storedCountry)
+            .eq('service_type', 'medicine')
+            .single();
+          
+          if (!feeError && feeData) {
+            setServiceFee(Number(feeData.fee));
+          }
+        }
       } catch (err) {
         console.error('Balance fetch error:', err);
       } finally {
@@ -99,7 +94,6 @@ export default function CartScreen() {
     (sum, item) => sum + Number(item.product.price) * item.quantity,
     0
   );
-  const serviceFee = getServiceFee(country);
   const total = subtotal + serviceFee;
 
   // Handlers for quantity
@@ -179,13 +173,11 @@ export default function CartScreen() {
                   <View key={item.product.id} style={styles.cartItem}>
                     {item.product.image ? (
                       <Image
-                        source={
-                          typeof item.product.image === 'string'
-                            ? { uri: item.product.image }
-                            : typeof item.product.image === 'number'
-                            ? item.product.image
-                            : undefined
-                        }
+                        source={typeof item.product.image === 'string' 
+                          ? { uri: item.product.image.startsWith('http') 
+                              ? item.product.image 
+                              : `${MEDICINE_URL_PREFIX}${item.product.image}` }
+                          : item.product.image}
                         style={styles.productImage}
                       />
                     ) : (
@@ -225,7 +217,7 @@ export default function CartScreen() {
                   <Text style={styles.subtotalValue}>{getCurrency(country)} {subtotal.toFixed(2)}</Text>
                 </View>
                 <View style={styles.subtotalRow}>
-                  <Text style={styles.subtotalLabel}>Service Fee:</Text>
+                  <Text style={styles.subtotalLabel}>Medicine Service Fee:</Text>
                   <Text style={styles.subtotalValue}>{getCurrency(country)} {serviceFee.toFixed(2)}</Text>
                 </View>
                 <View style={styles.subtotalRow}>

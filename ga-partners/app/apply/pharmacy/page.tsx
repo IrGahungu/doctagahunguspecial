@@ -66,6 +66,7 @@ export default function PharmacyPage() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState(0);
 
   const applicationStatus = editingPharmacy?.status;
   const rejectionReason = editingPharmacy?.rejection_reason;
@@ -110,7 +111,25 @@ export default function PharmacyPage() {
     }
     setConfirmPassword("");
     setFormError(null);
+    setPasswordStrength(0);
   }, [editingPharmacy]);
+
+  const passwordRequirements = [
+    { label: "At least 8 characters", met: (pharmacyForm.password || "").length >= 8 },
+    { label: "1 capital letter", met: /[A-Z]/.test(pharmacyForm.password || "") },
+    { label: "1 special character (!@#$)", met: /[!@#$%^&*(),.?":{}|<>]/.test(pharmacyForm.password || "") },
+    { label: "At least 3 numbers", met: ((pharmacyForm.password || "").match(/\d/g) || []).length >= 3 },
+  ];
+
+  const getPasswordStrengthScore = (password: string) => {
+    let score = 0;
+    if (password.length === 0) return 0;
+    if (password.length >= 8) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++;
+    if ((password.match(/\d/g) || []).length >= 3) score++;
+    return score;
+  };
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -122,6 +141,10 @@ export default function PharmacyPage() {
       const newErrors = { ...errors };
       delete newErrors[name as keyof typeof newErrors];
       setErrors(newErrors);
+    }
+
+    if (name === "password") {
+      setPasswordStrength(getPasswordStrengthScore(value));
     }
   }
 
@@ -153,7 +176,16 @@ export default function PharmacyPage() {
     if (!pharmacyForm.whatsapp_number) newErrors.whatsapp_number = "WhatsApp number is required";
     if (!pharmacyForm.originCountry) newErrors.originCountry = "Origin country is required";
     if (!pharmacyForm.payment_id) newErrors.payment_id = "Payment ID is required";
-    if (!editingPharmacy && !pharmacyForm.password) newErrors.password = "Password is required";
+    if (!editingPharmacy) {
+      if (!pharmacyForm.password) {
+        newErrors.password = "Password is required";
+      } else {
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
+        if (!passwordRegex.test(pharmacyForm.password)) {
+          newErrors.password = "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers";
+        }
+      }
+    }
     if (pharmacyForm.password && pharmacyForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     if (!pharmacyForm.image) newErrors.image = "Pharmacy image is required";
 
@@ -314,7 +346,7 @@ export default function PharmacyPage() {
               <input
                 type="text"
                 name="whatsapp_number"
-                placeholder="+1234567890"
+                placeholder="Start by your country code like +12345678"
                 value={pharmacyForm.whatsapp_number}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.whatsapp_number ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
@@ -343,6 +375,35 @@ export default function PharmacyPage() {
                     )}
                   </button>
                 </div>
+                {/* Password Strength Meter */}
+                {!editingPharmacy && pharmacyForm.password && (
+                  <div className="mt-2 h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300 ease-in-out"
+                      style={{
+                        width: `${(passwordStrength / 4) * 100}%`,
+                        backgroundColor:
+                          passwordStrength === 0 ? 'transparent' :
+                          passwordStrength <= 1 ? '#ef4444' : // Red for weak
+                          passwordStrength <= 2 ? '#f97316' : // Orange for medium
+                          passwordStrength <= 3 ? '#eab308' : // Yellow for good
+                          '#22c55e', // Green for strong
+                      }}
+                    ></div>
+                  </div>
+                )}
+                {!editingPharmacy && pharmacyForm.password && (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-4">
+                    {passwordRequirements.map((req, i) => (
+                      <div key={i} className={`flex items-center text-[11px] transition-colors duration-200 ${req.met ? 'text-green-600 font-medium' : 'text-slate-400'}`}>
+                        <div className={`mr-2 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${req.met ? 'bg-green-100 border-green-500 text-green-600' : 'border-slate-200 text-transparent'}`}>
+                          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        {req.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <FieldLabel required>Confirm Password</FieldLabel>

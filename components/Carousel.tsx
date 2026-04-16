@@ -1,31 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Image,
-  StyleSheet,
-  Dimensions,
-  ScrollView,
-  TouchableOpacity,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  Text,
-} from 'react-native';
-// This global Banner type might be using ImageSourcePropType, which is for local assets.
-// By defining it locally, we ensure it matches the data from Supabase.
-// import { Banner } from '../types'; 
+import { View, Image, StyleSheet, Dimensions, ScrollView, TouchableOpacity, NativeSyntheticEvent, NativeScrollEvent, Text } from 'react-native';
 import { supabase } from "@/lib/supabase";
 import * as SecureStore from "expo-secure-store";
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH;
 const AUTO_SCROLL_INTERVAL = 3000;
 
-// Define the type for banners fetched from Supabase, where 'image' is a URL string.
 type Banner = {
   id: string;
   image: string;
   link: string;
+  country: string;
 };
 
 interface CarouselProps {
@@ -39,6 +27,9 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  //
+  // Fetch selected country
+  //
   useEffect(() => {
     const fetchCountry = async () => {
       const storedCountry = await SecureStore.getItemAsync("user_country");
@@ -48,28 +39,47 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
     fetchCountry();
   }, []);
 
-  useEffect(() => {
+  //
+  // Fetch banners function (used by both initial load & realtime)
+  //
+  const fetchBanners = async () => {
     if (!country) return;
 
-    const fetchBanners = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('banners')
-        .select('*')
-        .eq('country', country)
-        .order('created_at', { ascending: false });
+    setLoading(true);
 
-      if (error) {
-        console.error('Error fetching banners:', error.message);
-      } else if (data) {
-        setBanners(data);
-      }
-      setLoading(false);
-    };
+    const { data, error } = await supabase
+      .from('banners')
+      .select('*')
+      .eq('country', country)
+      .order('created_at', { ascending: false });
 
-    fetchBanners();
+    if (error) {
+      console.error('Error fetching banners:', error.message);
+    } else if (data) {
+      setBanners(data);
+      setActiveIndex(0); // Reset to first slide if data changes
+    }
+
+    setLoading(false);
+  };
+
+  //
+  // Initial fetch when country is available
+  //
+  useEffect(() => {
+    if (country) {
+      fetchBanners();
+    }
   }, [country]);
 
+  //
+  // 🔥 Silent realtime refresh
+  //
+  useRealtimeRefresh('banners', fetchBanners);
+
+  //
+  // Auto-scroll logic
+  //
   useEffect(() => {
     if (banners.length === 0) return;
 
@@ -91,6 +101,9 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
     setActiveIndex(index);
   };
 
+  //
+  // Loading State
+  //
   if (loading) {
     return (
       <View style={styles.container}>
@@ -99,6 +112,9 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
     );
   }
 
+  //
+  // Empty State
+  //
   if (banners.length === 0) {
     return (
       <View style={styles.container}>
@@ -109,6 +125,9 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
     );
   }
 
+  //
+  // Render
+  //
   return (
     <View style={styles.container}>
       <ScrollView
@@ -123,11 +142,14 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
           <TouchableOpacity key={item.id} activeOpacity={0.9} style={styles.slide}>
             <View style={styles.imageWrapper}>
               {item.image ? (
-                <Image 
-                  source={{ 
-                    uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image 
-                  }} 
-                  style={styles.image} 
+                <Image
+                  source={{
+                    uri:
+                      item.image && !item.image.startsWith('http')
+                        ? `${baseUrl}${item.image}`
+                        : item.image,
+                  }}
+                  style={styles.image}
                 />
               ) : (
                 <View style={[styles.image, styles.placeholderImage]}>
@@ -170,14 +192,14 @@ const styles = StyleSheet.create({
     width: '95%',
     height: '100%',
     overflow: 'hidden',
-    backgroundColor: 'gray', // Fallback color for better visibility
+    backgroundColor: 'gray',
     borderRadius: 20,
   },
   image: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover', // Show the whole image
-    backgroundColor: '#fff', // Optional: for images with transparency
+    resizeMode: 'cover',
+    backgroundColor: '#fff',
     borderRadius: 20,
   },
   placeholderImage: {

@@ -212,14 +212,17 @@ export default function AdminDashboard() {
     );
   const fetchMedicines = () =>
     fetchData("/api/admin/users?type=medicines", setMedicines, (data) =>
-      (Array.isArray(data) ? data : (data as any).medicines || []).map((med: any) => ({
+      (Array.isArray(data) ? data : (data as any).medicines || []).map((med: any) => {
+        console.log(`[AdminDashboard] Medicine: ${med.name}, Category ID: ${med.category_id}`);
+        return {
         ...med,
         pharmacies: (med.medicine_pharmacies || []).map((mp: any) => ({
           id: mp.pharmacy_id,
           locations: mp.locations,
           insurances: mp.insurances,
         })),
-      }))
+        };
+      })
     );
 
   /** ----------------------
@@ -864,6 +867,7 @@ export default function AdminDashboard() {
                 <tr>
                   <th className="p-2">Emoji</th>
                   <th className="p-2">Name</th>
+                  <th className="p-2">Medicines</th>
                   <th className="p-2">Actions</th>
                 </tr>
               </thead>
@@ -872,6 +876,12 @@ export default function AdminDashboard() {
                   <tr key={cat.id} className="border-t">
                     <td className="p-2 text-xl">{cat.image}</td>
                     <td className="p-2">{cat.name}</td>
+                    <td className="p-2 text-xs text-gray-600">
+                      {medicines.filter(m => m.category_id === cat.id).length} items 
+                      <span className="ml-1 text-gray-400">
+                        ({medicines.filter(m => m.category_id === cat.id).map(m => m.name).slice(0, 2).join(', ')}...)
+                      </span>
+                    </td>
                     <td className="p-2 space-x-2">
                       <button
                         onClick={() => openEditCategoryModal(cat)}

@@ -11,10 +11,13 @@ export async function GET(req: Request) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from("stock")
-    .select("*")
-    .eq("pharmacy_id", pharmacy_id)
-    .order("created_at", { ascending: false });
+  .from("stock")
+  .select(`
+    *,
+    categories ( name )
+  `)
+  .eq("pharmacy_id", pharmacy_id)
+  .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -32,7 +35,7 @@ export async function POST(req: Request) {
     const original_price = parseFloat(formData.get("original_price") as string);
     const quantity = parseInt(formData.get("quantity") as string);
     const description = formData.get("description") as string;
-    const category = formData.get("category") as string;
+    const category_id = formData.get("category_id") as string;
     const pharmacy_id = formData.get("pharmacy_id") as string;
     const in_stock = formData.get("in_stock") === "true";
     const insurancesRaw = formData.get("insurances") as string;
@@ -61,7 +64,7 @@ export async function POST(req: Request) {
         original_price,
         quantity,
         description,
-        category,
+        category_id,
         pharmacy_id,
         in_stock,
         insurances,
@@ -89,7 +92,7 @@ export async function PUT(req: Request) {
     const original_price = parseFloat(formData.get("original_price") as string);
     const quantity = parseInt(formData.get("quantity") as string);
     const description = formData.get("description") as string;
-    const category = formData.get("category") as string;
+    const category_id = formData.get("category_id") as string;
     const in_stock = formData.get("in_stock") === "true";
     const insurancesRaw = formData.get("insurances") as string;
     const insurances = insurancesRaw ? JSON.parse(insurancesRaw) : [];
@@ -104,7 +107,7 @@ export async function PUT(req: Request) {
       original_price,
       quantity,
       description,
-      category,
+      category_id,
       in_stock,
       insurances
     };

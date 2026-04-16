@@ -19,6 +19,7 @@ type PharmacyApplication = {
   opening_hours?: string | null;
   location?: string | null;
   views?: number;
+  accepted_insurances?: string | null;
 };
 
 type StockItem = {
@@ -29,9 +30,12 @@ type StockItem = {
   quantity: number;
   in_stock: boolean;
   description?: string;
-  category: string;
+  category_id?: string;
   image?: string;
   insurances?: string[];
+  categories?: {
+    name: string;
+  };
 };
 
 type Category = {
@@ -100,7 +104,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isStockLoading, setIsStockLoading] = useState(false);
   const [isAddingStock, setIsAddingStock] = useState(false);
   const [stockImageFile, setStockImageFile] = useState<File | null>(null);
-  const [stockForm, setStockForm] = useState({ name: "", price: "", original_price: "", quantity: "", description: "Dosage to be given by the approved Doctor.", category: "", image: "", insurances: [] as string[] });
+  const [stockForm, setStockForm] = useState({ 
+    name: "", 
+    price: "", 
+    original_price: "", 
+    quantity: "", 
+    description: "Dosage to be given by the approved Doctor.", 
+    category_id: "", 
+    image: "", 
+    insurances: [] as string[] 
+  });
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -638,11 +651,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   };
 
   async function handleSaveStock() {
-    if (!stockForm.name || !stockForm.price || !stockForm.category) {
+    if (!stockForm.name || !stockForm.price || !stockForm.category_id) {
       toast.error("Name, Price, and Category are required");
       return;
     }
     setIsAddingStock(true);
+    console.log('[DashboardClient] Saving stock item:', stockForm.name);
+    console.log('[DashboardClient] Selected Category ID:', stockForm.category_id);
     try {
       const url = editingStockId ? `/api/pharmacy/stock?id=${editingStockId}` : "/api/pharmacy/stock";
       const method = editingStockId ? "PUT" : "POST";
@@ -655,7 +670,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       formData.append("original_price", stockForm.original_price);
       formData.append("quantity", stockForm.quantity);
       formData.append("description", stockForm.description);
-      formData.append("category", stockForm.category);
+      formData.append("category_id", stockForm.category_id);
       formData.append("pharmacy_id", app.id);
       formData.append("in_stock", String(Number(stockForm.quantity) > 0));
       formData.append("insurances", JSON.stringify(stockForm.insurances));
@@ -678,7 +693,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           setStockItems((prev) => [...prev, savedItem]);
           toast.success("Stock item added");
         }
-        setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "Dosage to be given by the approved Doctor", category: "", image: "", insurances: [] });
+        setStockForm({ 
+          name: "", 
+          price: "", 
+          original_price: "", 
+          quantity: "", 
+          description: "Dosage to be given by the approved Doctor",
+          category_id: "", 
+          image: "", 
+          insurances: [] 
+        });
         setStockImageFile(null);
         setEditingStockId(null);
       } else {
@@ -699,7 +723,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       original_price: item.original_price.toString(),
       quantity: item.quantity.toString(),
       description: item.description || "",
-      category: item.category,
+      category_id: item.category_id || "",
       image: item.image || "",
       insurances: item.insurances || [],
     });
@@ -708,7 +732,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   }
 
   function handleCancelEdit() {
-    setStockForm({ name: "", price: "", original_price: "", quantity: "", description: "Dosage to be given by the approved Doctor", category: "", image: "", insurances: [] });
+    setStockForm({ 
+      name: "", 
+      price: "", 
+      original_price: "", 
+      quantity: "", 
+      description: "Dosage to be given by the approved Doctor", 
+      category_id: "", 
+      image: "", 
+      insurances: [] 
+    });
     setEditingStockId(null);
     setStockImageFile(null);
   }
@@ -976,7 +1009,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "dashboard" && (
               <div>
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Dashboard Overview</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Dashboard Overview</h3>
                 {isDashboardLoading ? (
                   <div className="text-center py-10">Loading stats...</div>
                 ) : (
@@ -1153,7 +1186,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "availability" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">My Stock Management</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Stock Management</h3>
 
                 <div className="mb-8 bg-gray-50 p-4 rounded-xl border border-gray-200">
                   <h4 className="font-semibold text-gray-700 mb-3">{editingStockId ? "Edit Item" : "Add New Item"}</h4>
@@ -1188,13 +1221,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <select
-                      value={stockForm.category}
-                      onChange={(e) => setStockForm({ ...stockForm, category: e.target.value })}
+                      value={stockForm.category_id}
+                      onChange={(e) => {
+                        const selectedCat = categories.find(c => c.id === e.target.value);
+                        setStockForm({ 
+                          ...stockForm, 
+                          category_id: e.target.value, 
+                        });
+                      }}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     >
                       <option value="">Select Category</option>
                       {categories.map((cat) => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
                       ))}
                     </select>
                     <input
@@ -1309,7 +1348,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 )}
                               </td>
                               <td className="p-3 font-medium">{item.name}</td>
-                              <td className="p-3 text-sm text-gray-600">{item.category}</td>
+                              <td className="p-3 text-sm text-gray-600">{item.categories?.name || "No Category"}</td>
                               <td className="p-3">{item.price}</td>
                               <td className="p-3 text-gray-500 text-sm">{item.original_price}</td>
                               <td className="p-3">{item.quantity}</td>
@@ -1344,7 +1383,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "bookings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Incoming Orders</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Incoming Orders</h3>
                 
                 <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Search Bar */}
@@ -1453,7 +1492,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                       <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
                                         <div className="flex items-center gap-3">
                                           {item.image ? (
-                                            <img src={item.image} alt={item.product_name} className="h-10 w-10 rounded object-cover border border-gray-200" />
+                                            <img src={getStockImageUrl(item.image)} alt={item.product_name} className="h-10 w-10 rounded object-cover border border-gray-200" />
                                           ) : (
                                             <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">No Img</div>
                                           )}
@@ -1501,13 +1540,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "profile" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">My Pharmacy</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Pharmacy</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading profile...</div>
                 ) : !isEditingProfile ? (
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
+                  <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200">
-                      <div className="flex items-center gap-6 mb-8">
+                      <div className="flex flex-col items-center md:flex-row md:items-center gap-4 md:gap-6 mb-8">
                         <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center text-gray-600 shadow-sm overflow-hidden border border-gray-200 shrink-0">
                           {profileForm.image ? (
                             <img src={getImageUrl(profileForm.image)} alt="Profile" className="h-full w-full object-cover" />
@@ -1517,22 +1556,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </svg>
                           )}
                         </div>
-                        <div>
-                          <h4 className="text-2xl font-bold text-gray-900">{profileForm.name}</h4>
-                          <p className="text-gray-500 text-sm mt-1">{profileForm.email}</p>
+                        <div className="min-w-0 flex-1 overflow-hidden w-full text-center md:text-left">
+                          <h4 className="text-lg md:text-2xl font-bold text-gray-900 truncate">{profileForm.name}</h4>
+                          <p className="text-gray-500 text-sm mt-1 truncate">{profileForm.email}</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">WhatsApp</h5>
                           <p className="text-gray-900 font-medium">{profileForm.whatsapp_number || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment ID</h5>
                           <p className="text-gray-900 font-medium">{profileForm.payment_id || "Not set"}</p>
                         </div>
-                        <div>
+                        <div className="text-center md:text-left">
                           <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Country</h5>
                           <p className="text-gray-900 font-medium">{profileForm.country || "Not set"}</p>
                         </div>
@@ -1971,7 +2010,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "settings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800">Settings</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Settings</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading settings...</div>
                 ) : (

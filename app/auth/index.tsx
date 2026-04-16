@@ -53,8 +53,8 @@ const AuthScreen = () => {
         console.log("Token on startup:", token);
 
         if (token) {
-          // User already logged in → redirect to home
-          router.replace("/(tabs)");
+          // User already logged in → redirect to payment fee
+          router.replace("/login-payment-fee");
           return;
         }
       } catch (err) {
@@ -114,7 +114,7 @@ const AuthScreen = () => {
         await SecureStore.setItemAsync("token", data.token);
         await SecureStore.setItemAsync("user_country", country);
         console.log("Login successful, token stored");
-        router.replace("/(tabs)");
+        router.replace("/login-payment-fee");
       } else {
         const errorMessage = data.error || data.message || "Unknown error";
         console.warn("Login failed:", errorMessage);

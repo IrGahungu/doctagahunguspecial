@@ -19,6 +19,14 @@ export async function POST(req: Request) {
       originCountry,
     } = body;
 
+    // Password strength check
+    const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
+    if (password && !passwordRegex.test(password)) {
+      return NextResponse.json({ 
+        error: "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers" 
+      }, { status: 400 });
+    }
+
     // Check if user exists
     const { data: existingUser } = await supabaseAdmin
       .from("insurance_users")

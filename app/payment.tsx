@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from '@/components/Toast';
 import { useToastStore } from '@/stores/toastStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import * as SecureStore from 'expo-secure-store';
+import { supabase } from '@/lib/supabase';
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
@@ -17,6 +19,8 @@ export default function PaymentScreen() {
   }>();
   const showToast = useToastStore((state) => state.showToast);
   const insets = useSafeAreaInsets();
+  const [serviceFee, setServiceFee] = useState<number>(0);
+  const [loadingFee, setLoadingFee] = useState(true);
 
   useEffect(() => {
     navigation.getParent()?.setOptions({
@@ -29,9 +33,42 @@ export default function PaymentScreen() {
     };
   }, [navigation]);
 
+  useEffect(() => {
+    const fetchServiceFee = async () => {
+      setLoadingFee(true);
+      try {
+        const storedCountry = await SecureStore.getItemAsync('user_country');
+        if (storedCountry) {
+          const { data, error } = await supabase
+            .from('service_fees')
+            .select('fee')
+            .eq('country', storedCountry)
+            .eq('service_type', 'doctor')
+            .single();
+          
+          if (!error && data) {
+            setServiceFee(Number(data.fee));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching doctor service fee:', err);
+      } finally {
+        setLoadingFee(false);
+      }
+    };
+    fetchServiceFee();
+  }, []);
+
+  const parsedConsultationFee = parseFloat(consultationFee || '0');
+  const totalAmount = parsedConsultationFee + serviceFee;
+
   const handlePayment = (method: 'Gahungu Wallet' | 'Gahungu Card') => {
-    console.log(`Processing payment for ${doctorName} on ${date} at ${time} (${type}) with ${method}`);
-    showToast('DR. IR. Gahungu ariko arabijengajenga,vuba birakora!', 7000);
+    console.log(`Processing payment for ${doctorName} on ${date} at ${time} (${type}) with ${method}. Total: ${totalAmount}`);
+    if (method === 'Gahungu Wallet') {
+      showToast('DR. IR. Gahungu ariko arabijengajenga,vuba birakora!', 7000);
+    } else {
+      showToast('Card payments are currently under maintenance.', 4000);
+    }
   };
 
   return (
@@ -68,8 +105,21 @@ export default function PaymentScreen() {
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Consultation Fee(To be Fixed by Doctors)</Text>
-            <Text style={styles.detailValue}>{consultationFee}</Text>
+            <Text style={styles.detailValue}>BIF {parsedConsultationFee.toLocaleString()}</Text>
           </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Doctor Service Fee</Text>
+            {loadingFee ? (
+              <ActivityIndicator size="small" color="#4CAF50" />
+            ) : (
+              <Text style={styles.detailValue}>BIF {serviceFee.toLocaleString()}</Text>
+            )}
+          </View>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalValue}>BIF {totalAmount.toLocaleString()}</Text>
+          </View>
+
           <Text style={styles.sectionTitle}>Payment Method</Text>
           <View style={styles.buttonsContainer}>
             <Pressable
@@ -174,6 +224,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Roboto-Regular',
     color: '#212121',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    marginBottom: 20,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+  },
+  totalValue: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#4CAF50',
   },
   buttonsContainer: {
     flexDirection: 'row',

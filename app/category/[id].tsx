@@ -68,31 +68,27 @@ export default function CategoryDetailScreen() {
 
 
   useEffect(() => {
-    if (!id || !country) { // Don't fetch until country is loaded
-      setLoading(false);
-      setError('Category ID is missing.');
-      return;
-    }
+    if (!id || !country) return;
 
     const fetchProductsByCategory = async () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from('medicines')
+      const { data, error } = await supabase
+        .from('stock')
         .select('*')
         .eq('category_id', id)
-        .eq('country', country);
 
-      if (fetchError) {
-        console.error('Error fetching products for category:', fetchError.message);
-        setError('Failed to load products. Please try again.');
-      } else if (data) {
+      if (error) {
+        console.error(error.message);
+        setError('Failed to load products.');
+      } else {
         const productsData = data.map((p) => ({
           ...p,
           originalPrice: p.original_price,
         }));
-        setProducts(productsData as Product[]);
+
+        setProducts(productsData);
       }
 
       setLoading(false);

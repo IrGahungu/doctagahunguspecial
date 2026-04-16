@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Pressable, Dimensions, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, Pressable, Dimensions, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,14 @@ import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
+
+const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
+
+const getFullImageUrl = (imagePath: any) => {
+  if (!imagePath) return '';
+  const path = String(imagePath);
+  return path.startsWith('http') ? path : `${PHARMACY_URL_PREFIX}${path}`;
+};
 
 type Pharmacy = {
   id: string;
@@ -32,6 +40,7 @@ export default function AllPharmaciesScreen() {
   const [pharmacies, setPharmacies] = useState<Pharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -42,29 +51,42 @@ export default function AllPharmaciesScreen() {
     fetchCountry();
   }, []);
 
+  const fetchPharmacies = useCallback(async () => {
+    if (!country) return;
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('pharmacy_applications')
+      .select('*')
+      .ilike('country', country.trim()) // Case-insensitive and trimmed
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching pharmacies:', error.message);
+    } else if (data) {
+      setPharmacies(data);
+    }
+    setLoading(false);
+    setRefreshing(false);
+  }, [country]);
+
   useEffect(() => {
     if (!country) return;
 
-    const fetchPharmacies = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('pharmacy_applications')
-        .select('*')
-        .eq('country', country)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching pharmacies:', error.message);
-      } else if (data) {
-        setPharmacies(data);
-      }
-      setLoading(false);
-    };
-
     fetchPharmacies();
-    const channel = supabase.channel('all-pharmacies-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacy_applications', filter: `country=eq.${country}` }, fetchPharmacies).subscribe();
+    
+    // Subscribe to changes for this specific country
+    const channel = supabase.channel('all-pharmacies-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacy_applications', filter: `country=eq.${country.trim()}` }, fetchPharmacies)
+      .subscribe();
+
     return () => { supabase.removeChannel(channel); };
-  }, [country]);
+  }, [country, fetchPharmacies]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPharmacies();
+  };
 
   const renderItem = ({ item }: { item: Pharmacy }) => (
     <Pressable
@@ -77,7 +99,7 @@ export default function AllPharmaciesScreen() {
       }}
     >
       {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: getFullImageUrl(item.image) }} style={styles.image} resizeMode="cover" />
       ) : (
         <View style={[styles.image, styles.placeholderImage]}>
           <Icon name="local-pharmacy" size={40} color="#ccc" />
@@ -114,6 +136,9 @@ export default function AllPharmaciesScreen() {
           showsVerticalScrollIndicator={false}
           numColumns={2}
           columnWrapperStyle={styles.columnWrapper}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4CAF50']} />
+          }
         />
       )}
     </View>
