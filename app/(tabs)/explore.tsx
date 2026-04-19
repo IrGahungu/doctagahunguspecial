@@ -2,136 +2,42 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, FlatList, TouchableOpacity, Dimensions, TouchableWithoutFeedback, Animated, Modal, Share, BackHandler, Alert, Linking, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, X, Plus, Check, Play, Pause, ChevronRight, Wallet, Globe, Instagram, Twitter } from 'lucide-react-native';
+import { Video, ResizeMode } from 'expo-av';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
+import { API_BASE_URL } from '@/config';
 
 const { width } = Dimensions.get('window');
 
-const STORIES = [
-  { 
-    id: '1', 
-    name: 'Bancobu', 
-    avatar: 'https://i.pravatar.cc/150?img=67', 
-    images: ['https://picsum.photos/600/1000?random=11', 'https://picsum.photos/600/1000?random=12'],
-    tag: 'Sponsored',
-    website: 'https://www.bancobu.com',
-  },
-  { 
-    id: '2', 
-    name: 'Brarudi', 
-    avatar: 'https://i.pravatar.cc/150?img=44', 
-    images: ['https://picsum.photos/600/1000?random=21'],
-    tag: 'Sponsored',
-    website: 'https://www.brarudi.bi',
-  },
-  { 
-    id: '3', 
-    name: 'Kigingi', 
-    avatar: 'https://i.pravatar.cc/150?img=67', 
-    images: [
-      'https://picsum.photos/600/1000?random=31', 
-      'https://picsum.photos/600/1000?random=32', 
-      'https://picsum.photos/600/1000?random=33'
-    ],
-    tag: 'Promoted',
-    website: 'https://www.facebook.com/kigingi',
-  },
-  { 
-    id: '4', 
-    name: 'Alglass', 
-    avatar: 'https://i.pravatar.cc/150?img=44', 
-    images: ['https://picsum.photos/600/1000?random=41'],
-    tag: 'Promoted',
-    website: 'https://www.alglass.com',
-  },
-];
+const isVideo = (url: string) => /\.(mp4|mov|avi|mkv|webm)$/i.test(url);
 
-const USERS = [
-  { id: '1', name: 'Dr. Gahungu', avatar: 'https://i.pravatar.cc/150?img=11' },
-  { id: '2', name: 'Pharmacy Plus', avatar: 'https://i.pravatar.cc/150?img=12' },
-  { id: '3', name: 'Health First', avatar: 'https://i.pravatar.cc/150?img=13' },
-  { id: '4', name: 'City Hospital', avatar: 'https://i.pravatar.cc/150?img=14' },
-  { id: '5', name: 'Wellness Center', avatar: 'https://i.pravatar.cc/150?img=15' },
-];
 
-// Dummy Data for Posts
-const POSTS = [
-  {
-    id: '1',
-    title: 'Bancobu',
-    tag: 'Sponsored',
-    user: USERS[0],
-    images: [
-      'https://picsum.photos/600/600?random=1', 
-      'https://picsum.photos/600/600?random=10', 
-      'https://picsum.photos/600/600?random=100'
-    ],
-    caption: 'Checking the new stock of medicines. Quality first! 💊 #healthcare #pharmacy',
-    likes: 120,
-    website: 'https://www.bancobu.com',
-    whatsapp: '25712345678',
-    instagram: 'https://instagram.com/bancobu',
-    twitter: 'https://twitter.com/bancobu',
-  },
-  {
-    id: '2',
-    title: 'Brarudi',
-    tag: 'Promoted',
-    user: USERS[1],
-    images: ['https://picsum.photos/600/800?random=2', 'https://picsum.photos/600/800?random=20'],
-    caption: 'Happy to help patients recover faster. Stay safe everyone! 🏥',
-    likes: 85,
-    website: 'https://www.brarudi.bi',
-    whatsapp: '25712345678',
-    instagram: 'https://instagram.com/brarudi',
-    twitter: 'https://twitter.com/brarudi',
-  },
-  {
-    id: '3',
-    title: 'Health Tips',
-    tag: null,
-    user: USERS[2],
-    images: ['https://picsum.photos/600/500?random=3', 'https://picsum.photos/600/500?random=30'],
-    caption: 'New vitamins available. Boost your immunity today. 🍊',
-    likes: 200,
-    website: 'https://www.brarudi.bi',
-    whatsapp: '25712345678',
-    instagram: 'https://instagram.com/brarudi',
-    twitter: 'https://twitter.com/brarudi',
-  },
-  {
-    id: '4',
-    title: 'Gahungu Tips',
-    tag: 'Promoted',
-    user: USERS[3],
-    images: ['https://picsum.photos/600/700?random=4', 'https://picsum.photos/600/700?random=40'],
-    caption: 'Our new facility is open 24/7. Visit us for emergency care.',
-    likes: 340,
-    website: 'https://www.brarudi.bi',
-    whatsapp: '25712345678',
-    instagram: 'https://instagram.com/brarudi',
-    twitter: 'https://twitter.com/brarudi',
-  },
-  {
-    id: '5',
-    title: 'Medicine News',
-    tag: 'Sponsored',
-    user: USERS[4],
-    images: ['https://picsum.photos/600/600?random=5', 'https://picsum.photos/600/600?random=50'],
-    caption: 'Healthy living tips: Drink water and sleep well! 💧😴',
-    likes: 150,
-    website: 'https://www.brarudi.bi',
-    whatsapp: '25712345678',
-    instagram: 'https://instagram.com/brarudi',
-    twitter: 'https://twitter.com/brarudi',
-  },
-];
+const SkeletonStory = () => (
+  <View style={styles.storyContainer}>
+    <View style={[styles.storyRing, { borderColor: '#e0e0e0' }]}>
+      <View style={[styles.storyAvatar, styles.skeleton]} />
+    </View>
+    <View style={[styles.skeleton, { width: 40, height: 10, borderRadius: 4 }]} />
+  </View>
+);
+
+const SkeletonPost = () => (
+  <View style={styles.postContainer}>
+    <View style={styles.postHeader}>
+      <View style={styles.postHeaderLeft}>
+        <View style={[styles.postAvatar, styles.skeleton]} />
+        <View style={[styles.skeleton, { width: 100, height: 14, borderRadius: 4 }]} />
+      </View>
+    </View>
+    <View style={[styles.postImage, styles.skeleton]} />
+  </View>
+);
 
 const Post = ({ item, onLike, onNextImage }: { 
-  item: typeof POSTS[0], 
+  item: any, 
   onLike: () => void,
-  onNextImage: () => void 
+  onNextImage: (index: number) => void 
 }) => {
   const [lastTap, setLastTap] = useState<number | null>(null);
   const [isLiked, setIsLiked] = useState(false);
@@ -140,6 +46,18 @@ const Post = ({ item, onLike, onNextImage }: {
   const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>({ 0: true });
   
   // Multi-heart animation refs
+
+  const recordPostLike = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      await fetch(`${API_BASE_URL}/interactions/post-like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ post_id: item.id, post_title: item.title })
+      });
+    } catch (e) { console.error(e); }
+  };
+
   const heartAnimations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
 
   const triggerLikeAnimation = () => {
@@ -171,8 +89,9 @@ const Post = ({ item, onLike, onNextImage }: {
     if (lastTap && (now - lastTap) < DOUBLE_PRESS_DELAY) {
       if (!isLiked) {
         setIsLiked(true);
-        setLikes((prev) => prev + 1);
+        setLikes((prev: number) => prev + 1);
         onLike();
+        recordPostLike();
       }
       triggerLikeAnimation();
       setLastTap(null);
@@ -185,7 +104,8 @@ const Post = ({ item, onLike, onNextImage }: {
     if (!isLiked) {
       triggerLikeAnimation();
       onLike();
-      setLikes((prev) => prev + 1);
+      setLikes((prev: number) => prev + 1);
+      recordPostLike();
       setIsLiked(true);
     }
   };
@@ -209,7 +129,7 @@ const Post = ({ item, onLike, onNextImage }: {
     
     if (!viewedIndices[nextIndex]) {
       setViewedIndices(prev => ({ ...prev, [nextIndex]: true }));
-      onNextImage();
+      onNextImage(nextIndex);
     }
   };
 
@@ -229,7 +149,7 @@ const Post = ({ item, onLike, onNextImage }: {
     <View style={styles.postContainer}>
       <View style={styles.postHeader}>
         <View style={styles.postHeaderLeft}>
-          <Image source={{ uri: item.user.avatar }} style={styles.postAvatar} />
+          <Image source={{ uri: item.avatar }} style={styles.postAvatar} />
           <Text style={styles.postUsername}>{item.title}</Text>
         </View>
         {!!item.tag && <Text style={styles.postTag}>{item.tag}</Text>}
@@ -240,25 +160,25 @@ const Post = ({ item, onLike, onNextImage }: {
       </View>
 
       <View style={styles.postLinksContainer}>
-        {item.website && (
+        {item.website && item.show_website !== false && (
           <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.website, "their website")}>
             <Globe size={14} color="#4CAF50" />
             <Text style={styles.postLinkText}>Link to the website</Text>
           </TouchableOpacity>
         )}
-        {item.whatsapp && (
+        {item.whatsapp && item.show_whatsapp !== false && (
           <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(`whatsapp://send?phone=${item.whatsapp}`, "WhatsApp")}>
             <MessageCircle size={14} color="#25D366" />
             <Text style={styles.postLinkText}>Click here to Whatsapp</Text>
           </TouchableOpacity>
         )}
-        {item.instagram && (
+        {item.instagram && item.show_instagram !== false && (
           <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.instagram, "Instagram")}>
             <Instagram size={14} color="#E1306C" />
             <Text style={styles.postLinkText}>Follow them on Instagram</Text>
           </TouchableOpacity>
         )}
-        {item.twitter && (
+        {item.twitter && item.show_twitter !== false && (
           <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.twitter, "X")}>
             <Twitter size={14} color="#000" />
             <Text style={styles.postLinkText}>Follow them on X</Text>
@@ -268,14 +188,27 @@ const Post = ({ item, onLike, onNextImage }: {
 
       <TouchableWithoutFeedback onPress={handleDoubleTap}>
         <View>
-          <Image source={{ uri: item.images[currentImageIndex] }} style={styles.postImage} resizeMode="cover" />
+          {isVideo(item.images[currentImageIndex]) ? (
+            <Video
+              source={{ uri: item.images[currentImageIndex] }}
+              style={styles.postImage}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay
+              isLooping
+              isMuted
+              useNativeControls={false}
+            />
+          ) : (
+            <Image source={{ uri: item.images[currentImageIndex] }} style={styles.postImage} resizeMode="cover" />
+          )}
+          
           {item.images.length > 1 ? (
             <>
               <TouchableOpacity style={styles.nextImageButton} onPress={handleNextImage}>
                 <ChevronRight size={20} color="#fff" />
               </TouchableOpacity>
               <View style={styles.paginationDotsContainer}>
-                {item.images.map((_, index) => (
+                {item.images.map((_: any, index: number) => (
                   <View
                     key={index}
                     style={[styles.dot, index === currentImageIndex && styles.activeDot]}
@@ -332,7 +265,10 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const [selectedStory, setSelectedStory] = useState<typeof STORIES[0] | null>(null);
+  const [stories, setStories] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedStory, setSelectedStory] = useState<any | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isTimerActive, setIsTimerActive] = useState(false);
@@ -357,6 +293,31 @@ export default function ExploreScreen() {
 
   // Effect to load/save daily stats and reset if new day
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [storiesRes, postsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/stories`),
+          fetch(`${API_BASE_URL}/posts`)
+        ]);
+        const storiesData = await storiesRes.json();
+        const postsData = await postsRes.json();
+        
+        setStories(storiesData.map((s: any) => ({
+          ...s,
+          images: typeof s.images === 'string' ? JSON.parse(s.images) : s.images
+        })));
+        
+        setPosts(postsData.map((p: any) => ({
+          ...p,
+          images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images
+        })));
+      } catch (err) {
+        console.error("Error fetching explore data:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     const loadDailyStats = async () => {
       const today = new Date().toDateString();
       const storedDate = await SecureStore.getItemAsync('dailyStatsDate');
@@ -384,6 +345,7 @@ export default function ExploreScreen() {
       }
     };
 
+    fetchData();
     loadDailyStats();
   }, []);
 
@@ -512,7 +474,18 @@ export default function ExploreScreen() {
       progress.setValue(0);
       animationRef.current = null;
     }
-  }, [selectedStory, currentImageIndex, isPaused]);
+}, [selectedStory, currentImageIndex, isPaused]);
+
+  const recordInteraction = async (p0: string, type: 'story-view' | 'post-view', nameOrTitle: string, index: number) => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      await fetch(`${API_BASE_URL}/interactions/${type}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ [`${type.split('-')[0]}_${type === 'story-view' ? 'name' : 'title'}`]: nameOrTitle, image_index: index })
+      });
+    } catch (e) { console.error(e); }
+  };
 
   // PanResponder for Swipe-to-dismiss
   const panResponder = useRef(
@@ -538,6 +511,7 @@ export default function ExploreScreen() {
       const newViewed = { ...viewedImages, [key]: true };
       setViewedImages(newViewed);
       triggerRewardAnimation(500);
+      recordInteraction('story-view', 'story-view', selectedStory.name, currentImageIndex);
       
       graffitiScale.setValue(0);
       graffitiOpacity.setValue(1);
@@ -547,7 +521,7 @@ export default function ExploreScreen() {
         Animated.timing(graffitiOpacity, { toValue: 0, duration: 1000, useNativeDriver: true })
       ]).start();
 
-      const allImagesOfStoryViewed = selectedStory.images.every((_, index) => newViewed[`${selectedStory.id}-${index}`]);
+      const allImagesOfStoryViewed = selectedStory.images.every((_: any, index: number) => newViewed[`${selectedStory.id}-${index}`]);
       if (allImagesOfStoryViewed) setShowConfetti(true);
     }
   };
@@ -571,8 +545,8 @@ export default function ExploreScreen() {
     console.log('Add post clicked');
   };
 
-  const renderStory = ({ item }: { item: typeof STORIES[0] }) => {
-    const isFullyViewed = item.images.every((_, index) => viewedImages[`${item.id}-${index}`]);
+  const renderStory = ({ item }: { item: any }) => {
+    const isFullyViewed = item.images.every((_: any, index: number) => viewedImages[`${item.id}-${index}`]);
 
     return (
       <TouchableOpacity style={styles.storyContainer} onPress={() => { setSelectedStory(item); setIsPaused(false); }}>
@@ -642,39 +616,54 @@ export default function ExploreScreen() {
         </Animated.Text>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Stories Section */}
-        <View style={styles.storiesSection}>
-          <FlatList
-            data={STORIES}
-            renderItem={renderStory}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.storiesList}
-          />
-        </View>
+      {isLoading ? (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.storiesSection}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesList}>
+              {[1, 2, 3, 4, 5].map(i => <SkeletonStory key={i} />)}
+            </ScrollView>
+          </View>
+          <View style={styles.postsSection}>
+            {[1, 2].map(i => <SkeletonPost key={i} />)}
+          </View>
+        </ScrollView>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+          {/* Stories Section */}
+          <View style={styles.storiesSection}>
+            <FlatList
+              data={stories}
+              renderItem={renderStory}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.storiesList}
+            />
+          </View>
 
-        {/* Posts Section */}
-        <View style={styles.postsSection}>
-          {POSTS.map((post) => (
-            <View key={post.id}>
-              <Post
-                item={post}
-                onLike={() => {
-                  setPostsLikedToday(prev => prev + 1);
-                  setEpEarnedToday(prev => prev + 200);
-                  triggerRewardAnimation(200);
-                }}
-                onNextImage={() => {
-                  setEpEarnedToday(prev => prev + 300);
-                  triggerRewardAnimation(300);
-                }}
-              />
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+          {/* Posts Section */}
+          <View style={styles.postsSection}>
+            {posts.map((post) => (
+              <View key={post.id}>
+                <Post
+                  item={post}
+                  onLike={() => {
+                    setPostsLikedToday(prev => prev + 1);
+                    setEpEarnedToday(prev => prev + 200);
+                    triggerRewardAnimation(200);
+                    // Like API is called inside Post component
+                  }}
+                  onNextImage={(index) => {
+                    setEpEarnedToday(prev => prev + 300);
+                    triggerRewardAnimation(300);
+                    recordInteraction('post-view', post.id, post.title, index);
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
 
       <Modal
         visible={selectedStory !== null}
@@ -687,7 +676,7 @@ export default function ExploreScreen() {
         <Animated.View style={[styles.storyModalContainer, { transform: pan.getTranslateTransform() }]} {...panResponder.panHandlers}>
           {/* Progress Bar Container */}
           <View style={styles.progressBarContainer}>
-            {selectedStory?.images.map((_, index) => {
+            {selectedStory?.images.map((_: any, index: number) => {
               const n = selectedStory.images.length;
               return (
                 <View key={index} style={styles.progressSegmentBackground}>
@@ -729,18 +718,34 @@ export default function ExploreScreen() {
                   }
                 ]} 
               />
-              <Text style={styles.storyTag}>{selectedStory.tag.toUpperCase()}</Text>
+              {!!selectedStory.tag && selectedStory.show_tag !== false && (
+                <Text style={styles.storyTag}>{selectedStory.tag.toUpperCase()}</Text>
+              )}
               <Text style={styles.imageCounter}>
                 {currentImageIndex + 1} / {selectedStory.images.length}
               </Text>
-              <Image source={{ uri: selectedStory.images[currentImageIndex] }} style={styles.storyFullImage} resizeMode="cover" />
+              
+              {isVideo(selectedStory.images[currentImageIndex]) ? (
+                <Video
+                  source={{ uri: selectedStory.images[currentImageIndex] }}
+                  style={styles.storyFullImage}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={!isPaused}
+                  isLooping={false}
+                  useNativeControls={false}
+                />
+              ) : (
+                <Image source={{ uri: selectedStory.images[currentImageIndex] }} style={styles.storyFullImage} resizeMode="cover" />
+              )}
 
-              <AnimatedTouchableOpacity 
-                style={[styles.storyLinkButton, { transform: [{ scale: pulseScale }] }]} 
-                onPress={handleCallToAction}
-              >
-                <Text style={styles.storyLinkText}>Check out more here</Text>
-              </AnimatedTouchableOpacity>
+              {!!selectedStory.website && selectedStory.show_website !== false && (
+                <AnimatedTouchableOpacity 
+                  style={[styles.storyLinkButton, { transform: [{ scale: pulseScale }] }]} 
+                  onPress={handleCallToAction}
+                >
+                  <Text style={styles.storyLinkText}>Check out more here</Text>
+                </AnimatedTouchableOpacity>
+              )}
 
               <TouchableOpacity 
                 style={[
@@ -1070,5 +1075,8 @@ const styles = StyleSheet.create({
     zIndex: 25,
     right: -8,
     bottom: 92,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
   },
 });

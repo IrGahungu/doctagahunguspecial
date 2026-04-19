@@ -163,8 +163,8 @@ export default function InsuranceModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg w-full max-w-md flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl border border-gray-100 w-full max-w-md flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <div className="p-6 border-b shrink-0">
           <h3 className="text-lg font-semibold">{editingInsurance ? "Edit Insurance" : "Add Insurance"}</h3>
         </div>

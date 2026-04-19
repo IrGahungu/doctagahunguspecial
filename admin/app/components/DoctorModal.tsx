@@ -198,11 +198,11 @@ export default function DoctorModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50"
+      className="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg w-full max-w-lg flex flex-col max-h-[90vh]"
+        className="bg-white rounded-lg shadow-xl border border-gray-100 w-full max-w-lg flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6 border-b">
