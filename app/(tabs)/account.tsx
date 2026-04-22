@@ -17,6 +17,7 @@ type UserProfile = {
   id: string;
   fullname: string;
   wallet_balance?: number;
+  engagement_points?: number;
 };
 
 export default function AccountScreen() {
@@ -67,6 +68,9 @@ export default function AccountScreen() {
           const data = await res.json();
           if (res.ok) {
             setProfile(data);
+            if (data.engagement_points !== undefined) {
+              setEngagementPoints(data.engagement_points);
+            }
             useAuthStore.getState().setUserId(data.id); // ✅ Save user ID to global store
 
             // Fetch active orders count

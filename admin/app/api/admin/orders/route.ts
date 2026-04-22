@@ -1,74 +1,98 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 
-// Initialize Supabase
-const supabase = createClient(
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET() {
+const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
+
+export async function GET(request: Request) {
   try {
-    const { data: orders, error } = await supabase
-      .from('orders')
-      .select(`
-        id,
-        total_amount,
-        status,
-        created_at,
-        users (fullname),
-        order_items (
-          id,
-          quantity,
-          price,
-          medicines (name)
-        )
-      `);
+    // Fetch all orders
+    const { data: orders, error: ordersError } = await supabaseAdmin
+      .from("orders")
+      .select("id, created_at, total_amount, subtotal, service_fee, user_id, users(fullname)")
+      .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error('❌ Supabase fetch error:', error);
-      throw error;
+    if (ordersError) {
+      console.error("Error fetching orders:", ordersError);
+      return NextResponse.json({ error: ordersError.message }, { status: 500 });
     }
 
-    console.log('🟢 Raw orders data from Supabase:', JSON.stringify(orders, null, 2));
+    // Fetch all order items and join with stock (medicines)
+    // The error "Could not find a relationship between 'order_items' and 'medicines'"
+    // suggests that 'medicines' was used here instead of 'stock'.
+    const { data: orderItems, error: orderItemsError } = await supabaseAdmin
+      .from("order_items")
+      .select("*, stock(id, name, image, pharmacy_applications(name))") // Join with stock and its associated pharmacy
+      .order("created_at", { ascending: false });
 
-    if (!orders || orders.length === 0) {
-      console.warn('⚠️ No orders found.');
-      return NextResponse.json([]);
+    if (orderItemsError) {
+      console.error("Error fetching order items:", orderItemsError);
+      return NextResponse.json({ error: orderItemsError.message }, { status: 500 });
     }
 
-    // ✅ Handle both array & single-object shapes safely
-    const formatted = orders.map((order: any) => {
-      const userFullname =
-        Array.isArray(order.users)
-          ? order.users[0]?.fullname ?? 'Unknown'
-          : order.users?.fullname ?? 'Unknown';
-
-      const productNames =
-        Array.isArray(order.order_items)
-          ? order.order_items.map((item: any) => {
-              if (Array.isArray(item.medicines)) {
-                return item.medicines[0]?.name ?? 'Unknown';
-              }
-              return item.medicines?.name ?? 'Unknown';
-            })
-          : [];
+    // Map order items to their respective orders
+    const ordersWithDetails = orders.map(order => {
+      const itemsForOrder = orderItems.filter(item => item.order_id === order.id).map(item => ({
+        id: item.id,
+        stock_id: item.stock_id,
+        quantity: item.quantity,
+        price: item.price,
+        status: item.status,
+        pharmacy_name: (item.stock as any)?.pharmacy_applications?.name || "N/A",
+        product_name: item.stock?.name || "Unknown Product",
+        product_image_url: item.stock?.image 
+          ? (item.stock.image.startsWith('http') 
+              ? item.stock.image 
+              : `${MEDICINE_URL_PREFIX}${item.stock.image}`)
+          : null,
+      }));
 
       return {
-        id: order.id,
-        user_fullname: userFullname,
-        total_amount: order.total_amount,
-        status: order.status,
-        created_at: order.created_at,
-        product_names: productNames,
+        ...order,
+        status: itemsForOrder[0]?.status || "Pending",
+        customer_name: (order.users as any)?.fullname || "N/A",
+        items: itemsForOrder,
       };
     });
 
-    console.log('🧩 Formatted orders sent to frontend:', JSON.stringify(formatted, null, 2));
+    return NextResponse.json(ordersWithDetails);
+  } catch (error: any) {
+    console.error("Unhandled error in GET /api/admin/orders:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
 
-    return NextResponse.json(formatted);
-  } catch (err: any) {
-    console.error('🔥 Unexpected error in GET /orders:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return NextResponse.json({ error: "Order ID and status are required" }, { status: 400 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("order_items")
+      .update({ status })
+      .eq("order_id", id)
+      .select();
+
+    if (error) {
+      console.error("Error updating order status:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ status });
+  } catch (error: any) {
+    console.error("Unhandled error in PUT /api/admin/orders:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

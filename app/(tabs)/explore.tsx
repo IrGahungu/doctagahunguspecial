@@ -34,16 +34,18 @@ const SkeletonPost = () => (
   </View>
 );
 
-const Post = ({ item, onLike, onNextImage }: { 
+const Post = ({ item, isLiked: initialIsLiked, onLike, onNextImage }: { 
   item: any, 
+  isLiked: boolean,
+  initialViewedIndices: Record<number, boolean>,
   onLike: () => void,
   onNextImage: (index: number) => void 
 }) => {
   const [lastTap, setLastTap] = useState<number | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [likes, setLikes] = useState(item.likes);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>({ 0: true });
+  const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>(item.initialViewedIndices || { 0: true });
   
   // Multi-heart animation refs
 
@@ -279,6 +281,8 @@ export default function ExploreScreen() {
   const [postsLikedToday, setPostsLikedToday] = useState(0);
   const [storiesViewedToday, setStoriesViewedToday] = useState(0);
   const [epEarnedToday, setEpEarnedToday] = useState(0);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [viewedPostImages, setViewedPostImages] = useState<Record<string, boolean>>({});
   const [rewardText, setRewardText] = useState('');
   
   const progress = useRef(new Animated.Value(0)).current;
@@ -295,10 +299,37 @@ export default function ExploreScreen() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [storiesRes, postsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/stories`),
-          fetch(`${API_BASE_URL}/posts`)
+        const token = await SecureStore.getItemAsync('token');
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const [storiesRes, postsRes, interactionsRes, profileRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/stories`, { headers }),
+          fetch(`${API_BASE_URL}/posts`, { headers }),
+          fetch(`${API_BASE_URL}/interactions/me`, { headers }),
+          fetch(`${API_BASE_URL}/me`, { headers })
         ]);
+
+        if (interactionsRes.ok) {
+          const { likedPostIds: serverLikes, viewedStories, viewedPosts } = await interactionsRes.json();
+          setLikedPostIds(new Set(serverLikes));
+          
+          const storyMap: Record<string, boolean> = {};
+          viewedStories.forEach((v: any) => {
+            storyMap[`${v.story_id}-${v.image_index}`] = true;
+          });
+          setViewedImages(storyMap);
+
+          const postMap: Record<string, boolean> = {};
+          viewedPosts.forEach((v: any) => {
+            postMap[`${v.post_id}-${v.image_index}`] = true;
+          });
+          setViewedPostImages(postMap);
+        }
+
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setEngagementPoints(profileData.engagement_points || 0);
+        }
         const storiesData = await storiesRes.json();
         const postsData = await postsRes.json();
         
@@ -476,13 +507,25 @@ export default function ExploreScreen() {
     }
 }, [selectedStory, currentImageIndex, isPaused]);
 
-  const recordInteraction = async (p0: string, type: 'story-view' | 'post-view', nameOrTitle: string, index: number) => {
+  const recordInteraction = async (type: 'story-view' | 'post-view', id: string, nameOrTitle: string, index: number) => {
     try {
+      const prefix = type.split('-')[0]; // 'story' or 'post'
+      const nameField = type === 'story-view' ? 'story_name' : 'post_title';
+      const idField = `${prefix}_id`;
+
+      const payload = {
+        [idField]: id,
+        [nameField]: nameOrTitle,
+        image_index: index
+      };
+
+      console.log(`[EXPLORE] Dispatching ${type}:`, payload);
+
       const token = await SecureStore.getItemAsync('token');
       await fetch(`${API_BASE_URL}/interactions/${type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ [`${type.split('-')[0]}_${type === 'story-view' ? 'name' : 'title'}`]: nameOrTitle, image_index: index })
+        body: JSON.stringify(payload)
       });
     } catch (e) { console.error(e); }
   };
@@ -511,7 +554,7 @@ export default function ExploreScreen() {
       const newViewed = { ...viewedImages, [key]: true };
       setViewedImages(newViewed);
       triggerRewardAnimation(500);
-      recordInteraction('story-view', 'story-view', selectedStory.name, currentImageIndex);
+      recordInteraction('story-view', selectedStory.id, selectedStory.name, currentImageIndex);
       
       graffitiScale.setValue(0);
       graffitiOpacity.setValue(1);
@@ -647,6 +690,15 @@ export default function ExploreScreen() {
               <View key={post.id}>
                 <Post
                   item={post}
+                  isLiked={likedPostIds.has(post.id)}
+                  initialViewedIndices={Object.keys(viewedPostImages)
+                    .filter(key => key.startsWith(`${post.id}-`))
+                    .reduce((acc, key) => {
+                      const index = parseInt(key.split('-')[1]);
+                      acc[index] = true;
+                      return acc;
+                    }, { 0: true } as Record<number, boolean>)
+                  }
                   onLike={() => {
                     setPostsLikedToday(prev => prev + 1);
                     setEpEarnedToday(prev => prev + 200);

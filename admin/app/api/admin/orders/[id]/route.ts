@@ -1,5 +1,6 @@
 // app/api/admin/orders/[id]/route.ts
-import { NextResponse } from "next/server";
+
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -11,10 +12,10 @@ const supabase = createClient(
 // GET single order by ID
 // -------------------------
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const { data: order, error } = await supabase
@@ -33,35 +34,30 @@ export async function GET(
         )
       `)
       .eq("id", id)
-      .maybeSingle(); // ← safer than single()
+      .maybeSingle();
 
     if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     if (!order) {
-      return NextResponse.json(
-        { error: "Order not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
 
-    // Format data for frontend
     const formatted = {
       id: order.id,
-      user_fullname: (order.users as unknown as { fullname: string } | null)?.fullname ?? "Unknown",
+      user_fullname:
+        (order.users as unknown as { fullname: string } | null)?.fullname ?? "Unknown",
       total_amount: order.total_amount,
       status: order.status,
       created_at: order.created_at,
-      items: order.order_items?.map((item: any) => ({
-        id: item.id,
-        medicine_name: item.medicines?.name ?? "Unknown",
-        quantity: item.quantity,
-        price: item.price,
-      })) ?? [],
+      items:
+        order.order_items?.map((item: any) => ({
+          id: item.id,
+          medicine_name: item.medicines?.name ?? "Unknown",
+          quantity: item.quantity,
+          price: item.price,
+        })) ?? [],
     };
 
     return NextResponse.json(formatted);
@@ -78,10 +74,10 @@ export async function GET(
 // PUT update order status
 // -------------------------
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
   const { status } = body;
 

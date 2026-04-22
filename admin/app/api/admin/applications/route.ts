@@ -5,8 +5,10 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get("type") || "doctor";
     const cookieStore = cookies();
     const token = (await cookieStore).get("token")?.value;
 
@@ -35,9 +37,19 @@ export async function GET() {
       );
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("doctor_applications")
-      .select(`
+    const tableNames: Record<string, string> = {
+      doctor: "doctor_applications",
+      pharmacy: "pharmacy_applications",
+      hospital: "hospital_applications",
+      insurance: "insurance_applications",
+    };
+
+    const tableName = tableNames[type] || "doctor_applications";
+    let query = supabaseAdmin.from(tableName);
+
+    let selectStr = "*";
+    if (type === "doctor") {
+      selectStr = `
         *,
         rejection_reason,
         doctor_users (
@@ -61,9 +73,11 @@ export async function GET() {
           medical_licence_image,
           proof_of_practice_image
         )
-      `)
-      // Fetch all applications to show them in the admin dashboard regardless of status
-      // .eq("status", "pending");
+      `;
+    }
+
+    const { data, error } = await query
+      .select(selectStr)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -103,7 +117,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden: Admins only." }, { status: 403 });
     }
 
-    const { id, status, rejection_reason } = await request.json();
+    const { id, status, rejection_reason, type } = await request.json();
 
     if (!id || !status || !['approved', 'rejected', 'pending'].includes(status)) {
       return NextResponse.json({ error: "Bad Request: Missing or invalid 'id' or 'status'." }, { status: 400 });
@@ -121,9 +135,26 @@ export async function PATCH(request: NextRequest) {
       updatePayload.rejection_reason = null;
     }
 
+    const tableNames: Record<string, string> = {
+      doctor: "doctor_applications",
+      pharmacy: "pharmacy_applications",
+      hospital: "hospital_applications",
+      insurance: "insurance_applications",
+    };
+
+    const roles: Record<string, string> = {
+      doctor: "doctor",
+      pharmacy: "pharmacy",
+      hospital: "hospital",
+      insurance: "insurance",
+    };
+
+    const tableName = tableNames[type] || "doctor_applications";
+    const targetRole = roles[type] || "doctor";
+
     // Update the application status AND return the email
     const { data: application, error: appError } = await supabaseAdmin
-      .from("doctor_applications")
+      .from(tableName)
       .update(updatePayload)
       .eq("id", id)
       .select("email")
@@ -134,9 +165,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Failed to update application." }, { status: 500 });
     }
 
-    // If approved, update doctor_users.role using email
+    // If approved, update users.role using email
     if (status === 'approved') {
-      const { error: userUpdateError } = await supabaseAdmin.rpc('update_user_role_by_email', { p_email: application.email, p_role: 'doctor' });
+      const { error: userUpdateError } = await supabaseAdmin.rpc('update_user_role_by_email', { p_email: application.email, p_role: targetRole });
 
       if (userUpdateError) {
         return NextResponse.json({ error: "Failed to update doctor role." }, { status: 500 });

@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const password = formData.get("password") as string;
     const payment_id = formData.get("payment_id") as string;
     const country = formData.get("country") as string;
-    const originCountry = formData.get("originCountry") as string;
+    const origin_country = formData.get("origin_country") as string;
     
     const image = formData.get("image") as File | null;
 
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
           image: imagePath,
           status: "pending",
           country,
-          origin_country: originCountry,
+          origin_country,
         }
       ]);
 
@@ -129,13 +129,14 @@ export async function PUT(req: Request) {
     const payment_id = formData.get("payment_id") as string;
     const country = formData.get("country") as string;
     const location = formData.get("location") as string;
-    const originCountry = formData.get("originCountry") as string;
+    const origin_country = formData.get("origin_country") as string;
     const opening_hours = formData.get("opening_hours") as string;
     const contact_email = formData.get("contact_email") as string;
     const contact_phone = formData.get("contact_phone") as string;
     const contact_office = formData.get("contact_office") as string;
     const contact_website = formData.get("contact_website") as string;
     const accepted_insurances = formData.get("accepted_insurances") as string;
+    const status = formData.get("status") as string;
 
     const image = formData.get("image") as File | null;
 
@@ -150,7 +151,7 @@ export async function PUT(req: Request) {
       payment_id,
       location,
       country,
-      origin_country: originCountry,
+      origin_country,
       opening_hours,
       contact_email,
       contact_phone,
@@ -158,6 +159,8 @@ export async function PUT(req: Request) {
       contact_website,
       accepted_insurances,
     };
+
+    if (status) updates.status = status;
 
     // Helper to upload file and return path
     const uploadFile = async (file: File | null, folder: string) => {

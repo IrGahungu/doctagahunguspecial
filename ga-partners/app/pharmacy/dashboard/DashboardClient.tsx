@@ -1164,6 +1164,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           setIsNavigating(true);
                           // navigate to the apply page with the application id so the form can prefill
                           router.push(`/apply/pharmacy?id=${app.id}`);
+                          // Reset navigation state after a delay in case the user comes back
+                          setTimeout(() => setIsNavigating(false), 3000);
                         }}
                         disabled={isNavigating}
                         className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"

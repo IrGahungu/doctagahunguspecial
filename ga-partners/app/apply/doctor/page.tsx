@@ -107,13 +107,28 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
           const data = await res.json();
           console.log("Loaded application by ID:", data);
 
+          const safeParseArray = (field: any) => {
+            if (Array.isArray(field)) return field;
+            if (typeof field !== 'string' || !field.trim()) return [];
+            try {
+              const parsed = JSON.parse(field);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+              // Handle potential Postgres array format: {item1, item2}
+              if (field.startsWith('{') && field.endsWith('}')) {
+                return field.replace(/[{}"]/g, "").split(",").map((s: string) => s.trim()).filter(Boolean);
+              }
+              return [];
+            }
+          };
+
           setDoctorForm({
             // Base the form on fetched data, providing defaults for all fields
             ...data,
-            password: "",
-            country: data.country || "Burundi", // Explicitly set country to prevent it from being cleared
-            location: data.location || [],
-
+            password: "", // Password should never be pre-filled for security
+            country: data.country || "Burundi",
+            location: safeParseArray(data.location),
+            availability: safeParseArray(data.availability),
             // Normalize field names so nothing becomes undefined
             originCountry: data.originCountry || data.origin_country || "",
             image: data.image || "",

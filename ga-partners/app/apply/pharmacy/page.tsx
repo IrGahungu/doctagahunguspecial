@@ -219,12 +219,13 @@ export default function PharmacyPage() {
       formData.append("email", pharmacyForm.email);
       formData.append("whatsapp_number", pharmacyForm.whatsapp_number);
       formData.append("country", pharmacyForm.country);
-      formData.append("originCountry", pharmacyForm.originCountry);
+      formData.append("origin_country", pharmacyForm.originCountry);
       formData.append("payment_id", pharmacyForm.payment_id);
       if (pharmacyForm.password) formData.append("password", pharmacyForm.password);
 
       if (editingPharmacy) {
         formData.append("id", editingPharmacy.id);
+        formData.append("status", "pending");
       }
 
       if (files.image) formData.append("image", files.image);

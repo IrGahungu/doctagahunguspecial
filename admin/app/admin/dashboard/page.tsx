@@ -26,6 +26,11 @@ type User = {
   gender: string;
   role: "admin" | "user";
   wallet_balance: string;
+  created_at: string;
+  secret_question: string;
+  secret_answer: string;
+  password?: string;
+  engagement_points: number;
 };
 
 type Category = {
@@ -297,7 +302,7 @@ export default function AdminDashboard() {
       (Array.isArray(data) ? data : []).map(mapStory)
     );
 
-  const fetchLeaderboard = () => fetchData("/api/admin/users?type=leaderboard", setLeaderboard);
+  const fetchLeaderboard = () => fetchData("/api/admin/leaderboard", setLeaderboard);
 
   const fetchPosts = () =>
     fetchData("/api/admin/users?type=posts", setPosts, (data) =>
@@ -1054,6 +1059,13 @@ export default function AdminDashboard() {
         {activeView === "orders" && (
           <div className="overflow-x-auto">
             <OrdersTable />
+          </div>
+        )}
+
+        {/* Applications */}
+        {activeView === "applications" && applicationType && ( // Ensure applicationType is not null
+          <div className="overflow-x-auto">
+            <ApplicationsTable type={applicationType} />
           </div>
         )}
 
