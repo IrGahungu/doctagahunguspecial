@@ -110,6 +110,9 @@ type Medicine = {
   image?: string | null;
   category_id?: string | null;
   description?: string | null;
+  pharmacy_id?: string;
+  quantity?: number;
+  insurances?: string[];
   pharmacies?: any[] | null;
 };
 
@@ -177,6 +180,7 @@ export default function AdminDashboard() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [stockSearchQuery, setStockSearchQuery] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activeView, setActiveView] = useState<string | null>(null);
   const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
@@ -251,7 +255,27 @@ export default function AdminDashboard() {
 
   const fetchCategories = () => fetchData("/api/admin/users?type=categories", setCategories);
   const fetchPharmacies = () =>
-    fetchData("/api/admin/users?type=pharmacies", setPharmacies);
+    fetchData("/api/admin/users?type=pharmacy_applications", setPharmacies, (data) =>
+      (Array.isArray(data) ? data : []).map((phar: any) => {
+        const parseArrayField = (field: any) => {
+          if (Array.isArray(field)) return field;
+          if (typeof field === "string") {
+            try {
+              const parsed = JSON.parse(field);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+              return field.replace(/[{}"]/g, "").split(",").map((s: any) => s.trim()).filter(Boolean);
+            }
+          }
+          return [];
+        };
+        return { 
+          ...phar, 
+          locations: parseArrayField(phar.location || phar.locations),
+          accepted_insurances: parseArrayField(phar.accepted_insurances)
+        };
+      })
+    );
   const fetchHospitals = () =>
     fetchData("/api/admin/users?type=hospitals", setHospitals, (data) =>
       (Array.isArray(data) ? data : []).map((hosp: any) => {
@@ -283,16 +307,16 @@ export default function AdminDashboard() {
       })
     );
   const fetchMedicines = () =>
-    fetchData("/api/admin/users?type=medicines", setMedicines, (data) =>
-      (Array.isArray(data) ? data : (data as any).medicines || []).map((med: any) => {
-        console.log(`[AdminDashboard] Medicine: ${med.name}, Category ID: ${med.category_id}`);
+    fetchData("/api/admin/users?type=stock", setMedicines, (data) =>
+      (Array.isArray(data) ? data : []).map((item: any) => {
+        const parseArray = (val: any) => {
+          if (!val) return [];
+          if (Array.isArray(val)) return val;
+          try { return JSON.parse(val); } catch (e) { return []; }
+        };
         return {
-        ...med,
-        pharmacies: (med.medicine_pharmacies || []).map((mp: any) => ({
-          id: mp.pharmacy_id,
-          locations: mp.locations,
-          insurances: mp.insurances,
-        })),
+          ...item,
+          insurances: parseArray(item.insurances),
         };
       })
     );
@@ -907,13 +931,13 @@ export default function AdminDashboard() {
             Manage Insu Applications
           </button>
           <button
-            onClick={() => setActiveView("medicines")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "medicines"
+            onClick={() => setActiveView("stock")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "stock"
                 ? "ring-2 ring-offset-2 ring-black"
                 : ""
               }`}
           >
-            Manage Medicines
+            Manage Stock
           </button>
           <button
             onClick={() => setActiveView("categories")}
@@ -1070,94 +1094,98 @@ export default function AdminDashboard() {
         )}
 
         {/* Medicines */}
-        {activeView === "medicines" && (
+        {activeView === "stock" && (
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Manage Medicines</h2>
-              <button
-                onClick={openAddMedicineModal}
-                className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-700"
-              >
-                + Add Medicine
-              </button>
+              <h2 className="text-2xl font-bold">Pharmacy Inventory Management</h2>
+              <div className="w-full max-w-xs">
+                <input
+                  type="text"
+                  placeholder="Search stock by name..."
+                  value={stockSearchQuery}
+                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
+                />
+              </div>
             </div>
 
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Title</th>
-                  <th className="p-2">Price</th>
-                  <th className="p-2">Category</th>
-                  <th className="p-2">Available In</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {medicines.map((med) => (
-                  <tr key={med.id} className="border-t">
-                    <td className="p-2">
-                      {med.image ? (
-                        <img src={med.image} alt={med.title} className="w-16 h-16 object-cover rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{med.name}</td>
-                    <td className="p-2">{med.title}</td>
-                    <td className="p-2">₹{med.price}</td>
-                    <td className="p-2">{categories.find(c => c.id === med.category_id)?.name || 'N/A'}</td>
-                    <td className="p-2 max-w-sm">
-                      {(!med.pharmacies || med.pharmacies.length === 0) ? (
-                        <span className="text-xs text-gray-500">Not available</span>
-                      ) : (
-                        <div className="flex flex-col gap-2">
-                          {med.pharmacies.map((medPharm: any) => {
-                            const pharmacy = pharmacies.find(p => p.id === medPharm.id);
-                            if (!pharmacy) return null;
-                            return (
-                              <div key={medPharm.id}>
-                                <span className="font-semibold text-sm">{pharmacy.name}</span>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {medPharm.locations?.length > 0 ? (
-                                    medPharm.locations.map((loc: string) => (
-                                      <span key={loc} className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
-                                        {loc}
-                                      </span>
-                                    ))
+            {pharmacies.length === 0 ? (
+              <p className="p-4 text-center text-gray-500">No pharmacies available to manage stock.</p>
+            ) : (
+              <>
+                {pharmacies.map((pharmacy) => {
+                  const filteredStock = medicines
+                    .filter(med => med.pharmacy_id === pharmacy.id)
+                    .filter(med => med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()));
+
+                  if (filteredStock.length === 0) return null;
+
+                  return (
+                    <div key={pharmacy.id} className="mb-8 p-4 border rounded-lg bg-gray-50 last:mb-0">
+                      <h3 className="text-xl font-bold mb-4 text-gray-800">{pharmacy.name}'s Stock</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm border">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="p-2">Image</th>
+                              <th className="p-2">Name</th>
+                              <th className="p-2">Price</th>
+                              <th className="p-2">Quantity</th>
+                              <th className="p-2">Category</th>
+                              <th className="p-2">Insurances</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredStock.map((med) => (
+                              <tr key={med.id} className="border-t">
+                                <td className="p-2">
+                                  {med.image ? (
+                                    <img 
+                                      src={med.image.startsWith("http") ? med.image : `https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/${med.image}`} 
+                                      alt={med.name} 
+                                      className="w-16 h-16 object-cover rounded" 
+                                    />
                                   ) : (
-                                    <span className="text-xs text-gray-400 italic">All locations</span>
+                                    <span className="text-gray-400">No Image</span>
                                   )}
-                                  {medPharm.insurances?.map((ins: string) => (
-                                    <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
-                                      {ins}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-2 space-x-2">
-                      <button onClick={() => openEditMedicineModal(med)} className="text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => handleMedicineDelete(med.id)} disabled={loadingId === med.id} className="text-red-600 hover:underline">
-                        {loadingId === med.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {medicines.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-4 text-center text-gray-500">No medicines found</td>
-                  </tr>
+                                </td>
+                                <td className="p-2 font-medium">{med.name}</td>
+                                <td className="p-2">₹{med.price}</td>
+                                <td className="p-2">
+                                  <span className={`font-semibold ${Number(med.quantity) <= 5 ? 'text-red-600' : 'text-gray-700'}`}>
+                                    {med.quantity}
+                                  </span>
+                                </td>
+                                <td className="p-2">{categories.find(c => c.id === med.category_id)?.name || 'N/A'}</td>
+                                <td className="p-2 max-w-sm">
+                                  <div className="flex flex-wrap gap-1">
+                                    {med.insurances?.map((ins: string) => (
+                                      <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
+                                        {ins}
+                                      </span>
+                                    ))}
+                                    {(!med.insurances || med.insurances.length === 0) && (
+                                      <span className="text-xs text-gray-400 italic">All pharmacy insurances</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+                {stockSearchQuery && !pharmacies.some(p => 
+                  medicines.some(med => med.pharmacy_id === p.id && med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()))
+                ) && (
+                  <div className="p-10 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                    No items matching "{stockSearchQuery}" found in any pharmacy.
+                  </div>
                 )}
-              </tbody>
-            </table>
-            </div>
+              </>
+            )}
 
             <MedicineModal
               isOpen={medicineModalOpen}

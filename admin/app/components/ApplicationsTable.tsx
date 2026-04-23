@@ -52,6 +52,11 @@ type Application = {
   available_services?: string;
   available_blood_types?: string;
   medical_equipment?: string;
+  insurance_plans?: string;
+  coverage_summary?: string;
+  claim_process?: string;
+  partner_hospitals?: string;
+  office_locations?: string;
   // Nested user details for doctors (if applicable)
   doctor_users?: {
     fullname?: string;
@@ -147,6 +152,11 @@ type Application = {
     available_blood_types?: string;
     medical_equipment?: string;
     views?: number;
+    insurance_plans?: string;
+    coverage_summary?: string;
+    claim_process?: string;
+    partner_hospitals?: string;
+    office_locations?: string;
   } | null;
   origin_country?: string;
 };
@@ -330,6 +340,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
 
   const isPharma = type === "pharmacy";
   const isHospital = type === "hospital";
+  const isInsurance = type === "insurance";
 
   const renderFormattedModalContent = () => {
     if (!viewModal || !viewModal.content) return null;
@@ -374,15 +385,45 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
               // Render arrays as bulleted lists
               if (Array.isArray(val)) {
                 return (
-                  <ul className="list-disc list-inside mt-1 space-y-1">
+                  <ul className="space-y-2 mt-1">
                     {val.map((item: any, i: number) => (
                       <li key={i} className="text-sm text-gray-700">
-                        {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                        {typeof item === 'object' && item !== null ? (
+                          <div className="bg-white p-2 rounded border border-gray-100 shadow-sm">
+                            {Object.entries(item).map(([k, v]) => (
+                              <div key={k} className="flex gap-2 mb-1 last:mb-0">
+                                <span className="font-bold text-gray-400 uppercase text-[9px] min-w-[80px]">{k.replace(/_/g, ' ')}:</span>
+                                <span className="text-gray-800 flex-1">{String(v)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex items-start gap-2">
+                            <span className="text-indigo-500">•</span>
+                            <span>{String(item)}</span>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
                 );
               }
+
+            // Render nested objects (like structured contact details)
+            if (typeof val === 'object' && val !== null) {
+              return (
+                <div className="space-y-1 mt-1">
+                  {Object.entries(val).map(([k, v]) => (
+                    <div key={k} className="flex gap-2 text-xs bg-white p-2 rounded border border-gray-100 shadow-sm">
+                      <span className="font-bold text-gray-400 uppercase tracking-widest min-w-[100px] text-[9px]">
+                        {k.replace(/_/g, ' ')}
+                      </span>
+                      <span className="text-gray-800 flex-1 font-medium">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            }
 
               // Default string/number rendering
               return <p className="text-sm text-gray-800 whitespace-pre-wrap mt-1">{String(val)}</p>;
@@ -500,12 +541,13 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
               <th className="p-2">Email</th>
               <th className="p-2">WhatsApp</th>
               <th className="p-2">Password</th>
-              {!isPharma && !isHospital && <th className="p-2">Specialty</th>}
+              {!isPharma && !isHospital && !isInsurance && <th className="p-2">Specialty</th>}
+              <th className="p-2">Country</th>
               <th className="p-2">Location</th>
-              {(isPharma || isHospital) && <th className="p-2">Payment ID</th>}
-              {(isPharma || isHospital) && <th className="p-2">Views</th>}
-              {(isPharma || isHospital) && <th className="p-2">Details</th>}
-              {!isPharma && !isHospital && <th className="p-2">Availability</th>}
+              {(isPharma || isHospital || isInsurance) && <th className="p-2">Payment ID</th>}
+              {(isPharma || isHospital || isInsurance) && <th className="p-2">Views</th>}
+              {(isPharma || isHospital || isInsurance) && <th className="p-2">Details</th>}
+              {!isPharma && !isHospital && !isInsurance && <th className="p-2">Availability</th>}
               <th className="p-2">Verification Docs</th>
               <th className="p-2">Submitted On</th>
               <th className="p-2">{isPharma ? "Logo" : "Image"}</th>
@@ -552,7 +594,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                     </button>
                   </div>
                 </td>
-                {!isPharma && !isHospital && <td className="p-2">{app.specialty || app.doctor_users?.specialty || "—"}</td>}
+                {!isPharma && !isHospital && !isInsurance && <td className="p-2">{app.specialty || app.doctor_users?.specialty || "—"}</td>}
+                <td className="p-2">
+                  {app.country || app.doctor_users?.country || app.pharmacy_users?.country || app.hospital_users?.country || app.insurance_users?.country || app.origin_country || "—"}
+                </td>
                 <td className="p-2">
                   {(app.location || app.locations || app.doctor_users?.location || app.hospital_users?.locations || app.insurance_users?.location || app.insurance_users?.locations) && (
                     <button
@@ -568,8 +613,8 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                     </button>
                   )}
                 </td>
-                {(isPharma || isHospital) && <td className="p-2">{app.payment_id || app.pharmacy_users?.payment_id || app.hospital_users?.payment_id || "—"}</td>}
-                {(isPharma || isHospital) && <td className="p-2">{app.views || app.pharmacy_users?.views || app.hospital_users?.views || 0}</td>}
+                {(isPharma || isHospital || isInsurance) && <td className="p-2">{app.payment_id || app.pharmacy_users?.payment_id || app.hospital_users?.payment_id || app.insurance_users?.payment_id || "—"}</td>}
+                {(isPharma || isHospital || isInsurance) && <td className="p-2">{app.views || app.pharmacy_users?.views || app.hospital_users?.views || app.insurance_users?.views || 0}</td>}
                 {isPharma && (
                   <td className="p-2">
                     <button
@@ -619,7 +664,33 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                     </button>
                   </td>
                 )}
-                {!isPharma && !isHospital && <td className="p-2">
+                {isInsurance && (
+                  <td className="p-2">
+                    <button
+                      onClick={() => {
+                        const iData = app.insurance_users || app.insurance_applications;
+                        setViewModal({
+                          isOpen: true,
+                          title: "Insurance Full Information",
+                          content: {
+                            "Insurance Plans": app.insurance_plans || iData?.insurance_plans,
+                            "Coverage Summary": app.coverage_summary || iData?.coverage_summary,
+                            "Claim Process": app.claim_process || iData?.claim_process,
+                            "Partner Hospitals": app.partner_hospitals || iData?.partner_hospitals,
+                            "Partner Pharmacies": app.partner_pharmacies || iData?.partner_pharmacies,
+                            "Office Locations": app.office_locations || app.locations || iData?.office_locations || iData?.locations,
+                            "Contact Details": app.contact_details || iData?.contact_details,
+                            "Location": app.location || iData?.location,
+                          }
+                        });
+                      }}
+                      className="px-3 py-1 bg-teal-100 text-teal-600 text-xs rounded hover:bg-teal-200"
+                    >
+                      View Details
+                    </button>
+                  </td>
+                )}
+                {!isPharma && !isHospital && !isInsurance && <td className="p-2">
                   {(app.availability || app.doctor_users?.availability) && (
                     <button
                       onClick={() => setViewModal({ isOpen: true, title: "Availability Details", content: app.doctor_users?.availability || "" })}
@@ -694,7 +765,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
             ))}
             {filteredApplications.length === 0 && (
               <tr>
-                <td colSpan={11} className="p-4 text-center text-gray-500">No applications found.</td>
+                <td colSpan={12} className="p-4 text-center text-gray-500">No applications found.</td>
               </tr>
             )}
           </tbody>
