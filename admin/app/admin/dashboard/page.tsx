@@ -186,6 +186,8 @@ export default function AdminDashboard() {
   const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -231,11 +233,12 @@ export default function AdminDashboard() {
         }
         return;
       }
-      const data = await res.json();
+      const result = await res.json();
+      const data = result.data || result;
       if (transform) {
         setter(transform(data));
       } else {
-        setter(data);
+        setter(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error(`Error fetching ${endpoint}:`, error);
@@ -277,7 +280,7 @@ export default function AdminDashboard() {
       })
     );
   const fetchHospitals = () =>
-    fetchData("/api/admin/users?type=hospitals", setHospitals, (data) =>
+    fetchData("/api/hospitals", setHospitals, (data) =>
       (Array.isArray(data) ? data : []).map((hosp: any) => {
         const parseArrayField = (field: any) => {
           if (Array.isArray(field)) return field;
@@ -292,7 +295,7 @@ export default function AdminDashboard() {
         };
       })
     );
-  const fetchInsurances = () => fetchData("/api/admin/users?type=insurances", setInsurances);
+  const fetchInsurances = () => fetchData("/api/insurances", setInsurances);
   const fetchBanners = () => fetchData("/api/admin/users?type=banners", setBanners);
   const fetchDeals = () => fetchData("/api/admin/users?type=deals", setDeals);
   const fetchDoctors = () =>
@@ -332,6 +335,40 @@ export default function AdminDashboard() {
     fetchData("/api/admin/users?type=posts", setPosts, (data) =>
       (Array.isArray(data) ? data : []).map(mapPost)
     );
+
+  /** ----------------------
+   * Navigation & Refresh Logic
+   -----------------------*/
+  const handleNavClick = async (view: string, type: "doctor" | "pharmacy" | "hospital" | "insurance" | null = null) => {
+    setIsRefreshing(true);
+    try {
+      if (activeView === view && applicationType === type) {
+        setRefreshKey((prev) => prev + 1);
+      }
+
+      setActiveView(view);
+      setApplicationType(type);
+      
+      const refreshTasks = [];
+      if (view === "stock") refreshTasks.push(fetchMedicines(), fetchPharmacies(), fetchCategories());
+      else if (view === "categories") refreshTasks.push(fetchCategories());
+      else if (view === "banners") refreshTasks.push(fetchBanners());
+      else if (view === "deals") refreshTasks.push(fetchDeals());
+      else if (view === "stories") refreshTasks.push(fetchStories());
+      else if (view === "posts") refreshTasks.push(fetchPosts());
+      else if (view === "leaderboard") refreshTasks.push(fetchLeaderboard());
+      
+      if (refreshTasks.length > 0) {
+        await Promise.all(refreshTasks);
+      } else {
+          // Brief delay for components that manage their own fetching (UsersTable, etc)
+          // so the user sees a visual confirmation of the refresh
+          await new Promise(resolve => setTimeout(resolve, 600));
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   /** ----------------------
    * Fetch current user and all data on mount
@@ -895,43 +932,43 @@ export default function AdminDashboard() {
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <button
-            onClick={() => setActiveView("users")}
+            onClick={() => handleNavClick("users")}
             className={`w-full text-left p-3 text-xs font-semibold bg-blue-500 text-white rounded-lg transition-all ${activeView === 'users' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Users
           </button>
           <button
-            onClick={() => setActiveView("orders")}
+            onClick={() => handleNavClick("orders")}
             className={`w-full text-left p-3 text-xs font-semibold bg-gray-500 text-white rounded-lg transition-all ${activeView === 'orders' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Orders
           </button>
           <button
-            onClick={() => { setActiveView("applications"); setApplicationType("doctor"); }}
+            onClick={() => handleNavClick("applications", "doctor")}
             className={`w-full text-left p-3 text-xs font-semibold bg-pink-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'doctor' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Doctor Applications
           </button>
           <button
-            onClick={() => { setActiveView("applications"); setApplicationType("pharmacy"); }}
+            onClick={() => handleNavClick("applications", "pharmacy")}
             className={`w-full text-left p-3 text-xs font-semibold bg-purple-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'pharmacy' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Pharma Applications
           </button>
           <button
-            onClick={() => { setActiveView("applications"); setApplicationType("hospital"); }}
+            onClick={() => handleNavClick("applications", "hospital")}
             className={`w-full text-left p-3 text-xs font-semibold bg-green-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'hospital' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Hospitals Applications
           </button>
           <button
-            onClick={() => { setActiveView("applications"); setApplicationType("insurance"); }}
+            onClick={() => handleNavClick("applications", "insurance")}
             className={`w-full text-left p-3 text-xs font-semibold bg-teal-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'insurance' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Insu Applications
           </button>
           <button
-            onClick={() => setActiveView("stock")}
+            onClick={() => handleNavClick("stock")}
             className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "stock"
                 ? "ring-2 ring-offset-2 ring-black"
                 : ""
@@ -940,61 +977,37 @@ export default function AdminDashboard() {
             Manage Stock
           </button>
           <button
-            onClick={() => setActiveView("categories")}
+            onClick={() => handleNavClick("categories")}
             className={`w-full text-left p-3 text-xs font-semibold bg-yellow-500 text-white rounded-lg transition-all ${activeView === 'categories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Categories
           </button>
           <button
-            onClick={() => setActiveView("pharmacies")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-purple-500 text-white rounded-lg transition-all ${activeView === 'pharmacies' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
-          >
-            Manage Pharmacies
-          </button>
-          <button
-            onClick={() => setActiveView("hospitals")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-green-500 text-white rounded-lg transition-all ${activeView === 'hospitals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
-          >
-            Manage Hospitals
-          </button>
-          <button
-            onClick={() => setActiveView("insurances")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-teal-500 text-white rounded-lg transition-all ${activeView === 'insurances' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
-          >
-            Manage Insurances
-          </button>
-          <button
-            onClick={() => setActiveView("banners")}
+            onClick={() => handleNavClick("banners")}
             className={`w-full text-left p-3 text-xs font-semibold bg-red-500 text-white rounded-lg transition-all ${activeView === 'banners' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Banners
           </button>
           <button
-            onClick={() => setActiveView("deals")}
+            onClick={() => handleNavClick("deals")}
             className={`w-full text-left p-3 text-xs font-semibold bg-orange-500 text-white rounded-lg transition-all ${activeView === 'deals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Deals
           </button>
           <button
-            onClick={() => setActiveView("doctors")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-cyan-500 text-white rounded-lg transition-all ${activeView === 'doctors' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
-          >
-            Manage Doctors
-          </button>
-          <button
-            onClick={() => setActiveView("stories")}
+            onClick={() => handleNavClick("stories")}
             className={`w-full text-left p-3 text-xs font-semibold bg-rose-500 text-white rounded-lg transition-all ${activeView === 'stories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Stories
           </button>
           <button
-            onClick={() => setActiveView("posts")}
+            onClick={() => handleNavClick("posts")}
             className={`w-full text-left p-3 text-xs font-semibold bg-sky-500 text-white rounded-lg transition-all ${activeView === 'posts' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Posts
           </button>
           <button
-            onClick={() => setActiveView("leaderboard")}
+            onClick={() => handleNavClick("leaderboard")}
             className={`w-full text-left p-3 text-xs font-semibold bg-amber-500 text-white rounded-lg transition-all ${activeView === 'leaderboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Engagement Leaderboard
@@ -1029,933 +1042,942 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Engagement Leaderboard */}
-        {activeView === "leaderboard" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Engagement Leaderboard (Top 50)</h2>
-              <button onClick={fetchLeaderboard} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors">Refresh</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-3">Rank</th>
-                    <th className="p-3">User Name</th>
-                    <th className="p-3">WhatsApp</th>
-                    <th className="p-3">Country</th>
-                    <th className="p-3">Engagement Points (EP)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((entry, index) => (
-                    <tr key={entry.id} className={`border-t ${index < 3 ? 'bg-amber-50' : ''}`}>
-                      <td className="p-3 font-bold">
-                        {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                      </td>
-                      <td className="p-3 font-semibold text-gray-800">{entry.fullname}</td>
-                      <td className="p-3 text-gray-600">{entry.whatsapp_number}</td>
-                      <td className="p-3 text-gray-600">{entry.country}</td>
-                      <td className="p-3">
-                        <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold">
-                          {entry.engagement_points.toLocaleString()} EP
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {leaderboard.length === 0 && (
-                    <tr><td colSpan={5} className="p-10 text-center text-gray-400">No data found</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+        {isRefreshing ? (
+          <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+            <Spinner className="h-12 w-12 text-blue-500" />
+            <p className="text-gray-500 font-medium animate-pulse">Updating dashboard data...</p>
           </div>
-        )}
-
-        {/* Users */}
-        {activeView === "users" && (
-          <div className="overflow-x-auto">
-            <UsersTable />
-          </div>
-        )}
-
-        {/* Orders */}
-        {activeView === "orders" && (
-          <div className="overflow-x-auto">
-            <OrdersTable />
-          </div>
-        )}
-
-        {/* Applications */}
-        {activeView === "applications" && applicationType && ( // Ensure applicationType is not null
-          <div className="overflow-x-auto">
-            <ApplicationsTable type={applicationType} />
-          </div>
-        )}
-
-        {/* Medicines */}
-        {activeView === "stock" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Pharmacy Inventory Management</h2>
-              <div className="w-full max-w-xs">
-                <input
-                  type="text"
-                  placeholder="Search stock by name..."
-                  value={stockSearchQuery}
-                  onChange={(e) => setStockSearchQuery(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
-                />
+        ) : (
+          <>
+            {/* Engagement Leaderboard */}
+            {activeView === "leaderboard" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold">Engagement Leaderboard (Top 50)</h2>
+                  <button onClick={fetchLeaderboard} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors">Refresh</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-3">Rank</th>
+                        <th className="p-3">User Name</th>
+                        <th className="p-3">WhatsApp</th>
+                        <th className="p-3">Country</th>
+                        <th className="p-3">Engagement Points (EP)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboard.map((entry, index) => (
+                        <tr key={entry.id || `leaderboard-${index}`} className={`border-t ${index < 3 ? 'bg-amber-50' : ''}`}>
+                          <td className="p-3 font-bold">
+                            {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                          </td>
+                          <td className="p-3 font-semibold text-gray-800">{entry.fullname}</td>
+                          <td className="p-3 text-gray-600">{entry.whatsapp_number}</td>
+                          <td className="p-3 text-gray-600">{entry.country}</td>
+                          <td className="p-3">
+                            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-bold">
+                              {(entry.engagement_points || 0).toLocaleString()} EP
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                      {leaderboard.length === 0 && (
+                        <tr key="no-data"><td colSpan={5} className="p-10 text-center text-gray-400">No data found</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-
-            {pharmacies.length === 0 ? (
-              <p className="p-4 text-center text-gray-500">No pharmacies available to manage stock.</p>
-            ) : (
-              <>
-                {pharmacies.map((pharmacy) => {
-                  const filteredStock = medicines
-                    .filter(med => med.pharmacy_id === pharmacy.id)
-                    .filter(med => med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()));
-
-                  if (filteredStock.length === 0) return null;
-
-                  return (
-                    <div key={pharmacy.id} className="mb-8 p-4 border rounded-lg bg-gray-50 last:mb-0">
-                      <h3 className="text-xl font-bold mb-4 text-gray-800">{pharmacy.name}'s Stock</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm border">
-                          <thead className="bg-gray-100">
-                            <tr>
-                              <th className="p-2">Image</th>
-                              <th className="p-2">Name</th>
-                              <th className="p-2">Price</th>
-                              <th className="p-2">Quantity</th>
-                              <th className="p-2">Category</th>
-                              <th className="p-2">Insurances</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredStock.map((med) => (
-                              <tr key={med.id} className="border-t">
-                                <td className="p-2">
-                                  {med.image ? (
-                                    <img 
-                                      src={med.image.startsWith("http") ? med.image : `https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/${med.image}`} 
-                                      alt={med.name} 
-                                      className="w-16 h-16 object-cover rounded" 
-                                    />
-                                  ) : (
-                                    <span className="text-gray-400">No Image</span>
-                                  )}
-                                </td>
-                                <td className="p-2 font-medium">{med.name}</td>
-                                <td className="p-2">₹{med.price}</td>
-                                <td className="p-2">
-                                  <span className={`font-semibold ${Number(med.quantity) <= 5 ? 'text-red-600' : 'text-gray-700'}`}>
-                                    {med.quantity}
-                                  </span>
-                                </td>
-                                <td className="p-2">{categories.find(c => c.id === med.category_id)?.name || 'N/A'}</td>
-                                <td className="p-2 max-w-sm">
-                                  <div className="flex flex-wrap gap-1">
-                                    {med.insurances?.map((ins: string) => (
-                                      <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
-                                        {ins}
-                                      </span>
-                                    ))}
-                                    {(!med.insurances || med.insurances.length === 0) && (
-                                      <span className="text-xs text-gray-400 italic">All pharmacy insurances</span>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  );
-                })}
-                {stockSearchQuery && !pharmacies.some(p => 
-                  medicines.some(med => med.pharmacy_id === p.id && med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()))
-                ) && (
-                  <div className="p-10 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
-                    No items matching "{stockSearchQuery}" found in any pharmacy.
-                  </div>
-                )}
-              </>
             )}
 
-            <MedicineModal
-              isOpen={medicineModalOpen}
-              onClose={closeAllModals}
-              editingMedicine={editingMedicine}
-              onSuccess={handleMedicineSaveSuccess}
-              categories={categories}
-              allPharmacies={pharmacies}
-            />
-          </div>
-        )}
+            {/* Users */}
+            {activeView === "users" && (
+              <div className="overflow-x-auto">
+                <UsersTable key={refreshKey} />
+              </div>
+            )}
 
-        {/* Categories */}
-        {activeView === "categories" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Categories</h2>
-              <button
-                onClick={openAddCategoryModal}
-                className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-700"
-              >
-                + Add Category
-              </button>
-            </div>
+            {/* Orders */}
+            {activeView === "orders" && (
+              <div className="overflow-x-auto">
+                <OrdersTable key={refreshKey} />
+              </div>
+            )}
 
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Emoji</th>
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Medicines</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((cat) => (
-                  <tr key={cat.id} className="border-t">
-                    <td className="p-2 text-xl">{cat.image}</td>
-                    <td className="p-2">{cat.name}</td>
-                    <td className="p-2 text-xs text-gray-600">
-                      {medicines.filter(m => m.category_id === cat.id).length} items 
-                      <span className="ml-1 text-gray-400">
-                        ({medicines.filter(m => m.category_id === cat.id).map(m => m.name).slice(0, 2).join(', ')}...)
-                      </span>
-                    </td>
-                    <td className="p-2 space-x-2">
-                      <button
-                        onClick={() => openEditCategoryModal(cat)}
-                        className="text-blue-600 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleCategoryDelete(cat.id)}
-                        disabled={loadingId === cat.id}
-                        className="text-red-600 hover:underline"
-                      >
-                        {loadingId === cat.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {categories.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={3}
-                      className="p-4 text-center text-gray-500"
-                    >
-                      No categories found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
+            {/* Applications */}
+            {activeView === "applications" && applicationType && ( // Ensure applicationType is not null
+              <div className="overflow-x-auto">
+                <ApplicationsTable key={`${applicationType}-${refreshKey}`} type={applicationType} />
+              </div>
+            )}
 
-            <CategoryModal
-              isOpen={categoryModalOpen}
-              onClose={closeAllModals}
-              editingCategory={editingCategory}
-              onSuccess={handleCategorySaveSuccess}
-            />
-          </div>
-        )}
+            {/* Medicines */}
+            {activeView === "stock" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Pharmacy Inventory Management</h2>
+                  <div className="w-full max-w-xs">
+                    <input
+                      type="text"
+                      placeholder="Search stock by name..."
+                      value={stockSearchQuery}
+                      onChange={(e) => setStockSearchQuery(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
+                    />
+                  </div>
+                </div>
 
-        {/* Pharmacies */}
-        {activeView === "pharmacies" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Pharmacies</h2>
-              <button
-                onClick={openAddPharmacyModal}
-                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-700"
-              >
-                + Add Pharmacy
-              </button>
-            </div>
+                {pharmacies.length === 0 ? (
+                  <p className="p-4 text-center text-gray-500">No pharmacies available to manage stock.</p>
+                ) : (
+                  <>
+                    {pharmacies.map((pharmacy) => {
+                      const filteredStock = medicines
+                        .filter(med => med.pharmacy_id === pharmacy.id)
+                        .filter(med => med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()));
 
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Location</th>
-                  <th className="p-2">Accepted Insurances</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pharmacies.map((phar) => (
-                  <tr key={phar.id} className="border-t">
-                    <td className="p-2">
-                      {phar.image ? (
-                        <img src={phar.image} alt={phar.name || 'Pharmacy image'} className="w-16 h-16 object-cover rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{phar.name}</td>
-                    <td className="p-2 max-w-xs">
-                      <div className="flex flex-col gap-2">
-                        {Array.isArray(phar.locations) && phar.locations.length > 0 ? (
-                          phar.locations.map((loc: any, idx: number) => (
-                            <div
-                              key={idx}
-                              className="px-3 py-2 bg-gray-50 border rounded-md flex flex-col"
-                            >
-                              <span className="font-medium text-gray-800">{loc.name}</span>
-                              <span className="text-xs text-gray-600">
-                                {loc.openingTime} - {loc.closingTime}
-                              </span>
-                              <span
-                                className={`text-xs font-semibold mt-1 ${loc.isOpen ? "text-green-600" : "text-red-600"
-                                  }`}
-                              >
-                                {loc.isOpen ? "Open" : "Closed"}
-                              </span>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-gray-400">No locations</span>
-                        )}
+                      if (filteredStock.length === 0) return null;
+
+                      return (
+                        <div key={pharmacy.id} className="mb-8 p-4 border rounded-lg bg-gray-50 last:mb-0">
+                          <h3 className="text-xl font-bold mb-4 text-gray-800">{pharmacy.name}'s Stock</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm border">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="p-2">Image</th>
+                                  <th className="p-2">Name</th>
+                                  <th className="p-2">Price</th>
+                                  <th className="p-2">Quantity</th>
+                                  <th className="p-2">Category</th>
+                                  <th className="p-2">Insurances</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {filteredStock.map((med) => (
+                                  <tr key={med.id} className="border-t">
+                                    <td className="p-2">
+                                      {med.image ? (
+                                        <img 
+                                          src={med.image.startsWith("http") ? med.image : `https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/${med.image}`} 
+                                          alt={med.name} 
+                                          className="w-16 h-16 object-cover rounded" 
+                                        />
+                                      ) : (
+                                        <span className="text-gray-400">No Image</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2 font-medium">{med.name}</td>
+                                    <td className="p-2">₹{med.price}</td>
+                                    <td className="p-2">
+                                      <span className={`font-semibold ${Number(med.quantity) <= 5 ? 'text-red-600' : 'text-gray-700'}`}>
+                                        {med.quantity}
+                                      </span>
+                                    </td>
+                                    <td className="p-2">{categories.find(c => c.id === med.category_id)?.name || 'N/A'}</td>
+                                    <td className="p-2 max-w-sm">
+                                      <div className="flex flex-wrap gap-1">
+                                        {med.insurances?.map((ins: string) => (
+                                          <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
+                                            {ins}
+                                          </span>
+                                        ))}
+                                        {(!med.insurances || med.insurances.length === 0) && (
+                                          <span className="text-xs text-gray-400 italic">All pharmacy insurances</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {stockSearchQuery && !pharmacies.some(p => 
+                      medicines.some(med => med.pharmacy_id === p.id && med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()))
+                    ) && (
+                      <div className="p-10 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                        No items matching "{stockSearchQuery}" found in any pharmacy.
                       </div>
-                    </td>
-
-                    <td className="p-2 max-w-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {phar.accepted_insurances?.map(name => (
-                          <span key={name} className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">{name}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-2 space-x-2">
-                      <button
-                        onClick={() => openEditPharmacyModal(phar)}
-                        className="text-blue-600 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handlePharmacyDelete(phar.id)}
-                        disabled={loadingId === phar.id}
-                        className="text-red-600 hover:underline"
-                      >
-                        {loadingId === phar.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {pharmacies.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="p-4 text-center text-gray-500"
-                    >
-                      No pharmacies found
-                    </td>
-                  </tr>
+                    )}
+                  </>
                 )}
-              </tbody>
-            </table>
-            </div>
 
-            <PharmacyModal
-              isOpen={pharmacyModalOpen}
-              onClose={closeAllModals}
-              editingPharmacy={editingPharmacy}
-              onSuccess={handlePharmacySaveSuccess}
-              allInsurances={insurances}
-            />
-          </div>
-        )}
+                <MedicineModal
+                  isOpen={medicineModalOpen}
+                  onClose={closeAllModals}
+                  editingMedicine={editingMedicine}
+                  onSuccess={handleMedicineSaveSuccess}
+                  categories={categories}
+                  allPharmacies={pharmacies}
+                />
+              </div>
+            )}
 
-        {/* Hospitals */}
-        {activeView === "hospitals" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Hospitals</h2>
-              <button
-                onClick={openAddHospitalModal}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-              >
-                + Add Hospital
-              </button>
-            </div>
+            {/* Categories */}
+            {activeView === "categories" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Categories</h2>
+                  <button
+                    onClick={openAddCategoryModal}
+                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-700"
+                  >
+                    + Add Category
+                  </button>
+                </div>
 
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Location</th>
-                  <th className="p-2">Specialties</th>
-                  <th className="p-2">Insurances</th>
-                  <th className="p-2">Blood Types</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hospitals.map((hosp) => (
-                  <tr key={hosp.id} className="border-t">
-                    <td className="p-2">
-                      {hosp.image ? (
-                        <img src={hosp.image} alt={hosp.name || 'Hospital image'} className="w-16 h-16 object-cover rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{hosp.name}</td>
-                    <td className="p-2 max-w-xs">
-                      {(hosp.location as string[])?.join(", ")}
-                    </td>
-                    <td className="p-2 max-w-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {(hosp.specialties as string[])?.map(spec => (
-                          <span key={spec} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                            {spec}
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Emoji</th>
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Medicines</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((cat) => (
+                      <tr key={cat.id || `category-${cat.name}`} className="border-t">
+                        <td className="p-2 text-xl">{cat.image}</td>
+                        <td className="p-2">{cat.name}</td>
+                        <td className="p-2 text-xs text-gray-600">
+                          {medicines.filter(m => m.category_id === cat.id).length} items 
+                          <span className="ml-1 text-gray-400">
+                            ({medicines.filter(m => m.category_id === cat.id).map(m => m.name).slice(0, 2).join(', ')}...)
                           </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-2 max-w-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {(hosp.insurances as string[])?.map(ins => (
-                          <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
-                            {ins}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-2 max-w-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {(hosp.blood_types as string[])?.map(bt => (
-                          <span key={bt} className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">{bt}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-2 space-x-2">
-                      <button onClick={() => openEditHospitalModal(hosp)} className="text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="text-red-600 hover:underline">
-                        {loadingId === hosp.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {hospitals.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="p-4 text-center text-gray-500">
-                      No hospitals found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
-
-            <HospitalModal
-              isOpen={hospitalModalOpen}
-              onClose={closeAllModals}
-              editingHospital={editingHospital}
-              onSuccess={handleHospitalSaveSuccess}
-            />
-          </div>
-        )}
-
-        {/* Insurances */}
-        {activeView === "insurances" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Insurances</h2>
-              <button
-                onClick={openAddInsuranceModal}
-                className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-700"
-              >
-                + Add Insurance
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Locations</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {insurances.map((ins) => (
-                  <tr key={ins.id} className="border-t">
-                    <td className="p-2">
-                      {ins.image ? (
-                        <img src={ins.image} alt={ins.name || 'Insurance image'} className="w-16 h-16 object-cover rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{ins.name}</td>
-                    <td className="p-2 max-w-xs">
-                      <div className="flex flex-wrap gap-1">
-                        {ins.locations?.map((l) => (
-                          <span key={l.location} className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
-                            {l.location}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="p-2 space-x-2">
-                      <button onClick={() => openEditInsuranceModal(ins)} className="text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="text-red-600 hover:underline">
-                        {loadingId === ins.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {insurances.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-4 text-center text-gray-500">
-                      No insurances found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
-
-            <InsuranceModal
-              isOpen={insuranceModalOpen}
-              onClose={closeAllModals}
-              editingInsurance={editingInsurance}
-              onSuccess={handleInsuranceSaveSuccess}
-            />
-          </div>
-        )}
-
-        {/* Banners */}
-        {activeView === "banners" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Banners</h2>
-              <button
-                onClick={openAddBannerModal}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700"
-              >
-                + Add Banner
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Link</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {banners.map((banner) => (
-                  <tr key={banner.id} className="border-t">
-                    <td className="p-2">
-                      {banner.image ? (
-                        <img src={banner.image.startsWith("http") ? banner.image : `${BANNER_URL_PREFIX}${banner.image}`} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{banner.link}</td>
-                    <td className="p-2 space-x-2">
-                      <button onClick={() => openEditBannerModal(banner)} className="text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="text-red-600 hover:underline">
-                        {loadingId === banner.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {banners.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="p-4 text-center text-gray-500">
-                      No banners found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
-
-            <BannerModal
-              isOpen={bannerModalOpen}
-              onClose={closeAllModals}
-              editingBanner={editingBanner}
-              onSuccess={handleBannerSaveSuccess}
-            />
-          </div>
-        )}
-
-        {/* Deals */}
-        {activeView === "deals" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Deals of the Day</h2>
-              <button
-                onClick={openAddDealModal}
-                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-700"
-              >
-                + Add Deal
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Title</th>
-                  <th className="p-2">Discount</th>
-                  <th className="p-2">Tagline</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deals.map((deal) => (
-                  <tr key={deal.id} className="border-t">
-                    <td className="p-2">
-                      {deal.image ? (
-                        <img src={deal.image.startsWith("http") ? deal.image : `${DEAL_URL_PREFIX}${deal.image}`} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{deal.title}</td>
-                    <td className="p-2">{deal.discount}</td>
-                    <td className="p-2">{deal.tagline}</td>
-                    <td className="p-2 space-x-2">
-                      <button onClick={() => openEditDealModal(deal)} className="text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="text-red-600 hover:underline">
-                        {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {deals.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="p-4 text-center text-gray-500">
-                      No deals found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
-
-            <DealModal
-              isOpen={dealModalOpen}
-              onClose={closeAllModals}
-              editingDeal={editingDeal}
-              onSuccess={handleDealSaveSuccess}
-            />
-          </div>
-        )}
-
-        {/* Doctors */}
-        {activeView === "doctors" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Doctors</h2>
-              <button
-                onClick={openAddDoctorModal}
-                className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-700"
-              >
-                + Add Doctor
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="p-2">Image</th>
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Specialty</th>
-                  <th className="p-2">Locations</th>
-                  <th className="p-2">Bio</th>
-                  <th className="p-2">Booking Type</th>
-                  <th className="p-2">Availability</th>
-                  <th className="p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {doctors.map((doc) => (
-                  <tr key={doc.id} className="border-t">
-                    <td className="p-2">
-                      {doc.image ? (
-                        <img src={doc.image} alt={doc.name || 'Doctor image'} className="w-16 h-16 object-cover rounded" />
-                      ) : (
-                        <span className="text-gray-400">No Image</span>
-                      )}
-                    </td>
-                    <td className="p-2">{doc.name}</td>
-                    <td className="p-2">{doc.specialty}</td>
-                    <td className="p-2 max-w-xs">{doc.location?.join(", ")}</td>
-                    <td className="p-2 max-w-xs truncate">{doc.bio}</td>
-                    <td className="p-2">{doc.booking_type}</td>
-                    <td className="p-2">{doc.availability && doc.availability.length > 0 ? 'Yes' : 'No'}</td>
-                    <td className="p-2 space-x-2">
-                      <button onClick={() => openEditDoctorModal(doc)} className="text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="text-red-600 hover:underline">
-                        {loadingId === doc.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {doctors.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="p-4 text-center text-gray-500">
-                      No doctors found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            </div>
-
-            <DoctorModal
-              isOpen={doctorModalOpen}
-              onClose={closeAllModals}
-              editingDoctor={editingDoctor}
-              onSuccess={handleDoctorSaveSuccess}
-            />
-          </div>
-        )}
-
-        {/* Stories */}
-        {activeView === "stories" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Manage Stories</h2>
-              <button onClick={openAddStoryModal} className="px-4 py-2 bg-rose-500 text-white rounded hover:bg-rose-700">+ Add Story</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-2">Avatar</th>
-                    <th className="p-2">Name</th>
-                    <th className="p-2">Tag & Status</th>
-                    <th className="p-2">Images</th>
-                    <th className="p-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stories.map((story) => (
-                    <tr key={story.id} className="border-t">
-                      <td className="p-2"><img src={story.avatar} className="w-10 h-10 rounded-full object-cover" /></td>
-                      <td className="p-2">{story.name}</td>
-                      <td className="p-2">
-                        <div className="flex flex-col gap-1">
-                          <button 
-                            onClick={() => toggleStoryVisibility(story, "show_tag")}
-                            className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+                        </td>
+                        <td className="p-2 space-x-2">
+                          <button
+                            onClick={() => openEditCategoryModal(cat)}
+                            className="text-blue-600 hover:underline"
                           >
-                            <span className={`text-xs font-bold uppercase ${story.show_tag === false ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{story.tag}</span>
-                            {story.show_tag === false && <span className="text-[9px] bg-red-100 text-red-600 px-1 rounded">Hidden</span>}
+                            Edit
                           </button>
-                          {story.website && (
-                            <button 
-                              onClick={() => toggleStoryVisibility(story, "show_website")}
-                              className="flex items-center gap-1 hover:opacity-70 transition-opacity"
-                            >
-                              <span className={`text-[10px] ${story.show_website === false ? 'text-gray-400' : 'text-blue-600'}`}>Website Link</span>
-                              <span className={`text-[9px] px-1 rounded ${story.show_website === false ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{story.show_website === false ? 'Hidden' : 'Visible'}</span>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {story.images?.map((url, i) => {
-                            const isVideo = url.match(/\.(mp4|mov|avi|mkv|webm)$/i);
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => setPreviewMedia(url)}
-                                className="hover:opacity-80 transition-opacity"
-                              >
-                                {isVideo ? (
-                                  <video 
-                                    src={url} 
-                                    className="w-10 h-10 rounded object-cover border bg-gray-100" 
-                                  />
-                                ) : (
-                                  <img 
-                                    src={url} 
-                                    className="w-10 h-10 rounded object-cover border" 
-                                  />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="p-2 space-x-2">
-                        <button onClick={() => viewStats('story', story.id, story.name)} className="text-green-600 hover:underline">Stats</button>
-                        <button onClick={() => openEditStoryModal(story)} className="text-blue-600 hover:underline">Edit</button>
-                        <button onClick={() => handleStoryDelete(story.id)} className="text-red-600 hover:underline">Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                  {stories.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="p-4 text-center text-gray-500">
-                        No stories for now
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <StoryModal
-              isOpen={storyModalOpen}
-              onClose={closeAllModals}
-              editingStory={editingStory}
-              onSuccess={handleStorySaveSuccess}
-            />
-          </div>
-        )}
+                          <button
+                            onClick={() => handleCategoryDelete(cat.id)}
+                            disabled={loadingId === cat.id}
+                            className="text-red-600 hover:underline"
+                          >
+                            {loadingId === cat.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {categories.length === 0 && (
+                  <tr key="no-categories">
+                        <td
+                          colSpan={3}
+                          className="p-4 text-center text-gray-500"
+                        >
+                          No categories found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
 
-        {/* Posts */}
-        {activeView === "posts" && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Manage Posts</h2>
-              <button onClick={openAddPostModal} className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-700">+ Add Post</button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="p-2">Image</th>
-                    <th className="p-2">Title</th>
-                    <th className="p-2">Links Visibility</th>
-                    <th className="p-2">Caption</th>
-                    <th className="p-2">Likes</th>
-                    <th className="p-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {posts.map((post) => (
-                    <tr key={post.id} className="border-t">
-                      <td className="p-2">
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {post.images?.map((url, i) => {
-                            const isVideo = url.match(/\.(mp4|mov|avi|mkv|webm)$/i);
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => setPreviewMedia(url)}
-                                className="hover:opacity-80 transition-opacity"
-                              >
-                                {isVideo ? (
-                                  <video 
-                                    src={url} 
-                                    className="w-12 h-12 rounded object-cover border bg-gray-100" 
-                                  />
-                                ) : (
-                                  <img 
-                                    src={url} 
-                                    className="w-12 h-12 rounded object-cover border" 
-                                  />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="p-2 font-bold">{post.title}</td>
-                      <td className="p-2">
-                        <div className="flex flex-wrap gap-1">
-                          {post.website && (
-                            <button 
-                              onClick={() => togglePostVisibility(post, "show_website")}
-                              title="Toggle Website visibility" 
-                              className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_website === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
-                            >
-                              WEB
-                            </button>
-                          )}
-                          {post.whatsapp && (
-                            <button 
-                              onClick={() => togglePostVisibility(post, "show_whatsapp")}
-                              title="Toggle WhatsApp visibility" 
-                              className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_whatsapp === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
-                            >
-                              WA
-                            </button>
-                          )}
-                          {post.instagram && (
-                            <button 
-                              onClick={() => togglePostVisibility(post, "show_instagram")}
-                              title="Toggle Instagram visibility" 
-                              className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_instagram === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
-                            >
-                              IG
-                            </button>
-                          )}
-                          {post.twitter && (
-                            <button 
-                              onClick={() => togglePostVisibility(post, "show_twitter")}
-                              title="Toggle X visibility" 
-                              className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_twitter === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
-                            >
-                              X
-                            </button>
-                          )}
-                          {!post.website && !post.whatsapp && !post.instagram && !post.twitter && (
-                            <span className="text-[10px] text-gray-400 italic">No links</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-2 truncate max-w-xs">{post.caption}</td>
-                      <td className="p-2">{post.likes}</td>
-                      <td className="p-2 space-x-2">
-                        <button onClick={() => viewStats('post-likes', post.id, post.title)} className="text-green-600 hover:underline">Likes</button>
-                        <button onClick={() => viewStats('post-views', post.id, post.title)} className="text-purple-600 hover:underline">Views</button>
-                        <button onClick={() => openEditPostModal(post)} className="text-blue-600 hover:underline">Edit</button>
-                        <button onClick={() => handlePostDelete(post.id)} className="text-red-600 hover:underline">Delete</button>
-                      </td>
-                    </tr>
-                  ))}
-                  {posts.length === 0 && (
+                <CategoryModal
+                  isOpen={categoryModalOpen}
+                  onClose={closeAllModals}
+                  editingCategory={editingCategory}
+                  onSuccess={handleCategorySaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Pharmacies */}
+            {activeView === "pharmacies" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Pharmacies</h2>
+                  <button
+                    onClick={openAddPharmacyModal}
+                    className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-700"
+                  >
+                    + Add Pharmacy
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
                     <tr>
-                      <td colSpan={6} className="p-4 text-center text-gray-500">
-                        No posts for now
-                      </td>
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Location</th>
+                      <th className="p-2">Accepted Insurances</th>
+                      <th className="p-2">Actions</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <PostModal
-              isOpen={postModalOpen}
-              onClose={closeAllModals}
-              editingPost={editingPost}
-              onSuccess={handlePostSaveSuccess}
-            />
-          </div>
+                  </thead>
+                  <tbody>
+                    {pharmacies.map((phar) => (
+                      <tr key={phar.id || `pharma-${phar.name}`} className="border-t">
+                        <td className="p-2">
+                          {phar.image ? (
+                            <img src={phar.image} alt={phar.name || 'Pharmacy image'} className="w-16 h-16 object-cover rounded" />
+                          ) : (
+                            <span className="text-gray-400">No Image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{phar.name}</td>
+                        <td className="p-2 max-w-xs">
+                          <div className="flex flex-col gap-2">
+                            {Array.isArray(phar.locations) && phar.locations.length > 0 ? (
+                              phar.locations.map((loc: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="px-3 py-2 bg-gray-50 border rounded-md flex flex-col"
+                                >
+                                  <span className="font-medium text-gray-800">{loc.name}</span>
+                                  <span className="text-xs text-gray-600">
+                                    {loc.openingTime} - {loc.closingTime}
+                                  </span>
+                                  <span
+                                    className={`text-xs font-semibold mt-1 ${loc.isOpen ? "text-green-600" : "text-red-600"
+                                      }`}
+                                  >
+                                    {loc.isOpen ? "Open" : "Closed"}
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-gray-400">No locations</span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="p-2 max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {phar.accepted_insurances?.map(name => (
+                              <span key={name} className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">{name}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2 space-x-2">
+                          <button
+                            onClick={() => openEditPharmacyModal(phar)}
+                            className="text-blue-600 hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handlePharmacyDelete(phar.id)}
+                            disabled={loadingId === phar.id}
+                            className="text-red-600 hover:underline"
+                          >
+                            {loadingId === phar.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {pharmacies.length === 0 && (
+                  <tr key="no-pharmacies">
+                        <td
+                          colSpan={5}
+                          className="p-4 text-center text-gray-500"
+                        >
+                          No pharmacies found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
+
+                <PharmacyModal
+                  isOpen={pharmacyModalOpen}
+                  onClose={closeAllModals}
+                  editingPharmacy={editingPharmacy}
+                  onSuccess={handlePharmacySaveSuccess}
+                  allInsurances={insurances}
+                />
+              </div>
+            )}
+
+            {/* Hospitals */}
+            {activeView === "hospitals" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Hospitals</h2>
+                  <button
+                    onClick={openAddHospitalModal}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    + Add Hospital
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Location</th>
+                      <th className="p-2">Specialties</th>
+                      <th className="p-2">Insurances</th>
+                      <th className="p-2">Blood Types</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hospitals.map((hosp) => (
+                      <tr key={hosp.id || `hosp-${hosp.name}`} className="border-t">
+                        <td className="p-2">
+                          {hosp.image ? (
+                            <img src={hosp.image} alt={hosp.name || 'Hospital image'} className="w-16 h-16 object-cover rounded" />
+                          ) : (
+                            <span className="text-gray-400">No Image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{hosp.name}</td>
+                        <td className="p-2 max-w-xs">
+                          {(hosp.location as string[])?.join(", ")}
+                        </td>
+                        <td className="p-2 max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {(hosp.specialties as string[])?.map(spec => (
+                              <span key={spec} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                {spec}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2 max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {(hosp.insurances as string[])?.map(ins => (
+                              <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
+                                {ins}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2 max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {(hosp.blood_types as string[])?.map(bt => (
+                              <span key={bt} className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">{bt}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2 space-x-2">
+                          <button onClick={() => openEditHospitalModal(hosp)} className="text-blue-600 hover:underline">Edit</button>
+                          <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="text-red-600 hover:underline">
+                            {loadingId === hosp.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {hospitals.length === 0 && (
+                  <tr key="no-hospitals">
+                        <td colSpan={7} className="p-4 text-center text-gray-500">
+                          No hospitals found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
+
+                <HospitalModal
+                  isOpen={hospitalModalOpen}
+                  onClose={closeAllModals}
+                  editingHospital={editingHospital}
+                  onSuccess={handleHospitalSaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Insurances */}
+            {activeView === "insurances" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Insurances</h2>
+                  <button
+                    onClick={openAddInsuranceModal}
+                    className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-700"
+                  >
+                    + Add Insurance
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Locations</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {insurances.map((ins) => (
+                      <tr key={ins.id || `ins-${ins.name}`} className="border-t">
+                        <td className="p-2">
+                          {ins.image ? (
+                            <img src={ins.image} alt={ins.name || 'Insurance image'} className="w-16 h-16 object-cover rounded" />
+                          ) : (
+                            <span className="text-gray-400">No Image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{ins.name}</td>
+                        <td className="p-2 max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {ins.locations?.map((l) => (
+                              <span key={l.location} className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
+                                {l.location}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-2 space-x-2">
+                          <button onClick={() => openEditInsuranceModal(ins)} className="text-blue-600 hover:underline">Edit</button>
+                          <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="text-red-600 hover:underline">
+                            {loadingId === ins.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {insurances.length === 0 && (
+                  <tr key="no-insurances">
+                        <td colSpan={4} className="p-4 text-center text-gray-500">
+                          No insurances found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
+
+                <InsuranceModal
+                  isOpen={insuranceModalOpen}
+                  onClose={closeAllModals}
+                  editingInsurance={editingInsurance}
+                  onSuccess={handleInsuranceSaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Banners */}
+            {activeView === "banners" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Banners</h2>
+                  <button
+                    onClick={openAddBannerModal}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700"
+                  >
+                    + Add Banner
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Link</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {banners.map((banner) => (
+                      <tr key={banner.id || `banner-${banner.link}`} className="border-t">
+                        <td className="p-2">
+                          {banner.image ? (
+                            <img src={banner.image.startsWith("http") ? banner.image : `${BANNER_URL_PREFIX}${banner.image}`} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
+                          ) : (
+                            <span className="text-gray-400">No Image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{banner.link}</td>
+                        <td className="p-2 space-x-2">
+                          <button onClick={() => openEditBannerModal(banner)} className="text-blue-600 hover:underline">Edit</button>
+                          <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="text-red-600 hover:underline">
+                            {loadingId === banner.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {banners.length === 0 && (
+                  <tr key="no-banners">
+                        <td colSpan={3} className="p-4 text-center text-gray-500">
+                          No banners found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
+
+                <BannerModal
+                  isOpen={bannerModalOpen}
+                  onClose={closeAllModals}
+                  editingBanner={editingBanner}
+                  onSuccess={handleBannerSaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Deals */}
+            {activeView === "deals" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Deals of the Day</h2>
+                  <button
+                    onClick={openAddDealModal}
+                    className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-700"
+                  >
+                    + Add Deal
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Title</th>
+                      <th className="p-2">Discount</th>
+                      <th className="p-2">Tagline</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deals.map((deal) => (
+                      <tr key={deal.id || `deal-${deal.title}`} className="border-t">
+                        <td className="p-2">
+                          {deal.image ? (
+                            <img src={deal.image.startsWith("http") ? deal.image : `${DEAL_URL_PREFIX}${deal.image}`} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
+                          ) : (
+                            <span className="text-gray-400">No Image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{deal.title}</td>
+                        <td className="p-2">{deal.discount}</td>
+                        <td className="p-2">{deal.tagline}</td>
+                        <td className="p-2 space-x-2">
+                          <button onClick={() => openEditDealModal(deal)} className="text-blue-600 hover:underline">Edit</button>
+                          <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="text-red-600 hover:underline">
+                            {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {deals.length === 0 && (
+                  <tr key="no-deals">
+                        <td colSpan={5} className="p-4 text-center text-gray-500">
+                          No deals found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
+
+                <DealModal
+                  isOpen={dealModalOpen}
+                  onClose={closeAllModals}
+                  editingDeal={editingDeal}
+                  onSuccess={handleDealSaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Doctors */}
+            {activeView === "doctors" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Doctors</h2>
+                  <button
+                    onClick={openAddDoctorModal}
+                    className="px-4 py-2 bg-cyan-500 text-white rounded hover:bg-cyan-700"
+                  >
+                    + Add Doctor
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2">Image</th>
+                      <th className="p-2">Name</th>
+                      <th className="p-2">Specialty</th>
+                      <th className="p-2">Locations</th>
+                      <th className="p-2">Bio</th>
+                      <th className="p-2">Booking Type</th>
+                      <th className="p-2">Availability</th>
+                      <th className="p-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doctors.map((doc) => (
+                      <tr key={doc.id || `doc-${doc.name}`} className="border-t">
+                        <td className="p-2">
+                          {doc.image ? (
+                            <img src={doc.image} alt={doc.name || 'Doctor image'} className="w-16 h-16 object-cover rounded" />
+                          ) : (
+                            <span className="text-gray-400">No Image</span>
+                          )}
+                        </td>
+                        <td className="p-2">{doc.name}</td>
+                        <td className="p-2">{doc.specialty}</td>
+                        <td className="p-2 max-w-xs">{doc.location?.join(", ")}</td>
+                        <td className="p-2 max-w-xs truncate">{doc.bio}</td>
+                        <td className="p-2">{doc.booking_type}</td>
+                        <td className="p-2">{doc.availability && doc.availability.length > 0 ? 'Yes' : 'No'}</td>
+                        <td className="p-2 space-x-2">
+                          <button onClick={() => openEditDoctorModal(doc)} className="text-blue-600 hover:underline">Edit</button>
+                          <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="text-red-600 hover:underline">
+                            {loadingId === doc.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {doctors.length === 0 && (
+                  <tr key="no-doctors">
+                        <td colSpan={8} className="p-4 text-center text-gray-500">
+                          No doctors found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                </div>
+
+                <DoctorModal
+                  isOpen={doctorModalOpen}
+                  onClose={closeAllModals}
+                  editingDoctor={editingDoctor}
+                  onSuccess={handleDoctorSaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Stories */}
+            {activeView === "stories" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Manage Stories</h2>
+                  <button onClick={openAddStoryModal} className="px-4 py-2 bg-rose-500 text-white rounded hover:bg-rose-700">+ Add Story</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Avatar</th>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Tag & Status</th>
+                        <th className="p-2">Images</th>
+                        <th className="p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stories.map((story) => (
+                      <tr key={story.id || `story-${story.name}`} className="border-t">
+                          <td className="p-2"><img src={story.avatar} className="w-10 h-10 rounded-full object-cover" /></td>
+                          <td className="p-2">{story.name}</td>
+                          <td className="p-2">
+                            <div className="flex flex-col gap-1">
+                              <button 
+                                onClick={() => toggleStoryVisibility(story, "show_tag")}
+                                className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+                              >
+                                <span className={`text-xs font-bold uppercase ${story.show_tag === false ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{story.tag}</span>
+                                {story.show_tag === false && <span className="text-[9px] bg-red-100 text-red-600 px-1 rounded">Hidden</span>}
+                              </button>
+                              {story.website && (
+                                <button 
+                                  onClick={() => toggleStoryVisibility(story, "show_website")}
+                                  className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+                                >
+                                  <span className={`text-[10px] ${story.show_website === false ? 'text-gray-400' : 'text-blue-600'}`}>Website Link</span>
+                                  <span className={`text-[9px] px-1 rounded ${story.show_website === false ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{story.show_website === false ? 'Hidden' : 'Visible'}</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {story.images?.map((url, i) => {
+                                const isVideo = url.match(/\.(mp4|mov|avi|mkv|webm)$/i);
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => setPreviewMedia(url)}
+                                    className="hover:opacity-80 transition-opacity"
+                                  >
+                                    {isVideo ? (
+                                      <video 
+                                        src={url} 
+                                        className="w-10 h-10 rounded object-cover border bg-gray-100" 
+                                      />
+                                    ) : (
+                                      <img 
+                                        src={url} 
+                                        className="w-10 h-10 rounded object-cover border" 
+                                      />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => viewStats('story', story.id, story.name)} className="text-green-600 hover:underline">Stats</button>
+                            <button onClick={() => openEditStoryModal(story)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handleStoryDelete(story.id)} className="text-red-600 hover:underline">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                      {stories.length === 0 && (
+                    <tr key="no-stories">
+                          <td colSpan={5} className="p-4 text-center text-gray-500">
+                            No stories for now
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <StoryModal
+                  isOpen={storyModalOpen}
+                  onClose={closeAllModals}
+                  editingStory={editingStory}
+                  onSuccess={handleStorySaveSuccess}
+                />
+              </div>
+            )}
+
+            {/* Posts */}
+            {activeView === "posts" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Manage Posts</h2>
+                  <button onClick={openAddPostModal} className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-700">+ Add Post</button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Title</th>
+                        <th className="p-2">Links Visibility</th>
+                        <th className="p-2">Caption</th>
+                        <th className="p-2">Likes</th>
+                        <th className="p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {posts.map((post) => (
+                        <tr key={post.id || `post-${post.title}`} className="border-t">
+                          <td className="p-2">
+                            <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {post.images?.map((url, i) => {
+                                const isVideo = url.match(/\.(mp4|mov|avi|mkv|webm)$/i);
+                                return (
+                                  <button
+                                    key={i}
+                                    onClick={() => setPreviewMedia(url)}
+                                    className="hover:opacity-80 transition-opacity"
+                                  >
+                                    {isVideo ? (
+                                      <video 
+                                        src={url} 
+                                        className="w-12 h-12 rounded object-cover border bg-gray-100" 
+                                      />
+                                    ) : (
+                                      <img 
+                                        src={url} 
+                                        className="w-12 h-12 rounded object-cover border" 
+                                      />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          <td className="p-2 font-bold">{post.title}</td>
+                          <td className="p-2">
+                            <div className="flex flex-wrap gap-1">
+                              {post.website && (
+                                <button 
+                                  onClick={() => togglePostVisibility(post, "show_website")}
+                                  title="Toggle Website visibility" 
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_website === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                >
+                                  WEB
+                                </button>
+                              )}
+                              {post.whatsapp && (
+                                <button 
+                                  onClick={() => togglePostVisibility(post, "show_whatsapp")}
+                                  title="Toggle WhatsApp visibility" 
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_whatsapp === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                >
+                                  WA
+                                </button>
+                              )}
+                              {post.instagram && (
+                                <button 
+                                  onClick={() => togglePostVisibility(post, "show_instagram")}
+                                  title="Toggle Instagram visibility" 
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_instagram === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                >
+                                  IG
+                                </button>
+                              )}
+                              {post.twitter && (
+                                <button 
+                                  onClick={() => togglePostVisibility(post, "show_twitter")}
+                                  title="Toggle X visibility" 
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_twitter === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                >
+                                  X
+                                </button>
+                              )}
+                              {!post.website && !post.whatsapp && !post.instagram && !post.twitter && (
+                                <span className="text-[10px] text-gray-400 italic">No links</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-2 truncate max-w-xs">{post.caption}</td>
+                          <td className="p-2">{post.likes}</td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => viewStats('post-likes', post.id, post.title)} className="text-green-600 hover:underline">Likes</button>
+                            <button onClick={() => viewStats('post-views', post.id, post.title)} className="text-purple-600 hover:underline">Views</button>
+                            <button onClick={() => openEditPostModal(post)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handlePostDelete(post.id)} className="text-red-600 hover:underline">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                      {posts.length === 0 && (
+                    <tr key="no-posts">
+                          <td colSpan={6} className="p-4 text-center text-gray-500">
+                            No posts for now
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <PostModal
+                  isOpen={postModalOpen}
+                  onClose={closeAllModals}
+                  editingPost={editingPost}
+                  onSuccess={handlePostSaveSuccess}
+                />
+              </div>
+            )}
+          </>
         )}
       </main>
 
@@ -1978,7 +2000,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {statsModal.data.map((row, i) => (
-                    <tr key={i} className="border-t">
+                    <tr key={row.id || `stat-${i}`} className="border-t">
                       <td className="p-2">{row.fullname}</td>
                       <td className="p-2">{row.whatsapp_number}</td>
                       <td className="p-2">
@@ -1988,7 +2010,7 @@ export default function AdminDashboard() {
                     </tr>
                   ))}
                   {statsModal.data.length === 0 && (
-                    <tr><td colSpan={3} className="p-10 text-center text-gray-400">No interactions yet</td></tr>
+                    <tr key="no-stats"><td colSpan={3} className="p-10 text-center text-gray-400">No interactions yet</td></tr>
                   )}
                 </tbody>
               </table>
