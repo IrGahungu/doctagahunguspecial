@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, FlatList, TouchableOpacity, Dimensions, TouchableWithoutFeedback, Animated, Modal, Share, BackHandler, Alert, Linking, PanResponder } from 'react-native';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, FlatList, TouchableOpacity, Dimensions, TouchableWithoutFeedback, Animated, Modal, Share, BackHandler, Alert, Linking, PanResponder, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, X, Plus, Check, Play, Pause, ChevronRight, Wallet, Globe, Instagram, Twitter } from 'lucide-react-native';
 import { Video, ResizeMode } from 'expo-av';
@@ -34,7 +34,7 @@ const SkeletonPost = () => (
   </View>
 );
 
-const Post = ({ item, isLiked: initialIsLiked, onLike, onNextImage }: { 
+const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onNextImage }: { 
   item: any, 
   isLiked: boolean,
   initialViewedIndices: Record<number, boolean>,
@@ -45,7 +45,26 @@ const Post = ({ item, isLiked: initialIsLiked, onLike, onNextImage }: {
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [likes, setLikes] = useState(item.likes);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>(item.initialViewedIndices || { 0: true });
+  // Initialize viewedIndices with the prop, ensuring it's always an object
+  const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>(() => initialViewedIndices || {});
+  
+  // Sync local viewedIndices with props when they change (e.g., after server data loads)
+  useEffect(() => {
+    if (initialViewedIndices && Object.keys(initialViewedIndices).length > 0) {
+      setViewedIndices(prev => ({ ...prev, ...initialViewedIndices }));
+    }
+  }, [initialViewedIndices]);
+
+  // Effect to record view for the first image when the post component mounts
+  useEffect(() => {
+    // Award EP for the first image ONLY if it hasn't been viewed according to both server and local state
+    const alreadyViewed = initialViewedIndices[0] || viewedIndices[0];
+    if (item.images.length > 0 && !alreadyViewed) {
+      console.log(`[Post ${item.id}] Recording first view (index 0)`);
+      setViewedIndices(prev => ({ ...prev, 0: true }));
+      onNextImage(0); // This triggers EP and backend recording for the first image
+    }
+  }, [item.id, initialViewedIndices[0], onNextImage]); 
   
   // Multi-heart animation refs
 
@@ -129,7 +148,9 @@ const Post = ({ item, isLiked: initialIsLiked, onLike, onNextImage }: {
     const nextIndex = (currentImageIndex + 1) % item.images.length;
     setCurrentImageIndex(nextIndex);
     
+    console.log(`[Post ${item.id}] Swiped to index ${nextIndex}. Already viewed in map? ${viewedIndices[nextIndex]}`);
     if (!viewedIndices[nextIndex]) {
+      console.log(`[Post ${item.id}] New image view detected at index ${nextIndex}. Awarding EP...`);
       setViewedIndices(prev => ({ ...prev, [nextIndex]: true }));
       onNextImage(nextIndex);
     }
@@ -273,6 +294,8 @@ export default function ExploreScreen() {
   const [selectedStory, setSelectedStory] = useState<any | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isMediaLoading, setIsMediaLoading] = useState(true);
+  const [canShowCheck, setCanShowCheck] = useState(false);
   const [isTimerActive, setIsTimerActive] = useState(false);
   const isTimerActiveRef = useRef(isTimerActive);
   const [viewedImages, setViewedImages] = useState<Record<string, boolean>>({});
@@ -290,6 +313,7 @@ export default function ExploreScreen() {
   const graffitiScale = useRef(new Animated.Value(0)).current;
   const graffitiOpacity = useRef(new Animated.Value(0)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   const pulseScale = useRef(new Animated.Value(1)).current;
   const rewardAnim = useRef(new Animated.Value(0)).current;
   const rewardPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -311,6 +335,7 @@ export default function ExploreScreen() {
 
         if (interactionsRes.ok) {
           const { likedPostIds: serverLikes, viewedStories, viewedPosts } = await interactionsRes.json();
+          console.log('[ExploreScreen] Fetched interactions. Viewed posts count:', viewedPosts.length);
           setLikedPostIds(new Set(serverLikes));
           
           const storyMap: Record<string, boolean> = {};
@@ -323,6 +348,7 @@ export default function ExploreScreen() {
           viewedPosts.forEach((v: any) => {
             postMap[`${v.post_id}-${v.image_index}`] = true;
           });
+          console.log('[ExploreScreen] constructed viewedPostImages map keys:', Object.keys(postMap).slice(0, 5), '...');
           setViewedPostImages(postMap);
         }
 
@@ -386,7 +412,7 @@ export default function ExploreScreen() {
   useEffect(() => { SecureStore.setItemAsync('epEarnedToday', epEarnedToday.toString()); }, [epEarnedToday]);
   useEffect(() => { SecureStore.setItemAsync('totalEngagementPoints', engagementPoints.toString()); }, [engagementPoints]);
 
-  const triggerWalletGraffiti = () => {
+  const triggerWalletGraffiti = useCallback(() => {
     // Reset animations
     walletGraffitiAnimations.forEach(anim => anim.setValue(0));
 
@@ -406,9 +432,9 @@ export default function ExploreScreen() {
     });
 
     Animated.parallel(animations).start();
-  };
+  }, [walletGraffitiAnimations]);
 
-  const triggerRewardAnimation = (points: number) => {
+  const triggerRewardAnimation = useCallback((points: number) => {
     setRewardText(`+${points} EP`);
     rewardAnim.setValue(0);
     // Start from the middle-ish of the screen area
@@ -430,7 +456,7 @@ export default function ExploreScreen() {
       setRewardText('');
       triggerWalletGraffiti();
     });
-  };
+  }, [width, triggerWalletGraffiti]);
 
   // Subtle pulsing animation for the "Check out more here" button
   useEffect(() => {
@@ -459,6 +485,19 @@ export default function ExploreScreen() {
     return () => backHandler.remove();
   }, [selectedStory, isTimerActive]);
 
+  // Smooth cross-fade animation when media loads
+  useEffect(() => {
+    if (!isMediaLoading) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      fadeAnim.setValue(0);
+    }
+  }, [isMediaLoading, currentImageIndex]);
+
   useEffect(() => {
     isTimerActiveRef.current = isTimerActive;
   }, [isTimerActive]);
@@ -469,7 +508,7 @@ export default function ExploreScreen() {
       const STORY_DURATION = 45000;
       const imageDisplayDuration = STORY_DURATION / selectedStory.images.length;
 
-      if (!isPaused) {
+      if (!isPaused && !isMediaLoading) {
         setIsTimerActive(true);
         const startProgress = currentImageIndex / selectedStory.images.length;
         const endProgress = (currentImageIndex + 1) / selectedStory.images.length;
@@ -486,8 +525,10 @@ export default function ExploreScreen() {
         animationRef.current.start(({ finished }) => {
           if (finished) {
             if (currentImageIndex < selectedStory.images.length - 1) {
+              setIsMediaLoading(true);
               setCurrentImageIndex((prev) => prev + 1);
             } else {
+              // When story is done, close the modal instead of jumping to the next story
               setIsTimerActive(false);
               setSelectedStory(null);
             }
@@ -500,14 +541,56 @@ export default function ExploreScreen() {
 
       return () => animationRef.current?.stop();
     } else {
+      // Only reset index and progress when the modal is closed (selectedStory is null)
       setIsPaused(false);
       setCurrentImageIndex(0);
       progress.setValue(0);
       animationRef.current = null;
     }
-}, [selectedStory, currentImageIndex, isPaused]);
+}, [selectedStory, currentImageIndex, isPaused, isMediaLoading]);
 
-  const recordInteraction = async (type: 'story-view' | 'post-view', id: string, nameOrTitle: string, index: number) => {
+  // Handle 25s delay for the check button visibility
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    if (selectedStory && !isMediaLoading) {
+      // If already viewed, show the check immediately. Otherwise, start 25s timer.
+      if (viewedImages[`${selectedStory.id}-${currentImageIndex}`]) {
+        setCanShowCheck(true);
+      } else {
+        setCanShowCheck(false);
+        timeout = setTimeout(() => {
+          setCanShowCheck(true);
+        }, 25000);
+      }
+    } else {
+      setCanShowCheck(false);
+    }
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [selectedStory, currentImageIndex, isMediaLoading, viewedImages]);
+
+  // Navigation Handlers for Story Tapping
+  const handleStoryBack = () => {
+    if (currentImageIndex > 0) {
+      setIsMediaLoading(true);
+      setCurrentImageIndex(prev => prev - 1);
+      progress.setValue((currentImageIndex - 1) / selectedStory.images.length);
+    }
+  };
+
+  const handleStoryForward = () => {
+    if (currentImageIndex < selectedStory.images.length - 1) {
+      setIsMediaLoading(true);
+      setCurrentImageIndex(prev => prev + 1);
+      progress.setValue((currentImageIndex + 1) / selectedStory.images.length);
+    } else {
+      // If last image, close the story
+      setSelectedStory(null);
+    }
+  };
+
+  const recordInteraction = useCallback(async (type: 'story-view' | 'post-view', id: string, nameOrTitle: string, index: number) => {
     try {
       const prefix = type.split('-')[0]; // 'story' or 'post'
       const nameField = type === 'story-view' ? 'story_name' : 'post_title';
@@ -528,7 +611,14 @@ export default function ExploreScreen() {
         body: JSON.stringify(payload)
       });
     } catch (e) { console.error(e); }
-  };
+  }, []);
+
+  // Memoize the handlePostImageNext callback to be used by the Post component
+  const handlePostImageNext = useCallback((post: any, index: number) => {
+    setEpEarnedToday(prev => prev + 300);
+    triggerRewardAnimation(300);
+    recordInteraction('post-view', post.id, post.title, index);
+  }, [triggerRewardAnimation, recordInteraction]);
 
   // PanResponder for Swipe-to-dismiss
   const panResponder = useRef(
@@ -589,10 +679,17 @@ export default function ExploreScreen() {
   };
 
   const renderStory = ({ item }: { item: any }) => {
-    const isFullyViewed = item.images.every((_: any, index: number) => viewedImages[`${item.id}-${index}`]);
+    const isFullyViewed = item.images?.every((_: any, index: number) => viewedImages[`${item.id}-${index}`]);
 
     return (
-      <TouchableOpacity style={styles.storyContainer} onPress={() => { setSelectedStory(item); setIsPaused(false); }}>
+      <TouchableOpacity 
+        style={styles.storyContainer} 
+        onPress={() => { 
+          setIsMediaLoading(true);
+          setSelectedStory(item); 
+          setIsPaused(false); 
+        }}
+      >
         <View style={[styles.storyRing, isFullyViewed && styles.storyRingViewed]}>
           <Image source={{ uri: item.avatar }} style={styles.storyAvatar} />
           {isFullyViewed && (
@@ -691,13 +788,16 @@ export default function ExploreScreen() {
                 <Post
                   item={post}
                   isLiked={likedPostIds.has(post.id)}
-                  initialViewedIndices={Object.keys(viewedPostImages)
-                    .filter(key => key.startsWith(`${post.id}-`))
-                    .reduce((acc, key) => {
-                      const index = parseInt(key.split('-')[1]);
-                      acc[index] = true;
-                      return acc;
-                    }, { 0: true } as Record<number, boolean>)
+                  initialViewedIndices={(() => {
+                    const indices = Object.keys(viewedPostImages)
+                      .filter(key => key.startsWith(`${post.id}-`))
+                      .reduce((acc, key) => {
+                        const index = parseInt(key.split('-').pop() || '0');
+                        acc[index] = true;
+                        return acc;
+                      }, {} as Record<number, boolean>);
+                    return indices;
+                  })()
                   }
                   onLike={() => {
                     setPostsLikedToday(prev => prev + 1);
@@ -705,11 +805,7 @@ export default function ExploreScreen() {
                     triggerRewardAnimation(200);
                     // Like API is called inside Post component
                   }}
-                  onNextImage={(index) => {
-                    setEpEarnedToday(prev => prev + 300);
-                    triggerRewardAnimation(300);
-                    recordInteraction('post-view', post.id, post.title, index);
-                  }}
+                  onNextImage={(index) => handlePostImageNext(post, index)} // Use the memoized callback
                 />
               </View>
             ))}
@@ -761,6 +857,11 @@ export default function ExploreScreen() {
 
           {selectedStory && (
             <View style={styles.storyContent}>
+              {isMediaLoading && (
+                <View style={styles.mediaLoadingOverlay}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
+              )}
               <Animated.View 
                 style={[
                   styles.graffitiEffect, 
@@ -776,19 +877,35 @@ export default function ExploreScreen() {
               <Text style={styles.imageCounter}>
                 {currentImageIndex + 1} / {selectedStory.images.length}
               </Text>
+
+              {/* Tap Navigation Overlays */}
+              <View style={styles.storyTapOverlay}>
+                <TouchableOpacity style={styles.tapAreaLeft} onPress={handleStoryBack} activeOpacity={1} />
+                <TouchableOpacity style={styles.tapAreaRight} onPress={handleStoryForward} activeOpacity={1} />
+              </View>
               
-              {isVideo(selectedStory.images[currentImageIndex]) ? (
-                <Video
-                  source={{ uri: selectedStory.images[currentImageIndex] }}
-                  style={styles.storyFullImage}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={!isPaused}
-                  isLooping={false}
-                  useNativeControls={false}
-                />
-              ) : (
-                <Image source={{ uri: selectedStory.images[currentImageIndex] }} style={styles.storyFullImage} resizeMode="cover" />
-              )}
+              <Animated.View style={[styles.storyMediaWrapper, { opacity: fadeAnim }]}>
+                {isVideo(selectedStory.images[currentImageIndex]) ? (
+                  <Video
+                    source={{ uri: selectedStory.images[currentImageIndex] }}
+                    style={styles.storyFullImage}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={!isPaused}
+                    isLooping={false}
+                    useNativeControls={false}
+                    onLoadStart={() => setIsMediaLoading(true)}
+                    onLoad={() => setIsMediaLoading(false)}
+                  />
+                ) : (
+                  <Image 
+                    source={{ uri: selectedStory.images[currentImageIndex] }} 
+                    style={styles.storyFullImage} 
+                    resizeMode="cover" 
+                    onLoadStart={() => setIsMediaLoading(true)}
+                    onLoadEnd={() => setIsMediaLoading(false)}
+                  />
+                )}
+              </Animated.View>
 
               {!!selectedStory.website && selectedStory.show_website !== false && (
                 <AnimatedTouchableOpacity 
@@ -799,20 +916,22 @@ export default function ExploreScreen() {
                 </AnimatedTouchableOpacity>
               )}
 
-              <TouchableOpacity 
-                style={[
-                  styles.viewedButton, 
-                  viewedImages[`${selectedStory.id}-${currentImageIndex}`] && styles.viewedButtonActive
-                ]} 
-                onPress={handleMarkAsViewed}
-                activeOpacity={0.7}
-              >
-                {viewedImages[`${selectedStory.id}-${currentImageIndex}`] ? (
-                  <Check color="#fff" size={20} />
-                ) : (
-                  <Plus color="#fff" size={20} />
-                )}
-              </TouchableOpacity>
+              {canShowCheck && (
+                <TouchableOpacity 
+                  style={[
+                    styles.viewedButton, 
+                    viewedImages[`${selectedStory.id}-${currentImageIndex}`] && styles.viewedButtonActive
+                  ]} 
+                  onPress={handleMarkAsViewed}
+                  activeOpacity={0.7}
+                >
+                  {viewedImages[`${selectedStory.id}-${currentImageIndex}`] ? (
+                    <Check color="#fff" size={20} />
+                  ) : (
+                    <Plus color="#fff" size={20} />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </Animated.View>
@@ -999,7 +1118,7 @@ const styles = StyleSheet.create({
     right: 20,
     flexDirection: 'row',
     height: 4,
-    zIndex: 20,
+    zIndex: 50,
   },
   progressSegmentBackground: {
     flex: 1,
@@ -1036,7 +1155,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    zIndex: 20,
+    zIndex: 30,
   },
   imageCounter: {
     position: 'absolute',
@@ -1049,13 +1168,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    zIndex: 20,
+    zIndex: 30,
   },
   storyCloseButton: {
     position: 'absolute',
     top: 80,
     right: 20,
-    zIndex: 10,
+    zIndex: 60,
     padding: 4,
     borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1066,7 +1185,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 80,
     right: 60,
-    zIndex: 10,
+    zIndex: 60,
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -1089,6 +1208,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#fff',
     elevation: 5,
+    zIndex: 50,
   },
   storyLinkText: {
     color: '#fff',
@@ -1110,7 +1230,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#fff',
-    zIndex: 30,
+    zIndex: 50,
   },
   viewedButtonActive: {
     backgroundColor: '#4CAF50',
@@ -1130,5 +1250,30 @@ const styles = StyleSheet.create({
   },
   skeleton: {
     backgroundColor: '#e0e0e0',
+  },
+  mediaLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+  },
+  storyTapOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    zIndex: 20,
+  },
+  tapAreaLeft: {
+    flex: 1,
+  },
+  tapAreaRight: {
+    flex: 2,
+  },
+  storyMediaWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
 });

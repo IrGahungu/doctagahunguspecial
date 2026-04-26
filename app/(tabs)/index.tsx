@@ -424,5 +424,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     fontSize: 14,
     color: 'black',
+    letterSpacing: 0,
+    padding: 0,
   },
 });

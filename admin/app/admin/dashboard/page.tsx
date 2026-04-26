@@ -3,6 +3,9 @@
 import UsersTable from "@/app/components/UsersTable"
 import OrdersTable from "@/app/components/OrdersTable";
 import ApplicationsTable from "@/app/components/ApplicationsTable";
+import DoctorBookingsTable from "@/app/components/DoctorBookingsTable";
+import BusBookingsTable from "@/app/components/BusBookingsTable";
+import BusesTable from "@/app/components/BusesTable";
 import CategoryModal from "@/app/components/CategoryModal";
 import HospitalModal from "@/app/components/HospitalModal";
 import PharmacyModal from "@/app/components/PharmacyModal";
@@ -968,6 +971,30 @@ export default function AdminDashboard() {
             Manage Insu Applications
           </button>
           <button
+            onClick={() => handleNavClick("doctor-bookings")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-fuchsia-500 text-white rounded-lg transition-all ${activeView === 'doctor-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Doctor Bookings
+          </button>
+          <button
+            onClick={() => handleNavClick("hospital-bookings")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-emerald-500 text-white rounded-lg transition-all ${activeView === 'hospital-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Hospital Bookings
+          </button>
+          <button
+            onClick={() => handleNavClick("bus")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-slate-600 text-white rounded-lg transition-all ${activeView === 'bus' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Bus
+          </button>
+          <button
+            onClick={() => handleNavClick("bus-bookings")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-zinc-600 text-white rounded-lg transition-all ${activeView === 'bus-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Bus Bookings
+          </button>
+          <button
             onClick={() => handleNavClick("stock")}
             className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "stock"
                 ? "ring-2 ring-offset-2 ring-black"
@@ -1110,6 +1137,27 @@ export default function AdminDashboard() {
             {activeView === "applications" && applicationType && ( // Ensure applicationType is not null
               <div className="overflow-x-auto">
                 <ApplicationsTable key={`${applicationType}-${refreshKey}`} type={applicationType} />
+              </div>
+            )}
+
+            {/* Doctor Bookings */}
+            {activeView === "doctor-bookings" && (
+              <div className="overflow-x-auto">
+                <DoctorBookingsTable key={refreshKey} />
+              </div>
+            )}
+
+            {/* Bus Management */}
+            {activeView === "bus" && (
+              <div className="overflow-x-auto">
+                <BusesTable key={refreshKey} />
+              </div>
+            )}
+
+            {/* Bus Bookings */}
+            {activeView === "bus-bookings" && (
+              <div className="overflow-x-auto">
+                <BusBookingsTable key={refreshKey} />
               </div>
             )}
 
