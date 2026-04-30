@@ -56,9 +56,12 @@ export async function PUT(req: Request) {
 
     if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
 
+    // Strip out virtual/joined fields that do not exist in the database schema
+    const { booked_count, reservations, ...updateData } = body;
+
     const { data, error } = await supabaseAdmin
       .from("buses")
-      .update(body)
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();

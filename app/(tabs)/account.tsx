@@ -147,7 +147,7 @@ export default function AccountScreen() {
   return (
     <View style={styles.container}>
       <Header />
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContentContainer}>
 
         <TouchableOpacity 
           style={styles.monetizationCard} 
@@ -211,6 +211,7 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#E0F7FA" },
+  scrollContentContainer: { paddingBottom: 90 }, // Added padding for tab bar
   content: { flex: 1 },
   profileSection: {
     backgroundColor: "white",

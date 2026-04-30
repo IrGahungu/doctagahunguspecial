@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,34 +7,7 @@ import Toast from 'react-native-toast-message';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
-
-const dummyReviews = [
-  { id: '1', name: 'Niyonzima A.', rating: 5, comment: 'This app is a lifesaver! So easy to find medicines and pharmacies near me. Highly recommended.', date: '12/05/2024' },
-  //{ id: '2', name: 'Kaneza B.', rating: 5, comment: 'Excellent service. I ordered my medication and it was prepared for pickup in no time. The wallet feature is very convenient.' },
-  { id: '3', name: 'Manirakiza C.', rating: 4, comment: 'Very useful app for checking medicine availability. Saves a lot of time. The UI is clean and simple.', date: '10/05/2024' },
-  //{ id: '4', name: 'Irakoze D.', rating: 5, comment: 'I love the doctor booking feature. It\'s straightforward and works perfectly. Gahungu Pharmacy is the best!' },
-  { id: '5', name: 'Munezero E.', rating: 5, comment: 'A must-have app for anyone in Burundi. Finding the right insurance coverage for my meds was never easier.', date: '08/05/2024' },
-  { id: '6', name: 'Hakizimana F.', rating: 4, comment: 'Good application. It is very helpful for my family.', date: '05/05/2024' },
-  { id: '7', name: 'Gahungu G.', rating: 5, comment: 'The user interface is beautiful and intuitive. I found what I needed in seconds. Great job to Dr. Gahungu!', date: '01/05/2024' },
-  { id: '8', name: 'Keza H.', rating: 5, comment: 'The wallet payment is secure and fast. I use it for all my transactions now. No need to carry cash.', date: '28/04/2024' },
-  { id: '9', name: 'Mbonimpa I.', rating: 5, comment: 'Finally, an app that consolidates all pharmacy information in one place. This is revolutionary for our country.', date: '25/04/2024' },
-  { id: '10', name: 'Nshimirimana J.', rating: 4, comment: 'I appreciate the real-time updates on stock. It saved me a trip to a pharmacy that was out of my medicine.', date: '20/04/2024' },
-  { id: '11', name: 'Bizimana K.', rating: 5, comment: 'The customer support is very responsive. I had a question and they helped me through the support section.', date: '15/04/2024' },
-  { id: '12', name: 'Ineza L.', rating: 5, comment: 'Dr. Gahungu\'s vision is changing healthcare access. This app is proof of that Dieu avec nous!', date: '10/04/2024' },
-  { id: '13', name: 'Mugisha M.', rating: 5, comment: 'I was able to find a 24/7 pharmacy in my area using the app late at night. Thank you!', date: '05/04/2024' },
-  { id: '14', name: 'Ndayizeye N.', rating: 4, comment: 'The app is great. I would love to see a feature for prescription uploads in the future.', date: '01/04/2024' },
-  { id: '15', name: 'Tuyisenge O.', rating: 5, comment: 'Simple, effective, and reliable. It does exactly what it promises. Five stars from me!', date: '25/03/2024' },
-  { id: '16', name: 'Uwamahoro P.', rating: 5, comment: 'The design is very professional. It feels like a world-class application. Congratulations to the Dr. Gahungu\'s team.', date: '20/03/2024' },
-  //{ id: '17', name: 'Gatore Q.', rating: 5, comment: 'Booking an appointment with a specialist was incredibly easy. The calendar and time slots are very clear.' },
-  { id: '18', name: 'Rukundo R.', rating: 4, comment: 'A very solid app. It would be perfect if it had more language options.', date: '15/03/2024' },
-  { id: '19', name: 'Simbizi S.', rating: 5, comment: 'The information about which insurances are accepted at which pharmacies is invaluable. No more guesswork!', date: '10/03/2024' },
-  { id: '20', name: 'Ngendakumana T.', rating: 5, comment: 'I feel more in control of my health management with this app. It\'s empowering.', date: '05/03/2024' },
-  { id: '21', name: 'Berahino U.', rating: 5, comment: 'The design is very professional. It feels like a world-class application. Congratulations to the Dr. Gahungu\'s team.', date: '01/03/2024' },
-  { id: '22', name: 'Ciza V.', rating: 4, comment: 'It works well. I hope to see more hospitals and clinics added in the future.', date: '25/02/2024' },
-  { id: '23', name: 'Dushime W.', rating: 5, comment: 'This app respects the user\'s privacy and security, which is very important for a health app. Well done.', date: '20/02/2024' },
-  { id: '24', name: 'Eminente X.', rating: 5, comment: 'From finding a doctor to buying medicine, everything is seamless. It has simplified my life.', date: '15/02/2024' },
-  { id: '25', name: 'Fatuma Y.', rating: 5, comment: 'Best app of the year for me. It solves a real problem for the people of Burundi. God bless Dr. Gahungu.', date: '10/02/2024' },
-];
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const renderStars = (rating: number) => {
   const stars = [];
@@ -78,6 +51,14 @@ const ReviewItem = ({ item, currentUserId, onEdit, onDelete }: {
       {renderStars(Number(item.rating))}
     </View>
     <Text style={styles.reviewComment}>{item.comment}</Text>
+    {item.admin_reply && (
+      <View style={styles.adminReplyContainer}>
+        <View style={styles.adminReplyHeader}>
+          <Text style={styles.adminReplyTitle}>Gahungu Team</Text>
+        </View>
+        <Text style={styles.adminReplyText}>{item.admin_reply}</Text>
+      </View>
+    )}
   </View>
 );
 
@@ -120,7 +101,7 @@ export default function ReviewsScreen() {
     }
   };
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/reviews`);
       if (response.ok) {
@@ -132,7 +113,9 @@ export default function ReviewsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useRealtimeRefresh('reviews', fetchReviews);
 
   const averageRating = reviews.length > 0 
     ? (reviews.reduce((acc, curr) => acc + Number(curr.rating), 0) / reviews.length).toFixed(1)
@@ -557,5 +540,29 @@ const styles = StyleSheet.create({
   keyboardAvoidingView: {
     flex: 1,
     justifyContent: 'center',
+  },
+  adminReplyContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F0F4F8',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  adminReplyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  adminReplyTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  adminReplyText: {
+    fontSize: 13,
+    color: '#455A64',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
 });

@@ -308,6 +308,13 @@ export default function ExploreScreen() {
   const [viewedPostImages, setViewedPostImages] = useState<Record<string, boolean>>({});
   const [rewardText, setRewardText] = useState('');
   
+  const [config, setConfig] = useState({
+    epPostLike: 200,
+    epPostView: 300,
+    epStoryView: 500,
+    storyDuration: 45000,
+  });
+
   const progress = useRef(new Animated.Value(0)).current;
   const pan = useRef(new Animated.ValueXY()).current;
   const graffitiScale = useRef(new Animated.Value(0)).current;
@@ -324,14 +331,26 @@ export default function ExploreScreen() {
     const fetchData = async () => {
       try {
         const token = await SecureStore.getItemAsync('token');
+        const storedCountry = await SecureStore.getItemAsync('user_country') || 'Burundi';
         const headers = { Authorization: `Bearer ${token}` };
 
-        const [storiesRes, postsRes, interactionsRes, profileRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/stories`, { headers }),
-          fetch(`${API_BASE_URL}/posts`, { headers }),
-          fetch(`${API_BASE_URL}/interactions/me`, { headers }),
-          fetch(`${API_BASE_URL}/me`, { headers })
-        ]);
+      const [storiesRes, postsRes, interactionsRes, profileRes, configRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/stories`, { headers }),
+        fetch(`${API_BASE_URL}/posts`, { headers }),
+        fetch(`${API_BASE_URL}/interactions/me`, { headers }),
+        fetch(`${API_BASE_URL}/me`, { headers }),
+        fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers })
+      ]);
+
+        if (configRes.ok) {
+          const cfg = await configRes.json();
+          setConfig({
+            epPostLike: cfg.ep_post_like || 200,
+            epPostView: cfg.ep_post_view || 300,
+            epStoryView: cfg.ep_story_view || 500,
+            storyDuration: cfg.story_duration || 45000,
+          });
+        }
 
         if (interactionsRes.ok) {
           const { likedPostIds: serverLikes, viewedStories, viewedPosts } = await interactionsRes.json();
@@ -505,8 +524,7 @@ export default function ExploreScreen() {
   // Story Timer and Progress Logic
   useEffect(() => {
     if (selectedStory) {
-      const STORY_DURATION = 45000;
-      const imageDisplayDuration = STORY_DURATION / selectedStory.images.length;
+      const imageDisplayDuration = config.storyDuration / selectedStory.images.length;
 
       if (!isPaused && !isMediaLoading) {
         setIsTimerActive(true);
@@ -547,12 +565,16 @@ export default function ExploreScreen() {
       progress.setValue(0);
       animationRef.current = null;
     }
-}, [selectedStory, currentImageIndex, isPaused, isMediaLoading]);
+}, [selectedStory, currentImageIndex, isPaused, isMediaLoading, config.storyDuration]);
 
   // Handle 25s delay for the check button visibility
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
-    if (selectedStory && !isMediaLoading) {
+    if (selectedStory && !isMediaLoading) { // Ensure media is loaded
+      // Calculate dynamic delay based on story duration
+      const imageDisplayDuration = config.storyDuration / selectedStory.images.length;
+      const dynamicDelay = Math.min(Math.max(imageDisplayDuration * 0.5, 3000), 10000); // 50% of image duration, min 3s, max 10s
+
       // If already viewed, show the check immediately. Otherwise, start 25s timer.
       if (viewedImages[`${selectedStory.id}-${currentImageIndex}`]) {
         setCanShowCheck(true);
@@ -560,7 +582,7 @@ export default function ExploreScreen() {
         setCanShowCheck(false);
         timeout = setTimeout(() => {
           setCanShowCheck(true);
-        }, 25000);
+        }, dynamicDelay);
       }
     } else {
       setCanShowCheck(false);
@@ -568,7 +590,7 @@ export default function ExploreScreen() {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [selectedStory, currentImageIndex, isMediaLoading, viewedImages]);
+  }, [selectedStory, currentImageIndex, isMediaLoading, viewedImages, config.storyDuration]);
 
   // Navigation Handlers for Story Tapping
   const handleStoryBack = () => {
@@ -615,10 +637,10 @@ export default function ExploreScreen() {
 
   // Memoize the handlePostImageNext callback to be used by the Post component
   const handlePostImageNext = useCallback((post: any, index: number) => {
-    setEpEarnedToday(prev => prev + 300);
-    triggerRewardAnimation(300);
+    setEpEarnedToday(prev => prev + config.epPostView);
+    triggerRewardAnimation(config.epPostView);
     recordInteraction('post-view', post.id, post.title, index);
-  }, [triggerRewardAnimation, recordInteraction]);
+  }, [triggerRewardAnimation, recordInteraction, config.epPostView]);
 
   // PanResponder for Swipe-to-dismiss
   const panResponder = useRef(
@@ -643,7 +665,8 @@ export default function ExploreScreen() {
     if (!viewedImages[key]) {
       const newViewed = { ...viewedImages, [key]: true };
       setViewedImages(newViewed);
-      triggerRewardAnimation(500);
+      setEpEarnedToday(prev => prev + config.epStoryView);
+      triggerRewardAnimation(config.epStoryView);
       recordInteraction('story-view', selectedStory.id, selectedStory.name, currentImageIndex);
       
       graffitiScale.setValue(0);
@@ -801,8 +824,8 @@ export default function ExploreScreen() {
                   }
                   onLike={() => {
                     setPostsLikedToday(prev => prev + 1);
-                    setEpEarnedToday(prev => prev + 200);
-                    triggerRewardAnimation(200);
+                    setEpEarnedToday(prev => prev + config.epPostLike);
+                    triggerRewardAnimation(config.epPostLike);
                     // Like API is called inside Post component
                   }}
                   onNextImage={(index) => handlePostImageNext(post, index)} // Use the memoized callback

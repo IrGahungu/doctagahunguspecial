@@ -148,12 +148,29 @@ type Post = {
   show_twitter?: boolean;
 };
 
+type Review = {
+  id: string;
+  name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  admin_reply?: string;
+  user_id?: string;
+};
+
 type LeaderboardEntry = {
   id: string;
   fullname: string;
   whatsapp_number: string;
   country: string;
   engagement_points: number;
+};
+
+type ServiceFee = {
+  id: string;
+  service_type: string;
+  country: string;
+  fee: number;
 };
 
 const Spinner = ({ className = "h-5 w-5" }: { className?: string }) => (
@@ -182,11 +199,21 @@ export default function AdminDashboard() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [serviceFees, setServiceFees] = useState<ServiceFee[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [stockSearchQuery, setStockSearchQuery] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activeView, setActiveView] = useState<string | null>(null);
   const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
+  const [epRewards, setEpRewards] = useState({ 
+    ep_story_view: "500", 
+    ep_post_view: "300", 
+    ep_post_like: "200",
+    story_duration: "45000" // Add story_duration to the state
+  }); 
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState("");
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -216,8 +243,14 @@ export default function AdminDashboard() {
   const [postModalOpen, setPostModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
 
+  const [feeModalOpen, setFeeModalOpen] = useState(false);
+  const [newFee, setNewFee] = useState({ service_type: "bus", country: "Burundi", fee: "" });
+  const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
+  const [tempFeeValue, setTempFeeValue] = useState<string>("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [statsModal, setStatsModal] = useState<{ isOpen: boolean; title: string; data: any[] }>({ isOpen: false, title: "", data: [] });
+  const [minEpThreshold, setMinEpThreshold] = useState<number | null>(null);
+  const [newThresholdInput, setNewThresholdInput] = useState("");
   const [previewMedia, setPreviewMedia] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -332,6 +365,87 @@ export default function AdminDashboard() {
       (Array.isArray(data) ? data : []).map(mapStory)
     );
 
+  const fetchReviews = () => fetchData("/api/admin/users?type=reviews", setReviews);
+
+  const fetchServiceFees = () => fetchData("/api/admin/service-fees", setServiceFees);
+
+  const fetchEpThreshold = async () => {
+    try {
+      const res = await fetch("/api/admin/settings/min-ep-required");
+      if (res.ok) {
+        const data = await res.json();
+        setMinEpThreshold(data.min_ep_required);
+        setNewThresholdInput(data.min_ep_required.toString());
+      } else {
+        toast.error("Failed to load EP threshold configuration");
+      }
+    } catch (e) {
+      console.error("Failed to fetch EP threshold", e);
+      toast.error("Server error while fetching threshold");
+    }
+  };
+
+  const fetchEpRewards = async () => {
+    try {
+      const res = await fetch("/api/admin/settings/engagement-points");
+      if (res.ok) {
+        const data = await res.json();
+        setEpRewards({
+          ep_story_view: data.ep_story_view.toString(),
+          ep_post_view: data.ep_post_view.toString(),
+          ep_post_like: data.ep_post_like.toString(),
+          story_duration: data.story_duration.toString(), // Fetch story_duration
+        });
+      }
+    } catch (e) {
+      console.error("Failed to fetch EP rewards", e);
+    }
+  };
+
+  const handleUpdateEpReward = async (key: string, value: string) => {
+    const val = parseInt(value);
+    if (isNaN(val) || val < 0) {
+      return toast.error("Please enter a valid non-negative number");
+    }
+    
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/settings/engagement-points", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value: val }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      toast.success("Engagement point reward updated!");
+      fetchEpRewards();
+    } catch (err) {
+      toast.error("Error updating reward");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleUpdateThreshold = async () => {
+    const val = parseInt(newThresholdInput);
+    if (isNaN(val) || val < 0) return toast.error("Please enter a valid non-negative number");
+    
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/settings/min-ep-required", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: val }),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      toast.success("Engagement points threshold updated!");
+      fetchEpThreshold();
+    } catch (err) {
+      toast.error("Error updating threshold");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const fetchLeaderboard = () => fetchData("/api/admin/leaderboard", setLeaderboard);
 
   const fetchPosts = () =>
@@ -359,7 +473,11 @@ export default function AdminDashboard() {
       else if (view === "deals") refreshTasks.push(fetchDeals());
       else if (view === "stories") refreshTasks.push(fetchStories());
       else if (view === "posts") refreshTasks.push(fetchPosts());
+      else if (view === "reviews") refreshTasks.push(fetchReviews());
       else if (view === "leaderboard") refreshTasks.push(fetchLeaderboard());
+      else if (view === "service-fees") refreshTasks.push(fetchServiceFees());
+      else if (view === "ep-threshold") refreshTasks.push(fetchEpThreshold());
+      else if (view === "engagement-points") refreshTasks.push(fetchEpRewards());
       
       if (refreshTasks.length > 0) {
         await Promise.all(refreshTasks);
@@ -413,8 +531,11 @@ export default function AdminDashboard() {
       fetchDoctors();
       fetchMedicines();
       fetchStories();
+      fetchReviews();
       fetchPosts();
       fetchLeaderboard();
+      fetchServiceFees();
+      fetchEpThreshold();
     }
   }, [isSupabaseConnected]);
 
@@ -474,6 +595,7 @@ export default function AdminDashboard() {
     setMedicineModalOpen(false);
     setStoryModalOpen(false);
     setPostModalOpen(false);
+    setFeeModalOpen(false);
   }
 
   useEffect(() => {
@@ -493,6 +615,57 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Failed to sign out", error);
       setIsSigningOut(false);
+    }
+  }
+
+  async function handleCreateServiceFee() {
+    if (!newFee.fee || !newFee.country) return toast.error("Please fill all fields");
+    
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/service-fees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newFee),
+      });
+      
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create fee");
+      }
+      
+      toast.success("Service fee created");
+      setFeeModalOpen(false);
+      setNewFee({ service_type: "bus", country: "Burundi", fee: "" });
+      fetchServiceFees();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  /** ----------------------
+   * Service Fee CRUD
+   -----------------------*/
+  async function handleUpdateServiceFee(id: string) {
+    setLoadingId(id);
+    try {
+      const res = await fetch(`/api/admin/service-fees?id=${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fee: tempFeeValue }),
+      });
+      
+      if (!res.ok) throw new Error("Failed to update fee");
+      
+      toast.success("Service fee updated");
+      setEditingFeeId(null);
+      fetchServiceFees();
+    } catch (err) {
+      toast.error("Error updating fee");
+    } finally {
+      setLoadingId(null);
     }
   }
 
@@ -870,6 +1043,84 @@ export default function AdminDashboard() {
   }
 
   /** ----------------------
+   * Review CRUD
+   -----------------------*/
+  async function handleSaveReply(id: string) {
+    console.log(`[DEBUG] SAVING REPLY - ID: ${id}, Text: "${adminReplyText}"`);
+    
+    // Attempt to get token from storage if available
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    setLoadingId(id);
+    try {
+      const url = `/api/admin/reviews/${id}/reply`;
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ admin_reply: adminReplyText }),
+      });
+      
+      console.log(`[DEBUG] PUT Request to: ${url} | Status: ${res.status}`);
+
+      if (!res.ok) {
+        const resText = await res.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(resText);
+        } catch (e) {
+          console.error(`[DEBUG] Route not found or Server Error. URL: ${url} | Body: ${resText.substring(0, 100)}`);
+          throw new Error(`Server error (${res.status}): ${res.statusText}`);
+        }
+        throw new Error(errorData.error || errorData.details || "Failed to save reply");
+      }
+      
+      fetchReviews();
+      setReplyingToId(null);
+      toast.success("Reply saved");
+    } catch (err) {
+      console.error("[DEBUG] Catch block error:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to save reply");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  /** ----------------------
+   * Review CRUD
+   -----------------------*/
+  async function handleReviewDelete(id: string) {
+    if (!confirm("Delete this review?")) return;
+    console.log(`[DEBUG] DELETING REVIEW - ID: ${id}`);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    
+    setLoadingId(id);
+    try {
+      const res = await fetch(`/api/admin/reviews/${id}`, { 
+        method: "DELETE",
+        headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
+      });
+      
+      console.log(`[DEBUG] Delete response: ${res.status} ${res.statusText}`);
+      if (!res.ok) {
+        const resText = await res.text();
+        console.error(`[DEBUG] Delete failed:`, resText.substring(0, 100));
+        throw new Error("Failed to delete review");
+      }
+      
+      fetchReviews();
+      toast.success("Review deleted");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete review");
+    } finally {
+      setLoadingId(null);
+    }
+  }
+
+  /** ----------------------
    * Quick Visibility Toggles
    -----------------------*/
   async function toggleStoryVisibility(story: Story, field: "show_tag" | "show_website") {
@@ -995,6 +1246,24 @@ export default function AdminDashboard() {
             Manage Bus Bookings
           </button>
           <button
+            onClick={() => handleNavClick("service-fees")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-cyan-600 text-white rounded-lg transition-all ${activeView === 'service-fees' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Service Fees
+          </button>
+          <button
+            onClick={() => handleNavClick("ep-threshold")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-violet-600 text-white rounded-lg transition-all ${activeView === 'ep-threshold' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage EP Threshold
+          </button>
+          <button
+            onClick={() => handleNavClick("engagement-points")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-emerald-600 text-white rounded-lg transition-all ${activeView === 'engagement-points' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage EP Rewards
+          </button>
+          <button
             onClick={() => handleNavClick("stock")}
             className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "stock"
                 ? "ring-2 ring-offset-2 ring-black"
@@ -1008,6 +1277,12 @@ export default function AdminDashboard() {
             className={`w-full text-left p-3 text-xs font-semibold bg-yellow-500 text-white rounded-lg transition-all ${activeView === 'categories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Categories
+          </button>
+          <button
+            onClick={() => handleNavClick("reviews")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-yellow-600 text-white rounded-lg transition-all ${activeView === 'reviews' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Reviews
           </button>
           <button
             onClick={() => handleNavClick("banners")}
@@ -1119,6 +1394,215 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Service Fees */}
+            {activeView === "service-fees" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold">Manage Service Fees</h2>
+                  <div className="flex gap-2">
+                    <button onClick={() => setFeeModalOpen(true)} className="text-sm bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition-colors shadow-sm font-semibold">+ Add New Fee</button>
+                    <button onClick={fetchServiceFees} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors">Refresh</button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-3">Service Type</th>
+                        <th className="p-3">Country</th>
+                        <th className="p-3">Fee (BIF/Currency)</th>
+                        <th className="p-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {serviceFees.map((fee, index) => {
+                        const rowId = fee.id || `fee-${index}`;
+                        return (
+                        <tr key={rowId} className="border-t">
+                          <td className="p-3 font-semibold text-gray-800 capitalize">{fee.service_type}</td>
+                          <td className="p-3 text-gray-600">{fee.country}</td>
+                          <td className="p-3">
+                            {editingFeeId === rowId ? (
+                              <input
+                                type="number"
+                                value={tempFeeValue}
+                                onChange={(e) => setTempFeeValue(e.target.value)}
+                                className="border rounded px-2 py-1 w-32 focus:ring-2 focus:ring-cyan-500 outline-none"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="font-bold text-green-600">{Number(fee.fee).toLocaleString()}</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {editingFeeId === rowId ? (
+                              <div className="flex gap-2">
+                                <button onClick={() => handleUpdateServiceFee(fee.id)} className="text-blue-600 font-bold hover:underline">
+                                  {loadingId === fee.id ? "Saving..." : "Save"}
+                                </button>
+                                <button onClick={() => setEditingFeeId(null)} className="text-gray-500 hover:underline">Cancel</button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => { setEditingFeeId(rowId); setTempFeeValue(fee.fee.toString()); }}
+                                className="text-indigo-600 hover:underline"
+                              >
+                                Edit Fee
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      )})}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Add Fee Modal Overlay */}
+            {feeModalOpen && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
+                  <h3 className="text-xl font-bold mb-4">Add New Service Fee</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Type</label>
+                      <select 
+                        className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none"
+                        value={newFee.service_type}
+                        onChange={e => setNewFee(p => ({...p, service_type: e.target.value}))}
+                      >
+                        <option value="bus">Bus Service Fee</option>
+                        <option value="doctor">Doctor Booking Fee</option>
+                        <option value="medicine">Medicine Service Fee</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Country</label>
+                      <input type="text" placeholder="e.g. Burundi" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none" value={newFee.country} onChange={e => setNewFee(p => ({...p, country: e.target.value}))} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fee Amount</label>
+                      <input type="number" placeholder="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none" value={newFee.fee} onChange={e => setNewFee(p => ({...p, fee: e.target.value}))} />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 mt-8">
+                    <button onClick={() => setFeeModalOpen(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
+                    <button onClick={handleCreateServiceFee} className="px-6 py-2 bg-cyan-600 text-white rounded-lg font-bold hover:bg-cyan-700 shadow-md">Create Fee</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* EP Threshold Management */}
+            {activeView === "ep-threshold" && (
+              <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto border border-gray-100">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800">Manage Engagement Points Threshold</h2>
+                <div className="bg-violet-50 border-l-4 border-violet-500 p-5 mb-8 rounded-r-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-violet-100 rounded-full">
+                      <span className="text-xl">📊</span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-violet-700 font-bold uppercase tracking-wider">Current Required EP</p>
+                      <p className="text-3xl font-black text-violet-900 mt-1">{minEpThreshold?.toLocaleString() ?? "Loading..."}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-violet-600 mt-3 font-medium">This determines the minimum engagement points a user must have to book a bus ticket.</p>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-600 uppercase mb-2 ml-1">Update Threshold Value</label>
+                    <div className="flex gap-3">
+                      <input
+                        type="number"
+                        value={newThresholdInput}
+                        onChange={(e) => setNewThresholdInput(e.target.value)}
+                        className="flex-1 border-2 border-gray-200 rounded-xl p-4 text-lg font-semibold focus:border-violet-500 focus:ring-4 focus:ring-violet-100 outline-none transition-all shadow-inner bg-gray-50"
+                        placeholder="e.g. 5000"
+                      />
+                      <button
+                        onClick={handleUpdateThreshold}
+                        disabled={isRefreshing}
+                        className="bg-violet-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-violet-700 active:scale-95 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isRefreshing ? <Spinner /> : "Save Changes"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Engagement Points Rewards */}
+            {activeView === "engagement-points" && (
+              <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto border border-gray-100">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Manage Engagement Point Rewards</h2>
+                  <button onClick={fetchEpRewards} className="text-sm text-emerald-600 font-bold hover:underline">Refresh Values</button>
+                </div>
+                <div className="grid grid-cols-1 gap-6">
+                  {[
+                    { key: 'ep_story_view', label: 'Story View Reward', icon: '📱' },
+                    { key: 'ep_post_view', label: 'Post View Reward', icon: '🖼️' },
+                    { key: 'ep_post_like', label: 'Post Like Reward', icon: '❤️' },
+                  ].map((item) => (
+                    // Explicitly cast item.key to a key of epRewards to satisfy TypeScript
+                    // This is safe because we control the keys in the array and the epRewards type
+                    // The `as keyof typeof epRewards` assertion is necessary because TypeScript
+                    // cannot infer that `item.key` will always be a valid key of `epRewards`
+                    <div key={item.key} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
+                      <label className="block text-xs font-black text-gray-400 uppercase mb-3 tracking-widest ml-1">
+                        {item.icon} {item.label}
+                      </label>
+                      <div className="flex gap-4">
+                        <div className="relative flex-1">
+                          <input
+                            type="number" // Use type="number" for numerical inputs
+                            value={epRewards[item.key as keyof typeof epRewards]}
+                            onChange={(e) => setEpRewards({ ...epRewards, [item.key]: e.target.value })}
+                            className="w-full border-2 border-gray-200 rounded-xl p-3 pl-10 text-lg font-bold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 outline-none transition-all"
+                          />
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">EP</span>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateEpReward(item.key, epRewards[item.key as keyof typeof epRewards])}
+                          disabled={isRefreshing}
+                          className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-100 disabled:opacity-50 min-w-[120px]"
+                        >
+                          {isRefreshing ? <Spinner /> : "Update"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Add Story Duration input */}
+                  <div key="story_duration" className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
+                    <label className="block text-xs font-black text-gray-400 uppercase mb-3 tracking-widest ml-1">
+                      ⏱️ Story Duration (ms)
+                    </label>
+                    <div className="flex gap-4">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          value={epRewards.story_duration}
+                          onChange={(e) => setEpRewards({ ...epRewards, story_duration: e.target.value })}
+                          className="w-full border-2 border-gray-200 rounded-xl p-3 pl-10 text-lg font-bold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 outline-none transition-all"
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">ms</span>
+                      </div>
+                      <button
+                        onClick={() => handleUpdateEpReward('story_duration', epRewards.story_duration)}
+                        disabled={isRefreshing}
+                        className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-100 disabled:opacity-50 min-w-[120px]"
+                      >
+                        {isRefreshing ? <Spinner /> : "Update"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Users */}
             {activeView === "users" && (
               <div className="overflow-x-auto">
@@ -1204,8 +1688,8 @@ export default function AdminDashboard() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {filteredStock.map((med) => (
-                                  <tr key={med.id} className="border-t">
+                              {filteredStock.map((med, index) => (
+                                <tr key={med.id || `stock-${index}`} className="border-t">
                                     <td className="p-2">
                                       {med.image ? (
                                         <img 
@@ -1337,6 +1821,107 @@ export default function AdminDashboard() {
                   editingCategory={editingCategory}
                   onSuccess={handleCategorySaveSuccess}
                 />
+              </div>
+            )}
+
+            {/* Reviews */}
+            {activeView === "reviews" && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-2xl font-bold">Manage Reviews</h2>
+                  <button onClick={fetchReviews} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors">Refresh</button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Rating</th>
+                        <th className="p-2">Comment</th>
+                        <th className="p-2">Admin Reply</th>
+                        <th className="p-2">Date</th>
+                        <th className="p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reviews.map((review, index) => (
+                        <tr key={review.id || `review-${index}`} className="border-t">
+                          <td className="p-2 font-medium">{review.name}</td>
+                          <td className="p-2">
+                            <div className="flex text-yellow-500">
+                              {[...Array(5)].map((_, i) => (
+                                <span key={i}>{i < review.rating ? '★' : '☆'}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-2 max-w-xs text-gray-800">{review.comment}</td>
+                          <td className="p-2 max-w-md">
+                            {review.admin_reply && (
+                              <div className="p-2 bg-blue-50 border-l-2 border-blue-400 text-xs italic text-gray-600">
+                                {review.admin_reply}
+                              </div>
+                            )}
+                            {replyingToId === review.id && (
+                              <div className="mt-2 space-y-2">
+                                <textarea
+                                  className="w-full p-2 border rounded text-xs"
+                                  value={adminReplyText}
+                                  onChange={(e) => setAdminReplyText(e.target.value)}
+                                  placeholder="Type your reply..."
+                                />
+                                <div className="flex gap-2">
+                                  <button 
+                                    onClick={() => handleSaveReply(review.id)}
+                                    className="bg-blue-600 text-white px-2 py-1 rounded text-[10px]"
+                                  >
+                                    Save
+                                  </button>
+                                  <button 
+                                    onClick={() => setReplyingToId(null)}
+                                    className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px]"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-2 text-gray-500 text-xs">
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => { setReplyingToId(review.id); setAdminReplyText(review.admin_reply || ""); }}
+                                className="text-blue-600 hover:underline text-left"
+                              >
+                                {review.admin_reply ? "Edit Reply" : "Reply"}
+                              </button>
+                              <button
+                                onClick={() => handleReviewDelete(review.id)}
+                                disabled={loadingId === review.id}
+                                className="text-red-600 hover:underline flex items-center gap-1"
+                              >
+                                {loadingId === review.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {reviews.length === 0 && (
+                        <tr key="no-reviews">
+                          <td
+                            colSpan={5}
+                            className="p-10 text-center text-gray-500"
+                          >
+                            No reviews found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, Fragment, useEffect } from 'react';
+import React, { useState, useMemo, Fragment, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -6,18 +6,20 @@ import { ArrowLeft } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/lib/supabase';
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function BusSeatSelectionScreen() {
   const router = useRouter();
-  const { id, company, price, from, to, date } = useLocalSearchParams<{ 
+  const { id, company, price, from, to, date, totalSeats } = useLocalSearchParams<{ 
     id: string, 
     company: string, 
     price: string,
     from: string,
     to: string,
-    date: string
+    date: string,
+    totalSeats: string
   }>();
 
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
@@ -26,15 +28,51 @@ export default function BusSeatSelectionScreen() {
   const [serviceFee, setServiceFee] = useState<number>(500);
   const [loading, setLoading] = useState(true);
 
+  const seatsCount = useMemo(() => parseInt(Array.isArray(totalSeats) ? totalSeats[0] : (totalSeats || '30'), 10), [totalSeats]);
+
+  // Dynamically determine columns based on capacity
+  const numColumns = useMemo(() => {
+    if (seatsCount <= 16) return 2;
+    if (seatsCount <= 30) return 3;
+    return 4;
+  }, [seatsCount]);
+
+  // Set VIP rows (e.g., first 2 rows) and calculate dynamic seat width
+  const vipRows = useMemo(() => (seatsCount >= 20 ? 2 : 1), [seatsCount]);
+  const vipCount = vipRows * numColumns;
+  const seatWidth = (SCREEN_WIDTH - 120) / numColumns;
+
   // Define seat structure
   const seatLayout = useMemo(() => {
-    return Array.from({ length: 40 }, (_, i) => ({
+    return Array.from({ length: seatsCount }, (_, i) => ({
       id: i + 1,
       number: `${i + 1}`,
       isReserved: reservedSeats.includes(i + 1),
-      type: (i + 1) <= 8 ? 'VIP' : 'Standard',
+      type: (i + 1) <= vipCount ? 'VIP' : 'Standard',
     }));
-  }, [reservedSeats]);
+  }, [reservedSeats, seatsCount, vipCount]);
+
+  const travelDate = useMemo(() => date ? new Date(date).toISOString().split('T')[0] : null, [date]);
+
+  const fetchReservedSeats = useCallback(async () => {
+    if (!id || !travelDate) return;
+    try {
+      const { data, error } = await supabase
+        .from('bus_reservations')
+        .select('seat_number')
+        .eq('bus_id', id)
+        .eq('travel_date', travelDate)
+        .neq('status', 'cancelled');
+
+      if (error) throw error;
+      setReservedSeats(data?.map(r => r.seat_number) || []);
+    } catch (err) {
+      console.error('Error updating reservations:', err);
+    }
+  }, [id, travelDate]);
+
+  // Real-time listener for reservations on this bus and date
+  useRealtimeRefresh('bus_reservations', fetchReservedSeats, `bus_id=eq.${id}&travel_date=eq.${travelDate}`);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -43,20 +81,7 @@ export default function BusSeatSelectionScreen() {
         const storedCountry = await SecureStore.getItemAsync('user_country');
         setCountry(storedCountry);
 
-        // Fetch real-time reservations for this bus and date
-        const travelDate = date ? new Date(date).toISOString().split('T')[0] : null;
-        
-        if (id && travelDate) {
-          const { data, error } = await supabase
-            .from('bus_reservations')
-            .select('seat_number')
-            .eq('bus_id', id)
-            .eq('travel_date', travelDate)
-            .neq('status', 'cancelled');
-
-          if (error) throw error;
-          setReservedSeats(data?.map(r => r.seat_number) || []);
-        }
+        await fetchReservedSeats();
 
         if (storedCountry) {
           const { data: feeData, error: feeError } = await supabase
@@ -77,7 +102,7 @@ export default function BusSeatSelectionScreen() {
       }
     };
     loadInitialData();
-  }, [id, date]);
+  }, [fetchReservedSeats]);
 
   const basePrice = parseFloat(price || '0');
 
@@ -115,7 +140,8 @@ export default function BusSeatSelectionScreen() {
         selectedSeats: JSON.stringify(selectedSeats),
         subtotal: subtotal.toString(),
         serviceFee: serviceFee.toString(),
-        total: total.toString()
+        total: total.toString(),
+        totalSeats: totalSeats // Keep it passing for consistency
       }
     });
   };
@@ -160,19 +186,19 @@ export default function BusSeatSelectionScreen() {
               
               return (
                 <Fragment key={seat.id}>
-                  {index === 0 && <Text style={styles.sectionLabel}>VIP SECTION (1.5x Price)</Text>}
-                  {index === 8 && <View style={styles.sectionDivider}><Text style={styles.sectionLabel}>STANDARD SECTION</Text></View>}
+                  {index === 0 && vipCount > 0 && <Text style={styles.sectionLabel}>VIP SECTION (1.5x Price)</Text>}
+                  {index === vipCount && <View style={styles.sectionDivider}><Text style={styles.sectionLabel}>STANDARD SECTION</Text></View>}
                   
                   <TouchableOpacity
                     disabled={isReserved}
                     style={[
                       styles.seatBox,
+                      { width: seatWidth },
                       isVIP && styles.seatVIP,
                       isReserved && styles.seatReserved,
                       isSelected && (isVIP ? styles.seatVIPSelected : styles.seatSelected),
-                      isVIP 
-                        ? (seat.id % 3 === 2 && { marginRight: 50 }) 
-                        : ((seat.id - 8) % 4 === 2 && { marginRight: 30 })
+                      // Calculate aisle margin based on the middle column
+                      (index % numColumns === Math.floor(numColumns / 2) - 1) && { marginRight: 25 }
                     ]}
                     onPress={() => toggleSeat(seat.id)}
                   >
@@ -227,7 +253,6 @@ const styles = StyleSheet.create({
   steeringWheel: { width: 30, height: 30, borderRadius: 15, borderWidth: 4, borderColor: '#757575' },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 },
   seatBox: { 
-    width: (SCREEN_WIDTH - 120) / 4, 
     height: 45, 
     backgroundColor: '#E8F5E9', 
     borderRadius: 8, 

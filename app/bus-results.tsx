@@ -66,7 +66,8 @@ export default function BusResultsScreen() {
         price: Number(bus.price).toString(),
         from: bus.origin,
         to: bus.destination,
-        date: date
+        date: date,
+        totalSeats: (bus.seats || bus.capacity || 30).toString()
       }
     });
   };

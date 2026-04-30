@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,16 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
-} from 'react-native';
+  Animated,
+} from 'react-native'; 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Wallet, Bus, MapPin, Calendar } from 'lucide-react-native';
+import { ArrowLeft, Wallet, Bus, MapPin, Calendar, CheckCircle, AlertCircle } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { useAuthStore } from '@/stores/authStore';
 
 export default function BusCheckoutScreen() {
   const router = useRouter();
@@ -36,6 +38,11 @@ export default function BusCheckoutScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPinModalVisible, setIsPinModalVisible] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const currentUserId = useAuthStore((state) => state.userId);
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(true);
+  const [minEpRequired, setMinEpRequired] = useState<number>(5000); // Default fallback
+  const fadeScale = useRef(new Animated.Value(0)).current;
+  const [engagementPoints, setEngagementPoints] = useState<number>(0);
   const [pin, setPin] = useState('');
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -47,12 +54,70 @@ export default function BusCheckoutScreen() {
   const safeFrom = Array.isArray(from) ? from[0] : from;
   const safeTo = Array.isArray(to) ? to[0] : to;
 
+  // Fetch user's engagement points on component mount
+  useEffect(() => {
+    const fetchUserEngagementPoints = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('token');
+        if (!token || !currentUserId) return;
+
+        const res = await fetch(`${API_BASE_URL}/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (res.ok && data.engagement_points !== undefined) {
+          setEngagementPoints(data.engagement_points);
+          setUserId(data.id); // Also set userId here
+        }
+
+        // Fetch the dynamic threshold from backend
+        const configRes = await fetch(`${API_BASE_URL}/config/bus-booking-threshold`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const configData = await configRes.json();
+        if (configRes.ok && configData.min_ep_required) {
+          setMinEpRequired(configData.min_ep_required);
+        }
+      } catch (error) {
+        console.error('Error fetching engagement points:', error);
+      }
+    };
+    fetchUserEngagementPoints();
+
+    const timer = setTimeout(() => {
+      setIsCheckingEligibility(false);
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isCheckingEligibility) {
+      Animated.spring(fadeScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 6,
+        tension: 40,
+      }).start();
+    }
+  }, [isCheckingEligibility]);
+
   const handleInitiatePayment = async () => {
     if (!safeTotal || !id) {
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: 'Missing booking details.',
+      });
+      return;
+    }
+
+    if (engagementPoints < minEpRequired) {
+      Toast.show({
+        type: 'error',
+        text1: 'Insufficient Engagement Points',
+        text2: `You need ${minEpRequired.toLocaleString()} EP to book. Earn more by watching stories, viewing posts, and liking content!`,
+        visibilityTime: 5000,
       });
       return;
     }
@@ -273,10 +338,42 @@ export default function BusCheckoutScreen() {
           <Text style={styles.paymentText}>Pay from Gahungu Wallet</Text>
         </View>
 
+        <View style={styles.epMessageContainer}>
+          {isCheckingEligibility ? (
+            <View style={styles.epMessageRow}>
+              <ActivityIndicator size="small" color="#4CAF50" style={styles.epIcon} />
+              <Text style={styles.epCheckingText}>Checking your eligibility...</Text>
+            </View>
+          ) : engagementPoints >= minEpRequired ? (
+            <Animated.View style={[styles.epMessageRow, { opacity: fadeScale, transform: [{ scale: fadeScale }] }]}>
+              <CheckCircle size={18} color="#4CAF50" style={styles.epIcon} />
+              <Text style={styles.epEligibleText}>
+                Your current EP is {engagementPoints.toLocaleString()}, you are eligible to book.
+              </Text>
+            </Animated.View>
+          ) : (
+            <Animated.View style={{ opacity: fadeScale, transform: [{ scale: fadeScale }], alignItems: 'center' }}>
+              <View style={styles.epMessageRow}>
+                <AlertCircle size={18} color="#F44336" style={styles.epIcon} />
+                <Text style={styles.epWarningText}>
+                  Your current EP is less than {minEpRequired.toLocaleString()}.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => router.push('/(tabs)/explore')}
+                style={styles.earnEpLink}
+              >
+                <Text style={styles.earnEpLinkText}>Click here to increase your EP by watching stories, viewing posts and liking posts.</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </View>
+
+
         <TouchableOpacity
-          style={[styles.payButton, isLoading && styles.disabledBtn]}
+          style={[styles.payButton, (isLoading || isCheckingEligibility || engagementPoints < minEpRequired) && styles.disabledBtn]}
           onPress={handleInitiatePayment}
-          disabled={isLoading}
+          disabled={isLoading || isCheckingEligibility || engagementPoints < minEpRequired}
         >
           {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payButtonText}>Confirm & Pay</Text>}
         </TouchableOpacity>
@@ -358,4 +455,80 @@ const styles = StyleSheet.create({
   cancelBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: '#eee', justifyContent: 'center' },
   verifyBtn: { backgroundColor: '#4CAF50', paddingHorizontal: 30, paddingVertical: 10, borderRadius: 10 },
   verifyBtnText: { color: '#fff' }
+  ,
+  engagementPointsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  engagementPointsText: {
+    fontSize: 16,
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+    marginBottom: 10,
+  },
+  earnMoreButton: {
+    backgroundColor: '#FFC107', // A warm color to attract attention
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  earnMoreButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Roboto-Bold',
+  },
+  epMessageContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+  },
+  epMessageRow: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  epCheckingText: {
+    fontSize: 15,
+    fontFamily: 'Roboto-Medium',
+    color: '#757575',
+    textAlign: 'center',
+  },
+  epEligibleText: {
+    fontSize: 15,
+    fontFamily: 'Roboto-Medium',
+    color: '#4CAF50',
+    textAlign: 'center',
+  },
+  epWarningText: {
+    fontSize: 15,
+    fontFamily: 'Roboto-Medium',
+    color: '#F44336',
+    textAlign: 'center',
+    // Removed marginBottom: 8, as marginTop is added to earnEpLink
+  },
+  earnEpLink: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FFC107',
+    marginTop: 8, // Added marginTop for spacing
+  },
+  earnEpLinkText: {
+    fontSize: 13,
+    fontFamily: 'Roboto-Bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  epIcon: {
+    marginBottom: 8,
+  },
 });
