@@ -7,6 +7,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
 import { API_BASE_URL } from '@/config';
+import { supabase } from '@/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -423,6 +424,39 @@ export default function ExploreScreen() {
 
     fetchData();
     loadDailyStats();
+  }, []);
+
+  // Real-time updates for engagement settings and story duration
+  useEffect(() => {
+    const settingsChannel = supabase
+      .channel('engagement-settings-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'settings' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const { key, value } = payload.new;
+            const numValue = parseInt(value, 10);
+
+            if (!isNaN(numValue)) {
+              setConfig((prev) => {
+                switch (key) {
+                  case 'ep_story_view': return { ...prev, epStoryView: numValue };
+                  case 'ep_post_view': return { ...prev, epPostView: numValue };
+                  case 'ep_post_like': return { ...prev, epPostLike: numValue };
+                  case 'story_duration': return { ...prev, storyDuration: numValue };
+                  default: return prev;
+                }
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsChannel);
+    };
   }, []);
 
   // Effects to save stats whenever they change

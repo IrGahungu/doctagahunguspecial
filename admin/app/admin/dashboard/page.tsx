@@ -173,6 +173,22 @@ type ServiceFee = {
   fee: number;
 };
 
+type ButtonSettings = {
+  show_product_cta_button: boolean;
+  show_doctor_cta_button: boolean;
+  show_hospital_cta_button: boolean;
+  show_insurance_cta_button: boolean;
+  show_pharmacy_cta_button: boolean;
+};
+
+type EpRewards = {
+  ep_story_view: string;
+  ep_post_view: string;
+  ep_post_like: string;
+  story_duration: string;
+  show_add_to_cart_button: boolean;
+} & ButtonSettings;
+
 const Spinner = ({ className = "h-5 w-5" }: { className?: string }) => (
   <svg className={`animate-spin ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -206,12 +222,18 @@ export default function AdminDashboard() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activeView, setActiveView] = useState<string | null>(null);
   const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
-  const [epRewards, setEpRewards] = useState({ 
-    ep_story_view: "500", 
-    ep_post_view: "300", 
+  const [epRewards, setEpRewards] = useState({
+    ep_story_view: "500",
+    ep_post_view: "300",
     ep_post_like: "200",
-    story_duration: "45000" // Add story_duration to the state
-  }); 
+    story_duration: "45000",
+    show_add_to_cart_button: true, // Default to true
+    show_product_cta_button: true,
+    show_doctor_cta_button: true,
+    show_hospital_cta_button: true,
+    show_insurance_cta_button: true,
+    show_pharmacy_cta_button: true,
+  } as EpRewards);
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [adminReplyText, setAdminReplyText] = useState("");
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
@@ -308,8 +330,8 @@ export default function AdminDashboard() {
           }
           return [];
         };
-        return { 
-          ...phar, 
+        return {
+          ...phar,
           locations: parseArrayField(phar.location || phar.locations),
           accepted_insurances: parseArrayField(phar.accepted_insurances)
         };
@@ -323,7 +345,8 @@ export default function AdminDashboard() {
           if (typeof field === "string") return field.replace(/[{}"]/g, "").split(",").map((s) => s.trim()).filter(Boolean);
           return [];
         };
-        return { ...hosp, 
+        return {
+          ...hosp,
           location: parseArrayField(hosp.location),
           specialties: parseArrayField(hosp.specialties),
           insurances: parseArrayField(hosp.insurances),
@@ -387,37 +410,113 @@ export default function AdminDashboard() {
 
   const fetchEpRewards = async () => {
     try {
-      const res = await fetch("/api/admin/settings/engagement-points");
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch("/api/admin/settings/engagement-points", {
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        }
+      });
+
       if (res.ok) {
         const data = await res.json();
         setEpRewards({
-          ep_story_view: data.ep_story_view.toString(),
-          ep_post_view: data.ep_post_view.toString(),
-          ep_post_like: data.ep_post_like.toString(),
-          story_duration: data.story_duration.toString(), // Fetch story_duration
+          ep_story_view: (data.ep_story_view ?? "500").toString(),
+          ep_post_view: (data.ep_post_view ?? "300").toString(),
+          ep_post_like: (data.ep_post_like ?? "200").toString(),
+          story_duration: (data.story_duration ?? "45000").toString(),
+          show_add_to_cart_button: data.show_add_to_cart_button !== false,
+          show_product_cta_button: data.show_call_car_button_product !== false,
+          show_doctor_cta_button: data.show_call_car_button_doctor !== false,
+          show_hospital_cta_button: data.show_call_car_button_hospital !== false,
+          show_insurance_cta_button: data.show_call_car_button_insurance !== false,
+          show_pharmacy_cta_button: data.show_call_car_button_pharmacy !== false,
         });
+        console.log("Fetched EP Rewards and Settings:", data);
       }
     } catch (e) {
       console.error("Failed to fetch EP rewards", e);
     }
   };
 
-  const handleUpdateEpReward = async (key: string, value: string) => {
-    const val = parseInt(value);
-    if (isNaN(val) || val < 0) {
-      return toast.error("Please enter a valid non-negative number");
+  const handleUpdateEpReward = async (
+    key: string,
+    value: boolean | string
+  ) => {
+    console.log(`[Dashboard] Update requested - Key: ${key}, Value:`, value);
+
+    let endpoint = "/api/admin/settings/engagement-points";
+    let body: any = { key, value };
+
+    const ctaButtonKeys = [
+      "show_product_cta_button",
+      "show_doctor_cta_button",
+      "show_hospital_cta_button",
+      "show_insurance_cta_button",
+      "show_pharmacy_cta_button"
+    ];
+
+    if (key === "show_add_to_cart_button") {
+      endpoint = "/api/admin/settings/toggle-cart-button";
+      body = { isVisible: value };
+    } else if (ctaButtonKeys.includes(key)) {
+      endpoint = "/api/admin/settings/toggle-button";
+      body = { key, isVisible: value };
+    } else {
+      const parsedVal = parseInt(value as string);
+      if (isNaN(parsedVal) || parsedVal < 0) {
+        return toast.error("Please enter a valid non-negative number");
+      }
     }
-    
+
     setIsRefreshing(true);
+
     try {
-      const res = await fetch("/api/admin/settings/engagement-points", {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch(endpoint, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, value: val }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Update failed");
-      toast.success("Engagement point reward updated!");
-      fetchEpRewards();
+
+      if (!res.ok) {
+        console.error(
+          `[Dashboard] Update failed. Status: ${res.status}`
+        );
+        throw new Error("Update failed");
+      }
+
+      console.log(`[Dashboard] Server confirmed update`);
+
+      if (key === "show_add_to_cart_button" || ctaButtonKeys.includes(key)) {
+        if (key === "show_add_to_cart_button") {
+          toast.success(
+            value ? "Add to cart button visible" : "Add to cart button hidden"
+          );
+        } else {
+          toast.success("Visibility updated successfully");
+        }
+
+        setEpRewards((prev) => ({
+          ...prev,
+          [key]: value as boolean, // ✅ Fixed: Updates the specific key clicked
+        }));
+      } else if (key === "story_duration") {
+        toast.success("Story duration updated");
+        setEpRewards((prev) => ({
+          ...prev,
+          story_duration: String(value),
+        }));
+      } else {
+        toast.success("Engagement point reward updated!");
+        setEpRewards((prev) => ({
+          ...prev,
+          [key]: String(value),
+        }));
+      }
+
     } catch (err) {
       toast.error("Error updating reward");
     } finally {
@@ -425,10 +524,40 @@ export default function AdminDashboard() {
     }
   };
 
+
+  const handleToggleButton = async (key: string, value: boolean) => {
+    console.log("Sending:", key, value); // add this
+
+    setIsRefreshing(true);
+
+    try {
+      const res = await fetch("/api/admin/settings/toggle-button", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          isVisible: value,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Update failed");
+
+      setEpRewards((prev) => ({
+        ...prev,
+        [key]: value,
+      }));
+
+      toast.success("Setting updated");
+    } catch {
+      toast.error("Error updating setting");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
   const handleUpdateThreshold = async () => {
     const val = parseInt(newThresholdInput);
     if (isNaN(val) || val < 0) return toast.error("Please enter a valid non-negative number");
-    
+
     setIsRefreshing(true);
     try {
       const res = await fetch("/api/admin/settings/min-ep-required", {
@@ -465,7 +594,7 @@ export default function AdminDashboard() {
 
       setActiveView(view);
       setApplicationType(type);
-      
+
       const refreshTasks = [];
       if (view === "stock") refreshTasks.push(fetchMedicines(), fetchPharmacies(), fetchCategories());
       else if (view === "categories") refreshTasks.push(fetchCategories());
@@ -478,13 +607,14 @@ export default function AdminDashboard() {
       else if (view === "service-fees") refreshTasks.push(fetchServiceFees());
       else if (view === "ep-threshold") refreshTasks.push(fetchEpThreshold());
       else if (view === "engagement-points") refreshTasks.push(fetchEpRewards());
-      
+      else if (view === "manage-buttons") refreshTasks.push(fetchEpRewards()); // Fetch all EP settings, including button visibility
+
       if (refreshTasks.length > 0) {
         await Promise.all(refreshTasks);
       } else {
-          // Brief delay for components that manage their own fetching (UsersTable, etc)
-          // so the user sees a visual confirmation of the refresh
-          await new Promise(resolve => setTimeout(resolve, 600));
+        // Brief delay for components that manage their own fetching (UsersTable, etc)
+        // so the user sees a visual confirmation of the refresh
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
     } finally {
       setIsRefreshing(false);
@@ -536,6 +666,7 @@ export default function AdminDashboard() {
       fetchLeaderboard();
       fetchServiceFees();
       fetchEpThreshold();
+      fetchEpRewards(); // Fetch initial EP rewards and button visibility
     }
   }, [isSupabaseConnected]);
 
@@ -620,7 +751,7 @@ export default function AdminDashboard() {
 
   async function handleCreateServiceFee() {
     if (!newFee.fee || !newFee.country) return toast.error("Please fill all fields");
-    
+
     setIsRefreshing(true);
     try {
       const res = await fetch("/api/admin/service-fees", {
@@ -628,12 +759,12 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newFee),
       });
-      
+
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || "Failed to create fee");
       }
-      
+
       toast.success("Service fee created");
       setFeeModalOpen(false);
       setNewFee({ service_type: "bus", country: "Burundi", fee: "" });
@@ -656,9 +787,9 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fee: tempFeeValue }),
       });
-      
+
       if (!res.ok) throw new Error("Failed to update fee");
-      
+
       toast.success("Service fee updated");
       setEditingFeeId(null);
       fetchServiceFees();
@@ -823,8 +954,8 @@ export default function AdminDashboard() {
   function openEditBannerModal(banner: Banner) {
     const bannerWithFullUrl = {
       ...banner,
-      image: banner.image && !banner.image.startsWith("http") 
-        ? `${BANNER_URL_PREFIX}${banner.image}` 
+      image: banner.image && !banner.image.startsWith("http")
+        ? `${BANNER_URL_PREFIX}${banner.image}`
         : banner.image
     };
     setEditingBanner(bannerWithFullUrl);
@@ -1047,7 +1178,7 @@ export default function AdminDashboard() {
    -----------------------*/
   async function handleSaveReply(id: string) {
     console.log(`[DEBUG] SAVING REPLY - ID: ${id}, Text: "${adminReplyText}"`);
-    
+
     // Attempt to get token from storage if available
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -1056,13 +1187,13 @@ export default function AdminDashboard() {
       const url = `/api/admin/reviews/${id}/reply`;
       const res = await fetch(url, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ admin_reply: adminReplyText }),
       });
-      
+
       console.log(`[DEBUG] PUT Request to: ${url} | Status: ${res.status}`);
 
       if (!res.ok) {
@@ -1076,7 +1207,7 @@ export default function AdminDashboard() {
         }
         throw new Error(errorData.error || errorData.details || "Failed to save reply");
       }
-      
+
       fetchReviews();
       setReplyingToId(null);
       toast.success("Reply saved");
@@ -1095,21 +1226,21 @@ export default function AdminDashboard() {
     if (!confirm("Delete this review?")) return;
     console.log(`[DEBUG] DELETING REVIEW - ID: ${id}`);
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    
+
     setLoadingId(id);
     try {
-      const res = await fetch(`/api/admin/reviews/${id}`, { 
+      const res = await fetch(`/api/admin/reviews/${id}`, {
         method: "DELETE",
         headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
       });
-      
+
       console.log(`[DEBUG] Delete response: ${res.status} ${res.statusText}`);
       if (!res.ok) {
         const resText = await res.text();
         console.error(`[DEBUG] Delete failed:`, resText.substring(0, 100));
         throw new Error("Failed to delete review");
       }
-      
+
       fetchReviews();
       toast.success("Review deleted");
     } catch (err) {
@@ -1166,10 +1297,10 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(url);
       const data = await res.json();
-      setStatsModal({ 
-        isOpen: true, 
-        title: `Interactions: ${title}`, 
-        data: Array.isArray(data) ? data : [] 
+      setStatsModal({
+        isOpen: true,
+        title: `Interactions: ${title}`,
+        data: Array.isArray(data) ? data : []
       });
     } catch (e) {
       toast.error("Failed to fetch stats");
@@ -1264,10 +1395,16 @@ export default function AdminDashboard() {
             Manage EP Rewards
           </button>
           <button
+            onClick={() => handleNavClick("manage-buttons")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-blue-800 text-white rounded-lg transition-all ${activeView === 'manage-buttons' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Buttons
+          </button>
+          <button
             onClick={() => handleNavClick("stock")}
             className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "stock"
-                ? "ring-2 ring-offset-2 ring-black"
-                : ""
+              ? "ring-2 ring-offset-2 ring-black"
+              : ""
               }`}
           >
             Manage Stock
@@ -1418,41 +1555,42 @@ export default function AdminDashboard() {
                       {serviceFees.map((fee, index) => {
                         const rowId = fee.id || `fee-${index}`;
                         return (
-                        <tr key={rowId} className="border-t">
-                          <td className="p-3 font-semibold text-gray-800 capitalize">{fee.service_type}</td>
-                          <td className="p-3 text-gray-600">{fee.country}</td>
-                          <td className="p-3">
-                            {editingFeeId === rowId ? (
-                              <input
-                                type="number"
-                                value={tempFeeValue}
-                                onChange={(e) => setTempFeeValue(e.target.value)}
-                                className="border rounded px-2 py-1 w-32 focus:ring-2 focus:ring-cyan-500 outline-none"
-                                autoFocus
-                              />
-                            ) : (
-                              <span className="font-bold text-green-600">{Number(fee.fee).toLocaleString()}</span>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            {editingFeeId === rowId ? (
-                              <div className="flex gap-2">
-                                <button onClick={() => handleUpdateServiceFee(fee.id)} className="text-blue-600 font-bold hover:underline">
-                                  {loadingId === fee.id ? "Saving..." : "Save"}
+                          <tr key={rowId} className="border-t">
+                            <td className="p-3 font-semibold text-gray-800 capitalize">{fee.service_type}</td>
+                            <td className="p-3 text-gray-600">{fee.country}</td>
+                            <td className="p-3">
+                              {editingFeeId === rowId ? (
+                                <input
+                                  type="number"
+                                  value={tempFeeValue}
+                                  onChange={(e) => setTempFeeValue(e.target.value)}
+                                  className="border rounded px-2 py-1 w-32 focus:ring-2 focus:ring-cyan-500 outline-none"
+                                  autoFocus
+                                />
+                              ) : (
+                                <span className="font-bold text-green-600">{Number(fee.fee).toLocaleString()}</span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {editingFeeId === rowId ? (
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleUpdateServiceFee(fee.id)} className="text-blue-600 font-bold hover:underline">
+                                    {loadingId === fee.id ? "Saving..." : "Save"}
+                                  </button>
+                                  <button onClick={() => setEditingFeeId(null)} className="text-gray-500 hover:underline">Cancel</button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => { setEditingFeeId(rowId); setTempFeeValue(fee.fee.toString()); }}
+                                  className="text-indigo-600 hover:underline"
+                                >
+                                  Edit Fee
                                 </button>
-                                <button onClick={() => setEditingFeeId(null)} className="text-gray-500 hover:underline">Cancel</button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => { setEditingFeeId(rowId); setTempFeeValue(fee.fee.toString()); }}
-                                className="text-indigo-600 hover:underline"
-                              >
-                                Edit Fee
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )})}
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1467,23 +1605,24 @@ export default function AdminDashboard() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Service Type</label>
-                      <select 
+                      <select
                         className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none"
                         value={newFee.service_type}
-                        onChange={e => setNewFee(p => ({...p, service_type: e.target.value}))}
+                        onChange={e => setNewFee(p => ({ ...p, service_type: e.target.value }))}
                       >
                         <option value="bus">Bus Service Fee</option>
                         <option value="doctor">Doctor Booking Fee</option>
                         <option value="medicine">Medicine Service Fee</option>
+                        <option value="access">App Access Fee</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Country</label>
-                      <input type="text" placeholder="e.g. Burundi" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none" value={newFee.country} onChange={e => setNewFee(p => ({...p, country: e.target.value}))} />
+                      <input type="text" placeholder="e.g. Burundi" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none" value={newFee.country} onChange={e => setNewFee(p => ({ ...p, country: e.target.value }))} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fee Amount</label>
-                      <input type="number" placeholder="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none" value={newFee.fee} onChange={e => setNewFee(p => ({...p, fee: e.target.value}))} />
+                      <input type="number" placeholder="0" className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 outline-none" value={newFee.fee} onChange={e => setNewFee(p => ({ ...p, fee: e.target.value }))} />
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 mt-8">
@@ -1559,8 +1698,10 @@ export default function AdminDashboard() {
                         <div className="relative flex-1">
                           <input
                             type="number" // Use type="number" for numerical inputs
-                            value={epRewards[item.key as keyof typeof epRewards]}
-                            onChange={(e) => setEpRewards({ ...epRewards, [item.key]: e.target.value })}
+                            value={String(epRewards[item.key as keyof typeof epRewards])}
+                            onChange={(e) =>
+                              setEpRewards({ ...epRewards, [item.key as keyof typeof epRewards]: e.target.value })
+                            }
                             className="w-full border-2 border-gray-200 rounded-xl p-3 pl-10 text-lg font-bold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 outline-none transition-all"
                           />
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">EP</span>
@@ -1599,6 +1740,45 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Manage Buttons */}
+            {activeView === "manage-buttons" && (
+              <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto border border-gray-100">
+                <h2 className="text-2xl font-bold mb-6 text-gray-800">
+                  Manage App Visibility Buttons
+                </h2>
+
+                <div className="space-y-6">
+                  {[
+                    { key: 'show_add_to_cart_button', label: 'Show "Add to Cart" Button (Products)' },
+                    { key: 'show_product_cta_button', label: 'Show "Call Car" in Product Details' },
+                    { key: 'show_doctor_cta_button', label: 'Show "Call Car" in Doctor Details' },
+                    { key: 'show_hospital_cta_button', label: 'Show "Call Car" in Hospital Details' },
+                    { key: 'show_insurance_cta_button', label: 'Show "Call Car" in Insurance Details' },
+                    { key: 'show_pharmacy_cta_button', label: 'Show "Call Car" in Pharmacy Details' },
+                  ].map((btn) => (
+                    <div key={btn.key} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                      <label className="block text-sm font-bold text-gray-700">{btn.label}</label>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={!!epRewards[btn.key as keyof EpRewards]}
+                          onChange={(e) => handleUpdateEpReward(btn.key, e.target.checked)}
+                          disabled={isRefreshing}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  ))}
+                  {isRefreshing && (
+                    <div className="flex items-center justify-center text-blue-600">
+                      <Spinner className="h-5 w-5 mr-2" /> Updating...
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1688,14 +1868,14 @@ export default function AdminDashboard() {
                                 </tr>
                               </thead>
                               <tbody>
-                              {filteredStock.map((med, index) => (
-                                <tr key={med.id || `stock-${index}`} className="border-t">
+                                {filteredStock.map((med, index) => (
+                                  <tr key={med.id || `stock-${index}`} className="border-t">
                                     <td className="p-2">
                                       {med.image ? (
-                                        <img 
-                                          src={med.image.startsWith("http") ? med.image : `https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/${med.image}`} 
-                                          alt={med.name} 
-                                          className="w-16 h-16 object-cover rounded" 
+                                        <img
+                                          src={med.image.startsWith("http") ? med.image : `https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/${med.image}`}
+                                          alt={med.name}
+                                          className="w-16 h-16 object-cover rounded"
                                         />
                                       ) : (
                                         <span className="text-gray-400">No Image</span>
@@ -1729,13 +1909,13 @@ export default function AdminDashboard() {
                         </div>
                       );
                     })}
-                    {stockSearchQuery && !pharmacies.some(p => 
+                    {stockSearchQuery && !pharmacies.some(p =>
                       medicines.some(med => med.pharmacy_id === p.id && med.name.toLowerCase().includes(stockSearchQuery.toLowerCase()))
                     ) && (
-                      <div className="p-10 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
-                        No items matching "{stockSearchQuery}" found in any pharmacy.
-                      </div>
-                    )}
+                        <div className="p-10 text-center text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                          No items matching "{stockSearchQuery}" found in any pharmacy.
+                        </div>
+                      )}
                   </>
                 )}
 
@@ -1764,55 +1944,55 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Emoji</th>
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Medicines</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.map((cat) => (
-                      <tr key={cat.id || `category-${cat.name}`} className="border-t">
-                        <td className="p-2 text-xl">{cat.image}</td>
-                        <td className="p-2">{cat.name}</td>
-                        <td className="p-2 text-xs text-gray-600">
-                          {medicines.filter(m => m.category_id === cat.id).length} items 
-                          <span className="ml-1 text-gray-400">
-                            ({medicines.filter(m => m.category_id === cat.id).map(m => m.name).slice(0, 2).join(', ')}...)
-                          </span>
-                        </td>
-                        <td className="p-2 space-x-2">
-                          <button
-                            onClick={() => openEditCategoryModal(cat)}
-                            className="text-blue-600 hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleCategoryDelete(cat.id)}
-                            disabled={loadingId === cat.id}
-                            className="text-red-600 hover:underline"
-                          >
-                            {loadingId === cat.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Emoji</th>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Medicines</th>
+                        <th className="p-2">Actions</th>
                       </tr>
-                    ))}
-                    {categories.length === 0 && (
-                  <tr key="no-categories">
-                        <td
-                          colSpan={3}
-                          className="p-4 text-center text-gray-500"
-                        >
-                          No categories found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {categories.map((cat) => (
+                        <tr key={cat.id || `category-${cat.name}`} className="border-t">
+                          <td className="p-2 text-xl">{cat.image}</td>
+                          <td className="p-2">{cat.name}</td>
+                          <td className="p-2 text-xs text-gray-600">
+                            {medicines.filter(m => m.category_id === cat.id).length} items
+                            <span className="ml-1 text-gray-400">
+                              ({medicines.filter(m => m.category_id === cat.id).map(m => m.name).slice(0, 2).join(', ')}...)
+                            </span>
+                          </td>
+                          <td className="p-2 space-x-2">
+                            <button
+                              onClick={() => openEditCategoryModal(cat)}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleCategoryDelete(cat.id)}
+                              disabled={loadingId === cat.id}
+                              className="text-red-600 hover:underline"
+                            >
+                              {loadingId === cat.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {categories.length === 0 && (
+                        <tr key="no-categories">
+                          <td
+                            colSpan={3}
+                            className="p-4 text-center text-gray-500"
+                          >
+                            No categories found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <CategoryModal
@@ -1871,13 +2051,13 @@ export default function AdminDashboard() {
                                   placeholder="Type your reply..."
                                 />
                                 <div className="flex gap-2">
-                                  <button 
+                                  <button
                                     onClick={() => handleSaveReply(review.id)}
                                     className="bg-blue-600 text-white px-2 py-1 rounded text-[10px]"
                                   >
                                     Save
                                   </button>
-                                  <button 
+                                  <button
                                     onClick={() => setReplyingToId(null)}
                                     className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px]"
                                   >
@@ -1939,89 +2119,89 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Image</th>
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Location</th>
-                      <th className="p-2">Accepted Insurances</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pharmacies.map((phar) => (
-                      <tr key={phar.id || `pharma-${phar.name}`} className="border-t">
-                        <td className="p-2">
-                          {phar.image ? (
-                            <img src={phar.image} alt={phar.name || 'Pharmacy image'} className="w-16 h-16 object-cover rounded" />
-                          ) : (
-                            <span className="text-gray-400">No Image</span>
-                          )}
-                        </td>
-                        <td className="p-2">{phar.name}</td>
-                        <td className="p-2 max-w-xs">
-                          <div className="flex flex-col gap-2">
-                            {Array.isArray(phar.locations) && phar.locations.length > 0 ? (
-                              phar.locations.map((loc: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  className="px-3 py-2 bg-gray-50 border rounded-md flex flex-col"
-                                >
-                                  <span className="font-medium text-gray-800">{loc.name}</span>
-                                  <span className="text-xs text-gray-600">
-                                    {loc.openingTime} - {loc.closingTime}
-                                  </span>
-                                  <span
-                                    className={`text-xs font-semibold mt-1 ${loc.isOpen ? "text-green-600" : "text-red-600"
-                                      }`}
-                                  >
-                                    {loc.isOpen ? "Open" : "Closed"}
-                                  </span>
-                                </div>
-                              ))
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Location</th>
+                        <th className="p-2">Accepted Insurances</th>
+                        <th className="p-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pharmacies.map((phar) => (
+                        <tr key={phar.id || `pharma-${phar.name}`} className="border-t">
+                          <td className="p-2">
+                            {phar.image ? (
+                              <img src={phar.image} alt={phar.name || 'Pharmacy image'} className="w-16 h-16 object-cover rounded" />
                             ) : (
-                              <span className="text-gray-400">No locations</span>
+                              <span className="text-gray-400">No Image</span>
                             )}
-                          </div>
-                        </td>
+                          </td>
+                          <td className="p-2">{phar.name}</td>
+                          <td className="p-2 max-w-xs">
+                            <div className="flex flex-col gap-2">
+                              {Array.isArray(phar.locations) && phar.locations.length > 0 ? (
+                                phar.locations.map((loc: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    className="px-3 py-2 bg-gray-50 border rounded-md flex flex-col"
+                                  >
+                                    <span className="font-medium text-gray-800">{loc.name}</span>
+                                    <span className="text-xs text-gray-600">
+                                      {loc.openingTime} - {loc.closingTime}
+                                    </span>
+                                    <span
+                                      className={`text-xs font-semibold mt-1 ${loc.isOpen ? "text-green-600" : "text-red-600"
+                                        }`}
+                                    >
+                                      {loc.isOpen ? "Open" : "Closed"}
+                                    </span>
+                                  </div>
+                                ))
+                              ) : (
+                                <span className="text-gray-400">No locations</span>
+                              )}
+                            </div>
+                          </td>
 
-                        <td className="p-2 max-w-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {phar.accepted_insurances?.map(name => (
-                              <span key={name} className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">{name}</span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-2 space-x-2">
-                          <button
-                            onClick={() => openEditPharmacyModal(phar)}
-                            className="text-blue-600 hover:underline"
+                          <td className="p-2 max-w-xs">
+                            <div className="flex flex-wrap gap-1">
+                              {phar.accepted_insurances?.map(name => (
+                                <span key={name} className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">{name}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-2 space-x-2">
+                            <button
+                              onClick={() => openEditPharmacyModal(phar)}
+                              className="text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handlePharmacyDelete(phar.id)}
+                              disabled={loadingId === phar.id}
+                              className="text-red-600 hover:underline"
+                            >
+                              {loadingId === phar.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {pharmacies.length === 0 && (
+                        <tr key="no-pharmacies">
+                          <td
+                            colSpan={5}
+                            className="p-4 text-center text-gray-500"
                           >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handlePharmacyDelete(phar.id)}
-                            disabled={loadingId === phar.id}
-                            className="text-red-600 hover:underline"
-                          >
-                            {loadingId === phar.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {pharmacies.length === 0 && (
-                  <tr key="no-pharmacies">
-                        <td
-                          colSpan={5}
-                          className="p-4 text-center text-gray-500"
-                        >
-                          No pharmacies found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                            No pharmacies found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <PharmacyModal
@@ -2048,74 +2228,74 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Image</th>
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Location</th>
-                      <th className="p-2">Specialties</th>
-                      <th className="p-2">Insurances</th>
-                      <th className="p-2">Blood Types</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hospitals.map((hosp) => (
-                      <tr key={hosp.id || `hosp-${hosp.name}`} className="border-t">
-                        <td className="p-2">
-                          {hosp.image ? (
-                            <img src={hosp.image} alt={hosp.name || 'Hospital image'} className="w-16 h-16 object-cover rounded" />
-                          ) : (
-                            <span className="text-gray-400">No Image</span>
-                          )}
-                        </td>
-                        <td className="p-2">{hosp.name}</td>
-                        <td className="p-2 max-w-xs">
-                          {(hosp.location as string[])?.join(", ")}
-                        </td>
-                        <td className="p-2 max-w-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {(hosp.specialties as string[])?.map(spec => (
-                              <span key={spec} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
-                                {spec}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-2 max-w-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {(hosp.insurances as string[])?.map(ins => (
-                              <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
-                                {ins}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-2 max-w-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {(hosp.blood_types as string[])?.map(bt => (
-                              <span key={bt} className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">{bt}</span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-2 space-x-2">
-                          <button onClick={() => openEditHospitalModal(hosp)} className="text-blue-600 hover:underline">Edit</button>
-                          <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="text-red-600 hover:underline">
-                            {loadingId === hosp.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Location</th>
+                        <th className="p-2">Specialties</th>
+                        <th className="p-2">Insurances</th>
+                        <th className="p-2">Blood Types</th>
+                        <th className="p-2">Actions</th>
                       </tr>
-                    ))}
-                    {hospitals.length === 0 && (
-                  <tr key="no-hospitals">
-                        <td colSpan={7} className="p-4 text-center text-gray-500">
-                          No hospitals found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {hospitals.map((hosp) => (
+                        <tr key={hosp.id || `hosp-${hosp.name}`} className="border-t">
+                          <td className="p-2">
+                            {hosp.image ? (
+                              <img src={hosp.image} alt={hosp.name || 'Hospital image'} className="w-16 h-16 object-cover rounded" />
+                            ) : (
+                              <span className="text-gray-400">No Image</span>
+                            )}
+                          </td>
+                          <td className="p-2">{hosp.name}</td>
+                          <td className="p-2 max-w-xs">
+                            {(hosp.location as string[])?.join(", ")}
+                          </td>
+                          <td className="p-2 max-w-xs">
+                            <div className="flex flex-wrap gap-1">
+                              {(hosp.specialties as string[])?.map(spec => (
+                                <span key={spec} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                  {spec}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-2 max-w-xs">
+                            <div className="flex flex-wrap gap-1">
+                              {(hosp.insurances as string[])?.map(ins => (
+                                <span key={ins} className="px-2 py-1 text-xs bg-teal-100 text-teal-800 rounded-full">
+                                  {ins}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-2 max-w-xs">
+                            <div className="flex flex-wrap gap-1">
+                              {(hosp.blood_types as string[])?.map(bt => (
+                                <span key={bt} className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">{bt}</span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => openEditHospitalModal(hosp)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="text-red-600 hover:underline">
+                              {loadingId === hosp.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {hospitals.length === 0 && (
+                        <tr key="no-hospitals">
+                          <td colSpan={7} className="p-4 text-center text-gray-500">
+                            No hospitals found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <HospitalModal
@@ -2141,52 +2321,52 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Image</th>
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Locations</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {insurances.map((ins) => (
-                      <tr key={ins.id || `ins-${ins.name}`} className="border-t">
-                        <td className="p-2">
-                          {ins.image ? (
-                            <img src={ins.image} alt={ins.name || 'Insurance image'} className="w-16 h-16 object-cover rounded" />
-                          ) : (
-                            <span className="text-gray-400">No Image</span>
-                          )}
-                        </td>
-                        <td className="p-2">{ins.name}</td>
-                        <td className="p-2 max-w-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {ins.locations?.map((l) => (
-                              <span key={l.location} className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
-                                {l.location}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-2 space-x-2">
-                          <button onClick={() => openEditInsuranceModal(ins)} className="text-blue-600 hover:underline">Edit</button>
-                          <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="text-red-600 hover:underline">
-                            {loadingId === ins.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Locations</th>
+                        <th className="p-2">Actions</th>
                       </tr>
-                    ))}
-                    {insurances.length === 0 && (
-                  <tr key="no-insurances">
-                        <td colSpan={4} className="p-4 text-center text-gray-500">
-                          No insurances found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {insurances.map((ins) => (
+                        <tr key={ins.id || `ins-${ins.name}`} className="border-t">
+                          <td className="p-2">
+                            {ins.image ? (
+                              <img src={ins.image} alt={ins.name || 'Insurance image'} className="w-16 h-16 object-cover rounded" />
+                            ) : (
+                              <span className="text-gray-400">No Image</span>
+                            )}
+                          </td>
+                          <td className="p-2">{ins.name}</td>
+                          <td className="p-2 max-w-xs">
+                            <div className="flex flex-wrap gap-1">
+                              {ins.locations?.map((l) => (
+                                <span key={l.location} className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
+                                  {l.location}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => openEditInsuranceModal(ins)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="text-red-600 hover:underline">
+                              {loadingId === ins.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {insurances.length === 0 && (
+                        <tr key="no-insurances">
+                          <td colSpan={4} className="p-4 text-center text-gray-500">
+                            No insurances found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <InsuranceModal
@@ -2212,42 +2392,42 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Image</th>
-                      <th className="p-2">Link</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {banners.map((banner) => (
-                      <tr key={banner.id || `banner-${banner.link}`} className="border-t">
-                        <td className="p-2">
-                          {banner.image ? (
-                            <img src={banner.image.startsWith("http") ? banner.image : `${BANNER_URL_PREFIX}${banner.image}`} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
-                          ) : (
-                            <span className="text-gray-400">No Image</span>
-                          )}
-                        </td>
-                        <td className="p-2">{banner.link}</td>
-                        <td className="p-2 space-x-2">
-                          <button onClick={() => openEditBannerModal(banner)} className="text-blue-600 hover:underline">Edit</button>
-                          <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="text-red-600 hover:underline">
-                            {loadingId === banner.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Link</th>
+                        <th className="p-2">Actions</th>
                       </tr>
-                    ))}
-                    {banners.length === 0 && (
-                  <tr key="no-banners">
-                        <td colSpan={3} className="p-4 text-center text-gray-500">
-                          No banners found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {banners.map((banner) => (
+                        <tr key={banner.id || `banner-${banner.link}`} className="border-t">
+                          <td className="p-2">
+                            {banner.image ? (
+                              <img src={banner.image.startsWith("http") ? banner.image : `${BANNER_URL_PREFIX}${banner.image}`} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
+                            ) : (
+                              <span className="text-gray-400">No Image</span>
+                            )}
+                          </td>
+                          <td className="p-2">{banner.link}</td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => openEditBannerModal(banner)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="text-red-600 hover:underline">
+                              {loadingId === banner.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {banners.length === 0 && (
+                        <tr key="no-banners">
+                          <td colSpan={3} className="p-4 text-center text-gray-500">
+                            No banners found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <BannerModal
@@ -2273,46 +2453,46 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Image</th>
-                      <th className="p-2">Title</th>
-                      <th className="p-2">Discount</th>
-                      <th className="p-2">Tagline</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deals.map((deal) => (
-                      <tr key={deal.id || `deal-${deal.title}`} className="border-t">
-                        <td className="p-2">
-                          {deal.image ? (
-                            <img src={deal.image.startsWith("http") ? deal.image : `${DEAL_URL_PREFIX}${deal.image}`} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
-                          ) : (
-                            <span className="text-gray-400">No Image</span>
-                          )}
-                        </td>
-                        <td className="p-2">{deal.title}</td>
-                        <td className="p-2">{deal.discount}</td>
-                        <td className="p-2">{deal.tagline}</td>
-                        <td className="p-2 space-x-2">
-                          <button onClick={() => openEditDealModal(deal)} className="text-blue-600 hover:underline">Edit</button>
-                          <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="text-red-600 hover:underline">
-                            {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Title</th>
+                        <th className="p-2">Discount</th>
+                        <th className="p-2">Tagline</th>
+                        <th className="p-2">Actions</th>
                       </tr>
-                    ))}
-                    {deals.length === 0 && (
-                  <tr key="no-deals">
-                        <td colSpan={5} className="p-4 text-center text-gray-500">
-                          No deals found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {deals.map((deal) => (
+                        <tr key={deal.id || `deal-${deal.title}`} className="border-t">
+                          <td className="p-2">
+                            {deal.image ? (
+                              <img src={deal.image.startsWith("http") ? deal.image : `${DEAL_URL_PREFIX}${deal.image}`} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
+                            ) : (
+                              <span className="text-gray-400">No Image</span>
+                            )}
+                          </td>
+                          <td className="p-2">{deal.title}</td>
+                          <td className="p-2">{deal.discount}</td>
+                          <td className="p-2">{deal.tagline}</td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => openEditDealModal(deal)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="text-red-600 hover:underline">
+                              {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {deals.length === 0 && (
+                        <tr key="no-deals">
+                          <td colSpan={5} className="p-4 text-center text-gray-500">
+                            No deals found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <DealModal
@@ -2338,52 +2518,52 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="p-2">Image</th>
-                      <th className="p-2">Name</th>
-                      <th className="p-2">Specialty</th>
-                      <th className="p-2">Locations</th>
-                      <th className="p-2">Bio</th>
-                      <th className="p-2">Booking Type</th>
-                      <th className="p-2">Availability</th>
-                      <th className="p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {doctors.map((doc) => (
-                      <tr key={doc.id || `doc-${doc.name}`} className="border-t">
-                        <td className="p-2">
-                          {doc.image ? (
-                            <img src={doc.image} alt={doc.name || 'Doctor image'} className="w-16 h-16 object-cover rounded" />
-                          ) : (
-                            <span className="text-gray-400">No Image</span>
-                          )}
-                        </td>
-                        <td className="p-2">{doc.name}</td>
-                        <td className="p-2">{doc.specialty}</td>
-                        <td className="p-2 max-w-xs">{doc.location?.join(", ")}</td>
-                        <td className="p-2 max-w-xs truncate">{doc.bio}</td>
-                        <td className="p-2">{doc.booking_type}</td>
-                        <td className="p-2">{doc.availability && doc.availability.length > 0 ? 'Yes' : 'No'}</td>
-                        <td className="p-2 space-x-2">
-                          <button onClick={() => openEditDoctorModal(doc)} className="text-blue-600 hover:underline">Edit</button>
-                          <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="text-red-600 hover:underline">
-                            {loadingId === doc.id ? <Spinner className="h-4 w-4" /> : "Delete"}
-                          </button>
-                        </td>
+                  <table className="w-full text-left text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="p-2">Image</th>
+                        <th className="p-2">Name</th>
+                        <th className="p-2">Specialty</th>
+                        <th className="p-2">Locations</th>
+                        <th className="p-2">Bio</th>
+                        <th className="p-2">Booking Type</th>
+                        <th className="p-2">Availability</th>
+                        <th className="p-2">Actions</th>
                       </tr>
-                    ))}
-                    {doctors.length === 0 && (
-                  <tr key="no-doctors">
-                        <td colSpan={8} className="p-4 text-center text-gray-500">
-                          No doctors found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {doctors.map((doc) => (
+                        <tr key={doc.id || `doc-${doc.name}`} className="border-t">
+                          <td className="p-2">
+                            {doc.image ? (
+                              <img src={doc.image} alt={doc.name || 'Doctor image'} className="w-16 h-16 object-cover rounded" />
+                            ) : (
+                              <span className="text-gray-400">No Image</span>
+                            )}
+                          </td>
+                          <td className="p-2">{doc.name}</td>
+                          <td className="p-2">{doc.specialty}</td>
+                          <td className="p-2 max-w-xs">{doc.location?.join(", ")}</td>
+                          <td className="p-2 max-w-xs truncate">{doc.bio}</td>
+                          <td className="p-2">{doc.booking_type}</td>
+                          <td className="p-2">{doc.availability && doc.availability.length > 0 ? 'Yes' : 'No'}</td>
+                          <td className="p-2 space-x-2">
+                            <button onClick={() => openEditDoctorModal(doc)} className="text-blue-600 hover:underline">Edit</button>
+                            <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="text-red-600 hover:underline">
+                              {loadingId === doc.id ? <Spinner className="h-4 w-4" /> : "Delete"}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      {doctors.length === 0 && (
+                        <tr key="no-doctors">
+                          <td colSpan={8} className="p-4 text-center text-gray-500">
+                            No doctors found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
 
                 <DoctorModal
@@ -2415,12 +2595,12 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {stories.map((story) => (
-                      <tr key={story.id || `story-${story.name}`} className="border-t">
+                        <tr key={story.id || `story-${story.name}`} className="border-t">
                           <td className="p-2"><img src={story.avatar} className="w-10 h-10 rounded-full object-cover" /></td>
                           <td className="p-2">{story.name}</td>
                           <td className="p-2">
                             <div className="flex flex-col gap-1">
-                              <button 
+                              <button
                                 onClick={() => toggleStoryVisibility(story, "show_tag")}
                                 className="flex items-center gap-1 hover:opacity-70 transition-opacity"
                               >
@@ -2428,7 +2608,7 @@ export default function AdminDashboard() {
                                 {story.show_tag === false && <span className="text-[9px] bg-red-100 text-red-600 px-1 rounded">Hidden</span>}
                               </button>
                               {story.website && (
-                                <button 
+                                <button
                                   onClick={() => toggleStoryVisibility(story, "show_website")}
                                   className="flex items-center gap-1 hover:opacity-70 transition-opacity"
                                 >
@@ -2449,14 +2629,14 @@ export default function AdminDashboard() {
                                     className="hover:opacity-80 transition-opacity"
                                   >
                                     {isVideo ? (
-                                      <video 
-                                        src={url} 
-                                        className="w-10 h-10 rounded object-cover border bg-gray-100" 
+                                      <video
+                                        src={url}
+                                        className="w-10 h-10 rounded object-cover border bg-gray-100"
                                       />
                                     ) : (
-                                      <img 
-                                        src={url} 
-                                        className="w-10 h-10 rounded object-cover border" 
+                                      <img
+                                        src={url}
+                                        className="w-10 h-10 rounded object-cover border"
                                       />
                                     )}
                                   </button>
@@ -2472,7 +2652,7 @@ export default function AdminDashboard() {
                         </tr>
                       ))}
                       {stories.length === 0 && (
-                    <tr key="no-stories">
+                        <tr key="no-stories">
                           <td colSpan={5} className="p-4 text-center text-gray-500">
                             No stories for now
                           </td>
@@ -2523,14 +2703,14 @@ export default function AdminDashboard() {
                                     className="hover:opacity-80 transition-opacity"
                                   >
                                     {isVideo ? (
-                                      <video 
-                                        src={url} 
-                                        className="w-12 h-12 rounded object-cover border bg-gray-100" 
+                                      <video
+                                        src={url}
+                                        className="w-12 h-12 rounded object-cover border bg-gray-100"
                                       />
                                     ) : (
-                                      <img 
-                                        src={url} 
-                                        className="w-12 h-12 rounded object-cover border" 
+                                      <img
+                                        src={url}
+                                        className="w-12 h-12 rounded object-cover border"
                                       />
                                     )}
                                   </button>
@@ -2542,36 +2722,36 @@ export default function AdminDashboard() {
                           <td className="p-2">
                             <div className="flex flex-wrap gap-1">
                               {post.website && (
-                                <button 
+                                <button
                                   onClick={() => togglePostVisibility(post, "show_website")}
-                                  title="Toggle Website visibility" 
+                                  title="Toggle Website visibility"
                                   className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_website === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   WEB
                                 </button>
                               )}
                               {post.whatsapp && (
-                                <button 
+                                <button
                                   onClick={() => togglePostVisibility(post, "show_whatsapp")}
-                                  title="Toggle WhatsApp visibility" 
+                                  title="Toggle WhatsApp visibility"
                                   className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_whatsapp === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   WA
                                 </button>
                               )}
                               {post.instagram && (
-                                <button 
+                                <button
                                   onClick={() => togglePostVisibility(post, "show_instagram")}
-                                  title="Toggle Instagram visibility" 
+                                  title="Toggle Instagram visibility"
                                   className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_instagram === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   IG
                                 </button>
                               )}
                               {post.twitter && (
-                                <button 
+                                <button
                                   onClick={() => togglePostVisibility(post, "show_twitter")}
-                                  title="Toggle X visibility" 
+                                  title="Toggle X visibility"
                                   className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_twitter === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   X
@@ -2593,7 +2773,7 @@ export default function AdminDashboard() {
                         </tr>
                       ))}
                       {posts.length === 0 && (
-                    <tr key="no-posts">
+                        <tr key="no-posts">
                           <td colSpan={6} className="p-4 text-center text-gray-500">
                             No posts for now
                           </td>
@@ -2654,29 +2834,29 @@ export default function AdminDashboard() {
 
       {/* Media Preview Overlay */}
       {previewMedia && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/80 backdrop-blur-sm z-100 flex items-center justify-center p-4"
           onClick={() => setPreviewMedia(null)}
         >
           <div className="relative max-w-5xl max-h-full" onClick={e => e.stopPropagation()}>
-            <button 
+            <button
               onClick={() => setPreviewMedia(null)}
               className="absolute -top-12 right-0 text-white text-4xl hover:text-gray-300 transition-colors"
             >
               &times;
             </button>
             {previewMedia.match(/\.(mp4|mov|avi|mkv|webm)$/i) ? (
-              <video 
-                src={previewMedia} 
-                controls 
-                className="max-w-full max-h-[80vh] rounded-lg shadow-2xl" 
-                autoPlay 
+              <video
+                src={previewMedia}
+                controls
+                className="max-w-full max-h-[80vh] rounded-lg shadow-2xl"
+                autoPlay
               />
             ) : (
-              <img 
-                src={previewMedia} 
-                alt="Full size preview" 
-                className="max-w-full max-h-[80vh] rounded-lg shadow-2xl object-contain" 
+              <img
+                src={previewMedia}
+                alt="Full size preview"
+                className="max-w-full max-h-[80vh] rounded-lg shadow-2xl object-contain"
               />
             )}
           </div>

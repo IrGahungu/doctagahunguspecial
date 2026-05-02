@@ -93,6 +93,7 @@ export default function DoctorDetailScreen() {
   const checkmarkScale = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showCallCarButton, setShowCallCarButton] = useState(true);
 
   const currentDayName = useMemo(() => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -105,6 +106,31 @@ export default function DoctorDetailScreen() {
       setCountry(storedCountry);
     };
     fetchCountry();
+
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+        if (res.ok) {
+          const data = await res.json();
+          setShowCallCarButton(data.show_call_car_button_doctor !== false);
+        }
+      } catch (error) { console.error(error); }
+    };
+    fetchSettings();
+
+    const channel = supabase.channel('doctor-call-car-visibility')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'settings', 
+        filter: 'key=eq.show_call_car_button_doctor' 
+      }, (payload: any) => {
+        if (payload.new) {
+          setShowCallCarButton(payload.new.value !== 'false');
+        }
+      }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {
@@ -627,12 +653,14 @@ export default function DoctorDetailScreen() {
                  </View>
            </View>
  
+           {showCallCarButton && (
            <Pressable
              style={styles.carButton}
              onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
            >
              <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text> 
            </Pressable>
+           )}
          </View>
        </ScrollView>
        {/* Booking Modal */}

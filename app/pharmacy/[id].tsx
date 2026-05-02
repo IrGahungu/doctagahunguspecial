@@ -65,6 +65,34 @@ export default function PharmacyDetailScreen() {
   const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const showToast = useToastStore(state => state.showToast);
+  const [showCallCarButton, setShowCallCarButton] = useState(true);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+        if (res.ok) {
+          const data = await res.json();
+          setShowCallCarButton(data.show_call_car_button_pharmacy !== false);
+        }
+      } catch (error) { console.error(error); }
+    };
+    fetchSettings();
+
+    const channel = supabase.channel('pharmacy-call-car-visibility')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'settings', 
+        filter: 'key=eq.show_call_car_button_pharmacy' 
+      }, (payload: any) => {
+        if (payload.new) {
+          setShowCallCarButton(payload.new.value !== 'false');
+        }
+      }).subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
     if (!id || typeof id !== 'string') {
@@ -361,12 +389,14 @@ export default function PharmacyDetailScreen() {
                 </View>
           </View>
 
+          {showCallCarButton && (
           <Pressable
             style={styles.carButton}
             onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
           >
             <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
           </Pressable>
+          )}
         </View>
       </ScrollView>
       <Toast />

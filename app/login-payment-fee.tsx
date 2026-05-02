@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { Wallet, ShieldCheck, ArrowRight, Eye, EyeOff, PlusCircle, LogOut } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
+import { supabase } from '@/lib/supabase';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
@@ -45,6 +46,7 @@ export default function LoginPaymentFeeScreen() {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [country, setCountry] = useState<string>('Burundi');
   const [userId, setUserId] = useState<string | null>(null);
+  const [fee, setFee] = useState<number>(1000);
   
   // New states for privacy and PIN
   const [isBalanceVisible, setIsBalanceVisible] = useState(false);
@@ -53,7 +55,6 @@ export default function LoginPaymentFeeScreen() {
   const [pin, setPin] = useState('');
   const [supportModalVisible, setSupportModalVisible] = useState(false);
 
-  const fee = LOGIN_FEE_MAP[country] || 500;
   const currency = currencyMap[country] || 'USD';
 
   useEffect(() => {
@@ -66,6 +67,20 @@ export default function LoginPaymentFeeScreen() {
         if (!token) {
           router.replace('/auth');
           return;
+        }
+
+        // Fetch dynamic access fee
+        if (storedCountry) {
+          const { data: feeData, error: feeError } = await supabase
+            .from('service_fees')
+            .select('fee')
+            .eq('country', storedCountry)
+            .eq('service_type', 'access')
+            .single();
+          
+          if (!feeError && feeData) {
+            setFee(Number(feeData.fee));
+          }
         }
 
         const res = await fetch(`${API_BASE_URL}/me`, {
@@ -103,6 +118,34 @@ export default function LoginPaymentFeeScreen() {
 
     fetchData();
   }, []);
+
+  // Real-time updates for the access fee
+  useEffect(() => {
+    if (!country) return;
+    
+    const feeChannel = supabase
+      .channel('access-fee-updates')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'service_fees', 
+          filter: `country=eq.${country}` 
+        },
+        (payload) => {
+          const updatedFee = payload.new as any;
+          if (updatedFee && updatedFee.service_type === 'access') {
+            setFee(Number(updatedFee.fee));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(feeChannel);
+    };
+  }, [country]);
 
   const handlePinSubmit = async () => {
     if (pin.length !== 4) {

@@ -54,6 +54,7 @@ export default function ProductDetailScreen() {
   const [country, setCountry] = useState<string | null>(null);
   const showToast = useToastStore(state => state.showToast);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
+  const [showAddToCartButton, setShowAddToCartButton] = useState(true); // Default to true
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -63,6 +64,47 @@ export default function ProductDetailScreen() {
 
     fetchCountry();
   }, []);
+
+  // Fetch "Add to Cart" button visibility setting
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+        if (res.ok) {
+          const data = await res.json();
+          setShowAddToCartButton(data.show_add_to_cart_button !== false);
+        }
+      } catch (error) {
+        console.error("Failed to fetch 'Add to Cart' button setting:", error);
+      }
+    };
+    fetchSettings();
+
+    // Real-time listener for the "Add to Cart" button visibility
+    const settingsChannel = supabase
+      .channel('cart-button-visibility-sync')
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'settings', 
+          filter: 'key=eq.show_add_to_cart_button' 
+        },
+        (payload) => {
+          if (payload.new) {
+            const { value } = payload.new as any;
+            setShowAddToCartButton(value !== 'false');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsChannel);
+    };
+  }, []);
+
 
   useEffect(() => {
     if (!id) {
@@ -419,16 +461,18 @@ export default function ProductDetailScreen() {
           </Pressable>
         </View>
 
-        <View ref={addToCartBtnRef}>
-          <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
-            <Text style={styles.addToCartText}>
-              Add to Cart
-              {selectedPharmacyId && product?.pharmacies?.find(p => p.id === selectedPharmacyId)
-                ? ` - ${(product.pharmacies.find(p => p.id === selectedPharmacyId) as any).price.toLocaleString()} ${getCurrency(country)}`
-                : ''}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {showAddToCartButton && (
+          <View ref={addToCartBtnRef}>
+            <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
+              <Text style={styles.addToCartText}>
+                Add to Cart
+                {selectedPharmacyId && product?.pharmacies?.find(p => p.id === selectedPharmacyId)
+                  ? ` - ${(product.pharmacies.find(p => p.id === selectedPharmacyId) as any).price.toLocaleString()} ${getCurrency(country)}`
+                  : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView >
       {/* Animation component */}
       {
