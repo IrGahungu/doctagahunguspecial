@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChevronRight, User, ShoppingBag, Star, Headphones, Settings, KeyRound, Calendar, History, Bus } from "lucide-react-native";
+import { ChevronRight, User, ShoppingBag, Star, Headphones, Settings, KeyRound, Calendar, History, Bus, Pill } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
 import { useRouter, useFocusEffect } from "expo-router";
 import Toast from "react-native-toast-message";
@@ -30,7 +30,12 @@ export default function AccountScreen() {
     storiesViewedToday: 0,
     epEarnedToday: 0,
   });
+  const [showOrdersButton, setShowOrdersButton] = useState(false);
+  const [showMyAppointmentsButton, setShowMyAppointmentsButton] = useState(false);
+  const [showBookBusButton, setShowBookBusButton] = useState(false);
+  const [showMyBusTicketsButton, setShowMyBusTicketsButton] = useState(false);
   const [displayProgress, setDisplayProgress] = useState(0);
+  const [monetizationGoal, setMonetizationGoal] = useState(50000);
   const router = useRouter();
 
   const menuItems = [
@@ -38,6 +43,7 @@ export default function AccountScreen() {
     { id: "6", title: "My Appointments", icon: Calendar, info: "View your scheduled doctor visits", route: "/appointments" },
     { id: "7", title: "View My Transactions", icon: History, info: "Check your wallet history", route: "/transactions" },
     { id: "8", title: "Book a JK BUS", icon: Bus, info: "Travel with comfort", route: "/bus-booking" },
+    //{ id: "11", title: "My Prescriptions", icon: Pill, info: "Search for multiple medicines", route: "/prescriptions" },
     { id: "9", title: "My Bus Tickets", icon: Bus, info: "View your reserved seats", route: "/bus-tickets" },
     { id: "2", title: "Reviews", icon: Star, info: "See what others are saying about the app", route: "/reviews" },
     { id: "5", title: "Transaction PIN", icon: KeyRound, info: "Set or change your payment PIN", route: "/pin-management" },
@@ -45,8 +51,6 @@ export default function AccountScreen() {
     { id: "10", title: "Update Profile", icon: User, info: "Manage your personal information", route: "/update-profile" },
     { id: "4", title: "Settings", icon: Settings, info: "App settings and preferences", route: "/settings" },
   ];
-
-  const MONETIZATION_GOAL = 50000;
 
   // Fetch profile from backend
   useFocusEffect(
@@ -68,9 +72,20 @@ export default function AccountScreen() {
           const data = await res.json();
           if (res.ok) {
             setProfile(data);
-            if (data.engagement_points !== undefined) {
-              setEngagementPoints(data.engagement_points);
+            setEngagementPoints(data.engagement_points || 0);
+
+            // Fetch button visibility from correct config endpoint to stay in sync
+            const settingsRes = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+            if (settingsRes.ok) {
+              const settingsData = await settingsRes.json();
+              // Update visibility states based on API config (force boolean conversion)
+              setShowOrdersButton(!!settingsData.show_orders_button);
+              setShowMyAppointmentsButton(!!settingsData.show_my_appointments_button);
+              setShowBookBusButton(!!settingsData.show_book_bus_button);
+              setShowMyBusTicketsButton(!!settingsData.show_my_bus_tickets_button);
+              setMonetizationGoal(settingsData.monetization_goal || 50000);
             }
+
             useAuthStore.getState().setUserId(data.id); // ✅ Save user ID to global store
 
             // Fetch active orders count
@@ -98,9 +113,11 @@ export default function AccountScreen() {
             epEarnedToday: parseInt(ep || '0'),
           });
 
+          const currentGoal = monetizationGoal; // Use the most recent state value
+
           // Animate the progress bar after a short delay to allow screen transition to settle
           setTimeout(() => {
-            setDisplayProgress(Math.min(currentPoints / MONETIZATION_GOAL, 1));
+            setDisplayProgress(Math.min(currentPoints / currentGoal, 1));
           }, 400);
         } catch (err) {
           console.error("Profile fetch error:", err);
@@ -112,6 +129,30 @@ export default function AccountScreen() {
       fetchProfile();
     }, [router])
   );
+
+  // Real-time subscription for button visibility settings
+  useEffect(() => {
+    const syncChannel = supabase.channel('account-button-visibility')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'settings'
+      }, (payload: any) => {
+        if (payload.new && payload.new.key) {
+          const { key, value } = payload.new;
+          const isVisible = value === 'true'; // Explicitly check for 'true'
+          if (key === 'show_orders_button') { console.log('[AccountScreen] Real-time Update for Orders:', isVisible); setShowOrdersButton(isVisible); }
+          if (key === 'show_my_appointments_button') { console.log('[AccountScreen] Real-time Update for My Appointments:', isVisible); setShowMyAppointmentsButton(isVisible); }
+          if (key === 'show_book_bus_button') { console.log('[AccountScreen] Real-time Update for Book Bus:', isVisible); setShowBookBusButton(isVisible); }
+          if (key === 'show_my_bus_tickets_button') { console.log('[AccountScreen] Real-time Update for My Bus Tickets:', isVisible); setShowMyBusTicketsButton(isVisible); }
+        }
+      }).subscribe();
+
+    return () => { 
+      supabase.removeChannel(syncChannel);
+    };
+  }, []);
+
 
   // Real-time subscription for active orders count
   useEffect(() => {
@@ -155,13 +196,14 @@ export default function AccountScreen() {
             pathname: '/wallet-details',
             params: { 
               engagementPoints: engagementPoints.toString(), 
+              monetizationGoal: monetizationGoal.toString(),
               ...dailyStats 
             }
           })}
         >
           <View style={styles.monetizationHeader}>
             <Text style={styles.monetizationTitle}>Monetization Goal</Text>
-            <Text style={styles.monetizationValue}>{Math.round(Math.min(engagementPoints / MONETIZATION_GOAL, 1) * 100)}%</Text>
+            <Text style={styles.monetizationValue}>{Math.round(Math.min(engagementPoints / monetizationGoal, 1) * 100)}%</Text>
           </View>
           <Progress.Bar 
             progress={displayProgress} 
@@ -175,12 +217,23 @@ export default function AccountScreen() {
             animationType="timing"
           />
           <Text style={styles.monetizationSubtext}>
-            {engagementPoints.toLocaleString()} / {MONETIZATION_GOAL.toLocaleString()} EP
+            {engagementPoints.toLocaleString()} / {monetizationGoal.toLocaleString()} EP
           </Text>
         </TouchableOpacity>
 
         <View style={styles.menuSection}>
-          {menuItems.map((item) => (
+          {menuItems.map((item) => {
+            // Determine if the menu item should be hidden based on admin settings (Toggleable items: 1, 6, 8, 9)
+            const isHidden = (
+              (item.id === "1" && !showOrdersButton) ||
+              (item.id === "6" && !showMyAppointmentsButton) ||
+              (item.id === "8" && !showBookBusButton) ||
+              (item.id === "9" && !showMyBusTicketsButton)
+            );
+
+            if (isHidden) return null;
+
+            return (
             <TouchableOpacity
               key={item.id}
               style={styles.menuItem}
@@ -200,7 +253,8 @@ export default function AccountScreen() {
               )}
               <ChevronRight size={22} />
             </TouchableOpacity>
-          ))}
+            );
+          })}
         </View>
 
         <Text style={styles.versionText}>Version 1.0.0</Text>

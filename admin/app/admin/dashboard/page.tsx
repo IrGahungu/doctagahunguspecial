@@ -179,6 +179,12 @@ type ButtonSettings = {
   show_hospital_cta_button: boolean;
   show_insurance_cta_button: boolean;
   show_pharmacy_cta_button: boolean;
+  show_book_online_button: boolean;
+  show_book_in_office_button: boolean;
+  show_orders_button: boolean; // New
+  show_my_appointments_button: boolean; // New
+  show_book_bus_button: boolean; // New
+  show_my_bus_tickets_button: boolean; // New
 };
 
 type EpRewards = {
@@ -187,6 +193,7 @@ type EpRewards = {
   ep_post_like: string;
   story_duration: string;
   show_add_to_cart_button: boolean;
+  monetization_goal: string;
 } & ButtonSettings;
 
 const Spinner = ({ className = "h-5 w-5" }: { className?: string }) => (
@@ -227,12 +234,18 @@ export default function AdminDashboard() {
     ep_post_view: "300",
     ep_post_like: "200",
     story_duration: "45000",
-    show_add_to_cart_button: true, // Default to true
+    show_add_to_cart_button: true, // Default to true to match your SQL initialization
     show_product_cta_button: true,
     show_doctor_cta_button: true,
     show_hospital_cta_button: true,
     show_insurance_cta_button: true,
     show_pharmacy_cta_button: true,
+    show_book_online_button: true,
+    show_book_in_office_button: true,
+    show_orders_button: true, // New
+    show_my_appointments_button: true, // New
+    show_book_bus_button: true, // New
+    show_my_bus_tickets_button: true, // New
   } as EpRewards);
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [adminReplyText, setAdminReplyText] = useState("");
@@ -419,17 +432,28 @@ export default function AdminDashboard() {
 
       if (res.ok) {
         const data = await res.json();
+        const settings = data.data || data;
+        
+        const isTrue = (val: any) => val === true || val === 'true';
+
         setEpRewards({
-          ep_story_view: (data.ep_story_view ?? "500").toString(),
-          ep_post_view: (data.ep_post_view ?? "300").toString(),
-          ep_post_like: (data.ep_post_like ?? "200").toString(),
-          story_duration: (data.story_duration ?? "45000").toString(),
-          show_add_to_cart_button: data.show_add_to_cart_button !== false,
-          show_product_cta_button: data.show_call_car_button_product !== false,
-          show_doctor_cta_button: data.show_call_car_button_doctor !== false,
-          show_hospital_cta_button: data.show_call_car_button_hospital !== false,
-          show_insurance_cta_button: data.show_call_car_button_insurance !== false,
-          show_pharmacy_cta_button: data.show_call_car_button_pharmacy !== false,
+          ep_story_view: (settings.ep_story_view?.toString() ?? "500"),
+          ep_post_view: (settings.ep_post_view?.toString() ?? "300"),
+          ep_post_like: (settings.ep_post_like?.toString() ?? "200"),
+          story_duration: (settings.story_duration?.toString() ?? "45000"),
+          show_add_to_cart_button: isTrue(settings.show_add_to_cart_button),
+          show_product_cta_button: isTrue(settings.show_call_car_button_product),
+          show_doctor_cta_button: isTrue(settings.show_call_car_button_doctor),
+          show_hospital_cta_button: isTrue(settings.show_call_car_button_hospital),
+          show_insurance_cta_button: isTrue(settings.show_call_car_button_insurance),
+          show_pharmacy_cta_button: isTrue(settings.show_call_car_button_pharmacy),
+          show_book_online_button: isTrue(settings.show_book_online_button),
+          show_book_in_office_button: isTrue(settings.show_book_in_office_button),
+          show_orders_button: isTrue(settings.show_orders_button), // New
+          show_my_appointments_button: isTrue(settings.show_my_appointments_button), // New
+          show_book_bus_button: isTrue(settings.show_book_bus_button), // New
+          show_my_bus_tickets_button: isTrue(settings.show_my_bus_tickets_button), // New
+          monetization_goal: (settings.monetization_goal?.toString() ?? "50000"),
         });
         console.log("Fetched EP Rewards and Settings:", data);
       }
@@ -447,12 +471,25 @@ export default function AdminDashboard() {
     let endpoint = "/api/admin/settings/engagement-points";
     let body: any = { key, value };
 
+    if (key === "monetization_goal") {
+      const parsedVal = parseInt(value as string);
+      if (isNaN(parsedVal) || parsedVal < 0) {
+        return toast.error("Please enter a valid non-negative number");
+      }
+    }
+
     const ctaButtonKeys = [
       "show_product_cta_button",
       "show_doctor_cta_button",
       "show_hospital_cta_button",
       "show_insurance_cta_button",
-      "show_pharmacy_cta_button"
+      "show_pharmacy_cta_button",
+      "show_book_online_button",
+      "show_book_in_office_button",
+      "show_orders_button",
+      "show_my_appointments_button",
+      "show_book_bus_button",
+      "show_my_bus_tickets_button"
     ];
 
     if (key === "show_add_to_cart_button") {
@@ -502,6 +539,12 @@ export default function AdminDashboard() {
         setEpRewards((prev) => ({
           ...prev,
           [key]: value as boolean, // ✅ Fixed: Updates the specific key clicked
+        }));
+      } else if (key === "monetization_goal") {
+        toast.success("Monetization goal updated!");
+        setEpRewards((prev) => ({
+          ...prev,
+          monetization_goal: String(value),
         }));
       } else if (key === "story_duration") {
         toast.success("Story duration updated");
@@ -554,7 +597,8 @@ export default function AdminDashboard() {
       setIsRefreshing(false);
     }
   };
-  const handleUpdateThreshold = async () => {
+  
+  const handleUpdateSettingValue = async (key: string, inputValue: string) => {
     const val = parseInt(newThresholdInput);
     if (isNaN(val) || val < 0) return toast.error("Please enter a valid non-negative number");
 
@@ -563,13 +607,14 @@ export default function AdminDashboard() {
       const res = await fetch("/api/admin/settings/min-ep-required", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: val }),
+        body: JSON.stringify({ key, value: val }),
       });
       if (!res.ok) throw new Error("Update failed");
-      toast.success("Engagement points threshold updated!");
-      fetchEpThreshold();
+      toast.success("Setting updated successfully!");
+      if (key === 'min_ep_required') fetchEpThreshold();
+      else fetchEpRewards();
     } catch (err) {
-      toast.error("Error updating threshold");
+      toast.error("Error updating setting");
     } finally {
       setIsRefreshing(false);
     }
@@ -1649,25 +1694,43 @@ export default function AdminDashboard() {
                   </div>
                   <p className="text-sm text-violet-600 mt-3 font-medium">This determines the minimum engagement points a user must have to book a bus ticket.</p>
                 </div>
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-600 uppercase mb-2 ml-1">Update Threshold Value</label>
-                    <div className="flex gap-3">
+
+                <div className="space-y-10">
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-200">
+                    <label className="block text-sm font-black text-gray-400 uppercase mb-4 tracking-widest ml-1">
+                      🚌 Bus Booking Eligibility (Min EP)
+                    </label>
+                    <div className="flex gap-4">
                       <input
                         type="number"
                         value={newThresholdInput}
                         onChange={(e) => setNewThresholdInput(e.target.value)}
-                        className="flex-1 border-2 border-gray-200 rounded-xl p-4 text-lg font-semibold focus:border-violet-500 focus:ring-4 focus:ring-violet-100 outline-none transition-all shadow-inner bg-gray-50"
-                        placeholder="e.g. 5000"
+                        className="flex-1 border-2 border-gray-200 rounded-xl p-3 text-lg font-bold focus:border-violet-500 focus:ring-4 focus:ring-violet-50 outline-none transition-all"
                       />
                       <button
-                        onClick={handleUpdateThreshold}
-                        disabled={isRefreshing}
-                        className="bg-violet-600 text-white px-8 py-4 rounded-xl font-bold hover:bg-violet-700 active:scale-95 transition-all shadow-lg shadow-violet-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {isRefreshing ? <Spinner /> : "Save Changes"}
-                      </button>
+                        onClick={() => handleUpdateSettingValue('min_ep_required', newThresholdInput)}
+                        className="bg-violet-600 text-white px-6 rounded-xl font-bold hover:bg-violet-700 active:scale-95 transition-all shadow-md shadow-violet-100 min-w-[140px]"
+                      >Save</button>
                     </div>
+                  </div>
+
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-200">
+                    <label className="block text-sm font-black text-gray-400 uppercase mb-4 tracking-widest ml-1">
+                      💰 Monetization Goal Threshold
+                    </label>
+                    <div className="flex gap-4">
+                      <input
+                        type="number"
+                        value={epRewards.monetization_goal}
+                        onChange={(e) => setEpRewards({ ...epRewards, monetization_goal: e.target.value })}
+                        className="flex-1 border-2 border-gray-200 rounded-xl p-3 text-lg font-bold focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 outline-none transition-all"
+                      />
+                      <button
+                        onClick={() => handleUpdateEpReward('monetization_goal', epRewards.monetization_goal)}
+                        className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-100 min-w-[140px]"
+                      >Save</button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-3 italic">This goal appears on the user's account progress bar.</p>
                   </div>
                 </div>
               </div>
@@ -1685,6 +1748,7 @@ export default function AdminDashboard() {
                     { key: 'ep_story_view', label: 'Story View Reward', icon: '📱' },
                     { key: 'ep_post_view', label: 'Post View Reward', icon: '🖼️' },
                     { key: 'ep_post_like', label: 'Post Like Reward', icon: '❤️' },
+                    { key: 'monetization_goal', label: 'Monetization Goal Threshold', icon: '💰' },
                   ].map((item) => (
                     // Explicitly cast item.key to a key of epRewards to satisfy TypeScript
                     // This is safe because we control the keys in the array and the epRewards type
@@ -1759,6 +1823,12 @@ export default function AdminDashboard() {
                     { key: 'show_hospital_cta_button', label: 'Show "Call Car" in Hospital Details' },
                     { key: 'show_insurance_cta_button', label: 'Show "Call Car" in Insurance Details' },
                     { key: 'show_pharmacy_cta_button', label: 'Show "Call Car" in Pharmacy Details' },
+                    { key: 'show_book_online_button', label: 'Show "Book Online" Button (Doctors)' },
+                    { key: 'show_book_in_office_button', label: 'Show "Book In Office" Button (Doctors)' },
+                    { key: 'show_orders_button', label: 'Show "Orders" Button (Account Screen)' }, // New
+                    { key: 'show_my_appointments_button', label: 'Show "My Appointments" Button (Account Screen)' }, // New
+                    { key: 'show_book_bus_button', label: 'Show "Book a JK BUS" Button (Account Screen)' }, // New
+                    { key: 'show_my_bus_tickets_button', label: 'Show "My Bus Tickets" Button (Account Screen)' }, // New
                   ].map((btn) => (
                     <div key={btn.key} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
                       <label className="block text-sm font-bold text-gray-700">{btn.label}</label>

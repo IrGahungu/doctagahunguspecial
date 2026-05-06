@@ -1,36 +1,112 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import * as Progress from 'react-native-progress'; // Need to install this: `npx expo install react-native-progress`
+import { API_BASE_URL } from "@/config";
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function WalletDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const userId = useAuthStore((state) => state.userId);
 
-  const engagementPoints = parseInt(params.engagementPoints as string || '0');
+  const [engagementPoints, setEngagementPoints] = useState(parseInt(params.engagementPoints as string || '0'));
   const postsLikedToday = parseInt(params.postsLikedToday as string || '0');
   const storiesViewedToday = parseInt(params.storiesViewedToday as string || '0');
   const epEarnedToday = parseInt(params.epEarnedToday as string || '0');
-
-  const MONETIZATION_GOAL = 50000;
-  const progressPercentage = Math.min(engagementPoints / MONETIZATION_GOAL, 1);
-  const pointsToReachGoal = MONETIZATION_GOAL - engagementPoints;
-
+  
+  const [monetizationGoal, setMonetizationGoal] = useState(parseInt(params.monetizationGoal as string || '50000'));
   const [displayProgress, setDisplayProgress] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  const progressPercentage = Math.min(engagementPoints / monetizationGoal, 1);
+  const pointsToReachGoal = monetizationGoal - engagementPoints;
 
   useEffect(() => {
-    // 1. Reset progress to 0 on mount
-    setDisplayProgress(0);
-    
-    // 2. Wait for the screen transition to finish (500ms) before filling
-    const timer = setTimeout(() => {
-      setDisplayProgress(progressPercentage);
-    }, 500);
+    const fetchGoal = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.monetization_goal !== undefined) {
+            setMonetizationGoal(data.monetization_goal);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch monetization goal:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGoal();
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [progressPercentage]);
+  // Real-time listener for monetization goal and engagement points
+  useEffect(() => {
+    // 1. Listen for global settings changes (monetization goal)
+    const settingsChannel = supabase
+      .channel('settings-goal-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'settings',
+          filter: 'key=eq.monetization_goal',
+        },
+        (payload: any) => {
+          if (payload.new && payload.new.value !== undefined) {
+            setMonetizationGoal(parseInt(payload.new.value || '0', 10));
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Listen for current user's engagement points changes
+    let userChannel: any;
+    if (userId) {
+      userChannel = supabase
+        .channel(`user-points-realtime-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'users',
+            filter: `id=eq.${userId}`,
+          },
+          (payload: any) => {
+            if (payload.new && payload.new.engagement_points !== undefined) {
+              setEngagementPoints(payload.new.engagement_points);
+            }
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      supabase.removeChannel(settingsChannel);
+      if (userChannel) supabase.removeChannel(userChannel);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!hasMounted) {
+      // Wait for the screen transition to finish (500ms) before filling the first time
+      const timer = setTimeout(() => {
+        setDisplayProgress(progressPercentage);
+        setHasMounted(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // For real-time updates after mounting, update immediately
+      setDisplayProgress(progressPercentage);
+    }
+  }, [progressPercentage, hasMounted]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -44,6 +120,12 @@ export default function WalletDetailsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.monetizationGoalCard}>
+          <Text style={styles.progressTitle}>Monetization Goal</Text>
+          <Text style={styles.summaryItem}>Threshold: {monetizationGoal.toLocaleString()} EP</Text>
+        </View>
+
+        {loading && <ActivityIndicator size="small" color="#4CAF50" style={{ marginBottom: 10 }} />}
         <View style={styles.progressBarContainer}>
           <Progress.Bar 
             progress={displayProgress} 
@@ -57,7 +139,7 @@ export default function WalletDetailsScreen() {
             animationType="timing"
           />
           <Text style={styles.progressText}>
-            {engagementPoints.toLocaleString()} / {MONETIZATION_GOAL.toLocaleString()} EP
+            {engagementPoints.toLocaleString()} / {monetizationGoal.toLocaleString()} EP
           </Text>
           <Text style={styles.motivationText}>
             {pointsToReachGoal > 0
@@ -65,16 +147,16 @@ export default function WalletDetailsScreen() {
               : `Congratulations! You've reached your monetization goal! 🎉`}
           </Text>
           <Text style={styles.monetizationInfo}>
-            Note: After reaching {MONETIZATION_GOAL.toLocaleString()} EP, you will be able to turn your points into money and withdraw it.
+            Note: After reaching {monetizationGoal.toLocaleString()} EP, you will be able to turn your points into money and withdraw it.
           </Text>
         </View>
 
         {/* Daily Summary Card */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryCardTitle}>Today's Engagement</Text>
-          <Text style={styles.summaryItem}>You liked {postsLikedToday} Posts today.</Text>
-          <Text style={styles.summaryItem}>You viewed {storiesViewedToday} Stories today.</Text>
-          <Text style={styles.summaryItem}>You earned {epEarnedToday} EP today.</Text>
+          <Text style={styles.summaryCardTitle}>Daily Summary</Text>
+          <Text style={styles.summaryItem}>• Posts Liked Today: {postsLikedToday}</Text>
+          <Text style={styles.summaryItem}>• Stories Viewed Today: {storiesViewedToday}</Text>
+          <Text style={styles.summaryItem}>• Points Earned Today: {epEarnedToday.toLocaleString()} EP</Text>
           <Text style={styles.summaryMessage}>
             Keep it up dear,our Team loves you!!
           </Text>
@@ -132,8 +214,8 @@ const styles = StyleSheet.create({
   progressBarContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    marginTop: 50, // Increased space between title/header and container to 50
+    padding: 20,
+    marginTop: 10, 
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 }, // More pronounced shadow

@@ -18,7 +18,13 @@ export async function PUT(req: Request) {
       'show_doctor_cta_button': 'show_call_car_button_doctor',
       'show_hospital_cta_button': 'show_call_car_button_hospital',
       'show_insurance_cta_button': 'show_call_car_button_insurance',
-      'show_pharmacy_cta_button': 'show_call_car_button_pharmacy'
+      'show_pharmacy_cta_button': 'show_call_car_button_pharmacy',
+      'show_book_online_button': 'show_book_online_button',
+      'show_book_in_office_button': 'show_book_in_office_button',
+      'show_orders_button': 'show_orders_button',
+      'show_my_appointments_button': 'show_my_appointments_button',
+      'show_book_bus_button': 'show_book_bus_button',
+      'show_my_bus_tickets_button': 'show_my_bus_tickets_button'
     };
 
     const dbKey = keyMap[key] || key;

@@ -252,7 +252,7 @@ export default function Header() {
               </Text>
               <TouchableOpacity
                 style={styles.walletContainer}
-                onPress={() => router.push('/wallet/add-money')}
+                //onPress={() => router.push('/wallet/add-money')}
                 activeOpacity={0.7}
               >
                 <Icon name="wallet" size={24} color="#4CAF50" />

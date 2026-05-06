@@ -55,15 +55,40 @@ export default function ProductDetailScreen() {
   const showToast = useToastStore(state => state.showToast);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
   const [showAddToCartButton, setShowAddToCartButton] = useState(true); // Default to true
+  const [showCallCarButton, setShowCallCarButton] = useState(true);
 
   useEffect(() => {
     const fetchCountry = async () => {
       const storedCountry = await SecureStore.getItemAsync("user_country");
-      setCountry(storedCountry);
+      setCountry(storedCountry ? storedCountry.trim() : null);
     };
 
     fetchCountry();
-  }, []);
+    const fetchSettings = async () => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+            if (res.ok) {
+              const data = await res.json();
+              setShowCallCarButton(data.show_call_car_button_product !== false);
+            }
+          } catch (error) { console.error(error); }
+        };
+        fetchSettings();
+    
+        const channel = supabase.channel('product-call-car-visibility')
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'settings', 
+            filter: 'key=eq.show_call_car_button_product' 
+          }, (payload: any) => {
+            if (payload.new) {
+              setShowCallCarButton(payload.new.value !== 'false');
+            }
+          }).subscribe();
+    
+        return () => { supabase.removeChannel(channel); };
+      }, []);
 
   // Fetch "Add to Cart" button visibility setting
   useEffect(() => {
@@ -127,6 +152,7 @@ export default function ProductDetailScreen() {
       } else if (stockData) {
         // 2. Fetch all stocks with the same name to list all pharmacies
         const userCountry = await SecureStore.getItemAsync("user_country");
+        const normalizedName = stockData.name.trim().replace(/[.,]$/, "");
         
         const { data: allStocks } = await supabase
             .from('stock')
@@ -136,14 +162,15 @@ export default function ProductDetailScreen() {
                     id, name, image, location, accepted_insurances, country
                 )
             `)
-            .ilike('name', stockData.name)
-            .eq('in_stock', true);
+            .ilike('name', normalizedName)
+            .eq('in_stock', true)
+            .ilike('pharmacy.country', userCountry ? userCountry.trim() : '');
 
         let pharmacyList: any[] = [];
 
         if (allStocks) {
              pharmacyList = allStocks
-                .filter((item: any) => item.pharmacy && (!userCountry || item.pharmacy.country === userCountry))
+                .filter((item: any) => item.pharmacy)
                 .map((item: any) => {
                     const pData = item.pharmacy;
                     
@@ -184,7 +211,7 @@ export default function ProductDetailScreen() {
 
         const transformedProduct = {
           id: stockData.id,
-          name: stockData.name,
+          name: stockData.name.replace(/[.,]$/, "").trim(),
           price: stockData.price,
           originalPrice: stockData.original_price,
           image: stockData.image,
@@ -453,12 +480,14 @@ export default function ProductDetailScreen() {
               <Text style={styles.noDataText}>No pharmacies listed</Text>
             )}
           </View>
-          <Pressable
-            style={styles.carButton}
-            onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
-          >
-            <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
-          </Pressable>
+          {showCallCarButton && (
+                     <Pressable
+                       style={styles.carButton}
+                       onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
+                     >
+                       <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text> 
+                     </Pressable>
+                     )}
         </View>
 
         {showAddToCartButton && (

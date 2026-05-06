@@ -73,6 +73,8 @@ type SearchResultItem = {
   // Add insurance-specific properties
   coverage?: string[];
   planType?: string;
+  available_blood_types?: string;
+  medical_equipment?: string;
 };
 
 interface Pharmacy {
@@ -121,6 +123,12 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
           pathname: '/product/[id]',
           params: {
             id: String(item.id),
+            name: item.name,
+            image: typeof item.image === 'string' ? item.image : '',
+            price: String(item.price || 0),
+            description: item.description || '',
+            pharmacies: JSON.stringify(item.pharmacies || []),
+            insurances: JSON.stringify(item.insurances || []),
           }
         });
         break;
@@ -143,7 +151,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
             location: JSON.stringify(item.location || []),
             specialties: JSON.stringify(item.hospitalSpecialties || []),
             insurances: JSON.stringify(item.insurances || []),
-            bloodTypes: JSON.stringify((item as any).blood_types || []),
+            bloodTypes: JSON.stringify(item.available_blood_types || []),
           }
         });
         break;
@@ -220,15 +228,32 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
         <View style={styles.itemContent}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
           {item.type === 'medicine' && item.price && (
-            <Text style={styles.itemPrice}>{getCurrency(country)} {item.price.toFixed(2)}</Text>
+            <Text style={styles.itemPrice}>
+              {item.pharmacies && item.pharmacies.length > 1 ? 'From ' : ''}
+              {getCurrency(country)} {item.price.toFixed(2)}
+            </Text>
           )}
-          {item.type === 'medicine' && item.pharmacies && (
+          {item.type === 'medicine' && item.pharmacies && item.pharmacies.length > 0 && (
             <Text style={styles.itemSubtext}>
-              Available in {item.pharmacies.length} pharmac{item.pharmacies.length !== 1 ? 'ies' : 'y'}
+              Available in {item.pharmacies.length} pharmac{item.pharmacies.length > 1 ? 'ies' : 'y'}
             </Text>
           )}
           {item.type === 'doctor' && item.speciality && (
             <Text style={styles.itemSpeciality}>{item.speciality}</Text>
+          )}
+          {item.type === 'hospital' && (
+            <View style={{ marginTop: 4 }}>
+              {item.available_blood_types && (
+                <Text style={styles.itemSubtext} numberOfLines={1}>
+                  <Icon name="bloodtype" size={12} color="#f44336" /> {item.available_blood_types}
+                </Text>
+              )}
+              {item.medical_equipment && (
+                <Text style={styles.itemSubtext} numberOfLines={1}>
+                  <Icon name="medical-services" size={12} color="#4caf50" /> {item.medical_equipment}
+                </Text>
+              )}
+            </View>
           )}
           {item.address && item.type !== 'hospital' && item.type !== 'doctor' && (
             <Text style={styles.itemAddress} numberOfLines={1}>

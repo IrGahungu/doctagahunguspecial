@@ -94,6 +94,11 @@ export default function DoctorDetailScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [showConfetti, setShowConfetti] = useState(false);
   const [showCallCarButton, setShowCallCarButton] = useState(true);
+  const [showBookOnlineButton, setShowBookOnlineButton] = useState(true);
+  const [showBookInOfficeButton, setShowBookInOfficeButton] = useState(true);
+
+  console.log('[DoctorDetail] Initial state of showBookOnlineButton (component mount):', showBookOnlineButton);
+  console.log('[DoctorDetail] Initial state of showBookInOfficeButton (component mount):', showBookInOfficeButton);
 
   const currentDayName = useMemo(() => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -112,25 +117,34 @@ export default function DoctorDetailScreen() {
         const res = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
         if (res.ok) {
           const data = await res.json();
+          console.log('[DoctorDetail] Initial settings fetch result:', data);
           setShowCallCarButton(data.show_call_car_button_doctor !== false);
+          setShowBookOnlineButton(data.show_book_online_button !== false);
+          setShowBookInOfficeButton(data.show_book_in_office_button !== false);
         }
       } catch (error) { console.error(error); }
     };
     fetchSettings();
 
-    const channel = supabase.channel('doctor-call-car-visibility')
+    const syncChannel = supabase.channel('doctor-button-visibility')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
-        table: 'settings', 
-        filter: 'key=eq.show_call_car_button_doctor' 
+        table: 'settings'
       }, (payload: any) => {
-        if (payload.new) {
-          setShowCallCarButton(payload.new.value !== 'false');
+        console.log('[DoctorDetail] Real-time visibility update received:', payload);
+        if (payload.new && payload.new.key) {
+          const { key, value } = payload.new;
+          const isVisible = value !== 'false';
+          if (key === 'show_call_car_button_doctor') { console.log('-> Updating Call Car Visibility:', isVisible); setShowCallCarButton(isVisible); }
+          if (key === 'show_book_online_button') { console.log('-> Updating Book Online Visibility:', isVisible); setShowBookOnlineButton(isVisible); }
+          if (key === 'show_book_in_office_button') { console.log('-> Updating Book In Office Visibility:', isVisible); setShowBookInOfficeButton(isVisible); }
         }
       }).subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      supabase.removeChannel(syncChannel);
+    };
   }, []);
 
   useEffect(() => {
@@ -386,23 +400,33 @@ export default function DoctorDetailScreen() {
 
   // Strict availability checks to ensure we don't fall back to defaults when a date is selected
   const isOnlineAvailable = useMemo(() => {
+    console.log('[DoctorDetail] Recalculating isOnlineAvailable. Global Toggle:', showBookOnlineButton, 'Selected Date:', selectedDate, 'Doctor Booking Type:', doctor?.booking_type);
     if (selectedDate) {
       // If date selected, strictly use slot configuration
       if (!selectedAvailability) return false;
       const type = selectedAvailability.booking_type;
-      return !type || type === 'online' || type === 'both';
+      const result = (!type || type === 'online' || type === 'both') && showBookOnlineButton;
+      console.log('[DoctorDetail] isOnlineAvailable (with selectedDate):', result);
+      return result;
     }
     // No date selected, use global defaults
-    return doctor?.booking_type === 'online' || doctor?.booking_type === 'both';
+    const result = (doctor?.booking_type === 'online' || doctor?.booking_type === 'both') && showBookOnlineButton;
+    console.log('[DoctorDetail] isOnlineAvailable (no selectedDate):', result);
+    return result;
   }, [selectedDate, selectedAvailability, doctor]);
 
   const isInOfficeAvailable = useMemo(() => {
+    console.log('[DoctorDetail] Recalculating isInOfficeAvailable. Global Toggle:', showBookInOfficeButton, 'Selected Date:', selectedDate, 'Doctor Booking Type:', doctor?.booking_type);
     if (selectedDate) {
       if (!selectedAvailability) return false;
       const type = selectedAvailability.booking_type;
-      return type === 'in-office' || type === 'both';
+      const result = (type === 'in-office' || type === 'both') && showBookInOfficeButton;
+      console.log('[DoctorDetail] isInOfficeAvailable (with selectedDate):', result);
+      return result;
     }
-    return doctor?.booking_type === 'in-office' || doctor?.booking_type === 'both';
+    const result = (doctor?.booking_type === 'in-office' || doctor?.booking_type === 'both') && showBookInOfficeButton;
+    console.log('[DoctorDetail] isInOfficeAvailable (no selectedDate):', result);
+    return result;
   }, [selectedDate, selectedAvailability, doctor]);
 
   if (loading) {
