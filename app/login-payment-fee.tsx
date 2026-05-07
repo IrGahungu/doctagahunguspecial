@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Wallet, ShieldCheck, ArrowRight, Eye, EyeOff, PlusCircle, LogOut } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
@@ -47,6 +47,7 @@ export default function LoginPaymentFeeScreen() {
   const [country, setCountry] = useState<string>('Burundi');
   const [userId, setUserId] = useState<string | null>(null);
   const [fee, setFee] = useState<number>(1000);
+  const [isDefaultPin, setIsDefaultPin] = useState<boolean>(false);
   
   // New states for privacy and PIN
   const [isBalanceVisible, setIsBalanceVisible] = useState(false);
@@ -57,67 +58,53 @@ export default function LoginPaymentFeeScreen() {
 
   const currency = currencyMap[country] || 'USD';
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = await SecureStore.getItemAsync('token');
-        const storedCountry = await SecureStore.getItemAsync('user_country');
-        if (storedCountry) setCountry(storedCountry);
+  const fetchData = useCallback(async () => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const storedCountry = await SecureStore.getItemAsync('user_country');
+      if (storedCountry) setCountry(storedCountry);
 
-        if (!token) {
-          router.replace('/auth');
-          return;
-        }
-
-        // Fetch dynamic access fee
-        if (storedCountry) {
-          const { data: feeData, error: feeError } = await supabase
-            .from('service_fees')
-            .select('fee')
-            .eq('country', storedCountry)
-            .eq('service_type', 'access')
-            .single();
-          
-          if (!feeError && feeData) {
-            setFee(Number(feeData.fee));
-          }
-        }
-
-        const res = await fetch(`${API_BASE_URL}/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-          setWalletBalance(Number(data.wallet_balance));
-          setUserId(data.id);
-
-          /*
-          // Check for existing valid payment (24-hour validity)
-          const lastPaymentKey = `last_login_payment_${data.id}`;
-          const lastPaymentStr = await SecureStore.getItemAsync(lastPaymentKey);
-          
-          if (lastPaymentStr) {
-            const lastPayment = parseInt(lastPaymentStr, 10);
-            const now = Date.now();
-            const twentyFourHours = 24 * 60 * 60 * 1000;
-
-            if (now - lastPayment < twentyFourHours) {
-              router.replace("/(tabs)");
-              return;
-            }
-          }
-          */
-        }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-      } finally {
-        setFetchingData(false);
+      if (!token) {
+        router.replace('/auth');
+        return;
       }
-    };
 
-    fetchData();
-  }, []);
+      // Fetch dynamic access fee
+      if (storedCountry) {
+        const { data: feeData, error: feeError } = await supabase
+          .from('service_fees')
+          .select('fee')
+          .eq('country', storedCountry)
+          .eq('service_type', 'access')
+          .single();
+        
+        if (!feeError && feeData) {
+          setFee(Number(feeData.fee));
+        }
+      }
+
+      const res = await fetch(`${API_BASE_URL}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        setWalletBalance(Number(data.wallet_balance));
+        setUserId(data.id);
+        setIsDefaultPin(data.is_default_pin);
+      }
+    } catch (err) {
+      console.error('Error fetching data:', err);
+    } finally {
+      setFetchingData(false);
+    }
+  }, [router]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   // Real-time updates for the access fee
   useEffect(() => {
@@ -243,6 +230,18 @@ export default function LoginPaymentFeeScreen() {
   };
 
   const handlePayFeePress = () => {
+    if (isDefaultPin) {
+      Alert.alert(
+        'Security Alert',
+        'Your PIN is currently "1616" (default). For your security, you must change it before you can pay the access fee.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Change PIN', onPress: () => router.push({ pathname: '/pin-management', params: { forceChangeDefaultPin: 'true' } }) },
+        ]
+      );
+      return;
+    }
+
     if (walletBalance < fee) {
       Alert.alert(
         'Insufficient Balance',
@@ -339,10 +338,19 @@ export default function LoginPaymentFeeScreen() {
       <View style={styles.infoContainer}>
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
-            This fee supports the maintenance of Dr. Gahungu's pharmacy network and 24/7 availability.
+            {isDefaultPin 
+              ? 'Notice: Your default wallet PIN is 1616. Please change it to continue.'
+              : 'This fee supports the maintenance of Dr. Gahungu\'s pharmacy network and 24/7 availability.'}
           </Text>
         </View>
       </View>
+
+      {isDefaultPin && (
+        <View style={styles.warningBox}>
+          <ShieldCheck size={20} color="#F44336" />
+          <Text style={styles.warningText}>Default PIN: 1616. Change it now!</Text>
+        </View>
+      )}
 
       <TouchableOpacity 
         style={[styles.payButton, loading && styles.disabledButton]} 
@@ -353,7 +361,7 @@ export default function LoginPaymentFeeScreen() {
           <ActivityIndicator color="#fff" />
         ) : (
           <>
-            <Text style={styles.payButtonText}>Pay & Enter App</Text>
+            <Text style={styles.payButtonText}>{isDefaultPin ? 'Change PIN to Continue' : 'Pay & Enter App'}</Text>
             <ArrowRight size={20} color="#fff" />
           </>
         )}
@@ -522,4 +530,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoutText: { color: '#d32f2f', fontSize: 16, fontWeight: '600' },
+  warningBox: {
+    backgroundColor: '#FFF3E0',
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  warningText: { flex: 1, fontSize: 13, color: '#E65100', fontWeight: 'bold' },
 });

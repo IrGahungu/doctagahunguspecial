@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, KeyRound } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from "@/config";
 
 const PinManagementScreen = () => {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [hasPin, setHasPin] = useState(true);
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [oldPin, setOldPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Determine if the user is forced to change the default PIN
+  const isForcedDefaultPinChange = params.forceChangeDefaultPin === 'true';
 
   // Check if user already has a PIN
   useEffect(() => {
@@ -37,7 +41,7 @@ const PinManagementScreen = () => {
       }
     };
 
-    checkHasPin();
+    if (!isForcedDefaultPinChange) checkHasPin(); // Only check if not forced to change default
   }, []);
 
   // Step 1: Verify old PIN
@@ -126,7 +130,7 @@ const PinManagementScreen = () => {
       <View style={styles.content}>
         <KeyRound size={60} color="#4CAF50" style={{ alignSelf: 'center', marginBottom: 20 }} />
 
-        {hasPin && !isPinVerified ? (
+        {hasPin && !isPinVerified && !isForcedDefaultPinChange ? (
           <>
             <Text style={styles.title}>Verify Your Current PIN</Text>
             <Text style={styles.subtitle}>Please enter your current 4-digit PIN to proceed.</Text>

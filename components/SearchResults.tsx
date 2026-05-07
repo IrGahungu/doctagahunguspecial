@@ -71,10 +71,10 @@ type SearchResultItem = {
   // Add more hospital-specific properties
   services?: string[];
   // Add insurance-specific properties
-  coverage?: string[];
-  planType?: string;
-  available_blood_types?: string;
-  medical_equipment?: string;
+  coverage?: string | string[] | object;
+  planType?: string | string[] | object;
+  available_blood_types?: string | string[] | object;
+  medical_equipment?: string | string[] | object;
 };
 
 interface Pharmacy {
@@ -111,6 +111,84 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
   console.log('SearchResults received results:', JSON.stringify(results, null, 2));
   const router = useRouter(); // Using Expo Router instead of React Navigation
   const [country, setCountry] = React.useState<string | null>(null);
+
+  // Helper to format array-like strings from DB for display
+  const formatArrayString = (input: string | string[] | object | undefined): string => {
+    // console.log('formatArrayString: Initial input:', input, 'Type:', typeof input);
+    if (!input) return '';
+
+    // Case 1: Already a JavaScript array
+    if (Array.isArray(input)) {
+      // Check if array elements are objects
+      if (input.length > 0 && typeof input[0] === 'object' && input[0] !== null) {
+        const formattedElements = input.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            // Try to find a 'name' or 'title' property, otherwise join all values
+            if ('name' in item && typeof item.name === 'string') return `${item.name}${('status' in item && typeof item.status === 'string') ? ` (${item.status})` : ''}`;
+            if ('title' in item && typeof item.title === 'string') return `${item.title}${('description' in item && typeof item.description === 'string') ? ` (${item.description})` : ''}`;
+            return Object.values(item).filter(val => typeof val === 'string' || typeof val === 'number').join(' '); // Fallback for other objects
+          }
+          return String(item);
+        });
+        // console.log('formatArrayString: Input is an array of objects. Joining formatted elements:', formattedElements.join(', '));
+        return formattedElements.join(', ');
+      }
+      // console.log('formatArrayString: Input is an array. Joining:', input.join(', '));
+      return input.join(', ');
+    }
+    
+    // Case 2: String that might be a JSON array or PostgreSQL array string
+    if (typeof input === 'string') {
+      // console.log('formatArrayString: Input is a string. Attempting JSON parse...');
+      try {
+        // Try parsing as JSON array (e.g., '["O+", "A-"]')
+        const parsed = JSON.parse(input);
+        // console.log('formatArrayString: JSON parsed successfully:', parsed, 'Type:', typeof parsed);
+        if (Array.isArray(parsed)) {
+          // Apply the same object-in-array formatting logic
+          if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null) {
+            const formattedElements = parsed.map(item => {
+              if (typeof item === 'object' && item !== null) {
+                if ('name' in item && typeof item.name === 'string') return `${item.name}${('status' in item && typeof item.status === 'string') ? ` (${item.status})` : ''}`;
+                if ('title' in item && typeof item.title === 'string') return `${item.title}${('description' in item && typeof item.description === 'string') ? ` (${item.description})` : ''}`;
+                return Object.values(item).filter(val => typeof val === 'string' || typeof val === 'number').join(' ');
+              }
+              return String(item);
+            });
+            // console.log('formatArrayString: Parsed JSON is an array of objects. Joining formatted elements:', formattedElements.join(', '));
+            return formattedElements.join(', ');
+          }
+          // console.log('formatArrayString: Parsed JSON is an array. Joining:', parsed.join(', '));
+          return parsed.join(', ');
+        }
+        // If it's a JSON object, try to stringify its values
+        if (typeof parsed === 'object' && parsed !== null) {
+          // console.log('formatArrayString: Parsed is an object. Extracting values:', Object.values(parsed).join(', '));
+          return Object.values(parsed).join(', ');
+        }
+      } catch (e) {
+        // console.log('formatArrayString: JSON parse failed. Checking for PostgreSQL array string.');
+        // Not a JSON array, try parsing as PostgreSQL array string (e.g., '{O+,A-}')
+        if (input.startsWith('{') && input.endsWith('}')) {
+          const pgArray = input.substring(1, input.length - 1).split(',').map(s => s.trim()).join(', ');
+          // console.log('formatArrayString: PostgreSQL array string parsed:', pgArray);
+          return pgArray;
+        }
+      }
+      // console.log('formatArrayString: Returning string as is (no special parsing):', input);
+      return input; // If parsing fails and it's not a PG array string, return as is
+    }
+    
+    // Case 3: If it's an object (not a string or array), try to extract its values
+    if (typeof input === 'object' && input !== null) {
+      // console.log('formatArrayString: Input is a direct object. Extracting values:', Object.values(input).join(', '));
+      return Object.values(input).join(', ');
+    }
+
+    // Fallback for any other unexpected type
+    // console.log('formatArrayString: Fallback to String(input):', String(input));
+    return String(input);
+  };
 
   React.useEffect(() => {
     SecureStore.getItemAsync("user_country").then(setCountry);
@@ -245,12 +323,12 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
             <View style={{ marginTop: 4 }}>
               {item.available_blood_types && (
                 <Text style={styles.itemSubtext} numberOfLines={1}>
-                  <Icon name="bloodtype" size={12} color="#f44336" /> {item.available_blood_types}
+                  <Icon name="bloodtype" size={12} color="#f44336" /> {formatArrayString(item.available_blood_types)}
                 </Text>
               )}
               {item.medical_equipment && (
                 <Text style={styles.itemSubtext} numberOfLines={1}>
-                  <Icon name="medical-services" size={12} color="#4caf50" /> {item.medical_equipment}
+                  <Icon name="medical-services" size={12} color="#4caf50" /> {formatArrayString(item.medical_equipment)}
                 </Text>
               )}
             </View>

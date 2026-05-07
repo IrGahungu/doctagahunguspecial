@@ -426,13 +426,6 @@ export default function HospitalDetailScreen() {
                 </View>
               </View>
           </View>
-          {/* New "Get a visit jeton" button */}
-          <Pressable
-            style={styles.visitJetonButton}
-            onPress={() => showToast('Dr. IR. Gahungu ariko arabikora!', 1500)} // Placeholder action
-          >
-            <Text style={styles.visitJetonButtonText}>Get a visit jeton</Text>
-          </Pressable>
 
           {showCallCarButton && (
           <Pressable

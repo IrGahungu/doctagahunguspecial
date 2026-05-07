@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Keyboard, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Keyboard, Dimensions, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Search, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -18,19 +18,84 @@ type Suggestion = {
   name: string;
   image?: string;
   type: 'medicine' | 'pharmacy' | 'hospital' | 'doctor' | 'insurance';
+  id?: string; // Added for keyExtractor
 };
+
+type RecentSearchItem = {
+  name: string;
+  type: string;
+  image?: string;
+};
+
+const RECENT_SEARCH_LIMIT = 10; // Limit the number of recent searches
+const RECENT_SEARCH_KEY = 'recent_searches';
 
 export default function SearchScreen() {
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]); // Suggestions from API
+  const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>([]); // Stored recent searches
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
   const [results, setResults] = useState<any>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  const getImageSourceForType = (type: string, imagePath?: string | null) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http')) return { uri: imagePath };
+    switch (type) {
+      case 'medicine': return { uri: `${MEDICINE_URL_PREFIX}${imagePath}` };
+      case 'pharmacy': return { uri: `${PHARMACY_URL_PREFIX}${imagePath}` };
+      case 'hospital': return { uri: `${HOSPITAL_URL_PREFIX}${imagePath}` };
+      case 'doctor': return { uri: `${DOCTOR_URL_PREFIX}${imagePath}` };
+      case 'insurance': return { uri: `${INSURANCE_URL_PREFIX}${imagePath}` };
+      default: return null;
+    }
+  };
+
+  // Function to load recent searches from SecureStore
+  const loadRecentSearches = useCallback(async () => {
+    try {
+      const storedSearches = await SecureStore.getItemAsync(RECENT_SEARCH_KEY);
+      if (storedSearches) {
+        setRecentSearches(JSON.parse(storedSearches));
+      } else {
+        setRecentSearches([]);
+      }
+    } catch (error) {
+      console.error('Failed to load recent searches:', error);
+      setRecentSearches([]); // Fallback to empty array on error
+    }
+  }, []);
+
+  // Function to save a new search term to SecureStore
+  const saveRecentSearch = useCallback(async (searchItem: RecentSearchItem) => {
+    if (!searchItem.name.trim()) return;
+
+    setRecentSearches(prevSearches => {
+      // Remove duplicates and add the new term to the front
+      const newSearches = [ 
+        searchItem,
+        ...prevSearches.filter(s => s.name.toLowerCase() !== searchItem.name.toLowerCase())
+      ].slice(0, RECENT_SEARCH_LIMIT); // Keep only the latest N searches
+
+      SecureStore.setItemAsync(RECENT_SEARCH_KEY, JSON.stringify(newSearches)).catch(error => {
+        console.error('Failed to save recent searches:', error);
+      });
+      return newSearches;
+    });
+  }, []);
+
+  const clearRecentSearches = useCallback(async () => {
+    await SecureStore.deleteItemAsync(RECENT_SEARCH_KEY);
+    setRecentSearches([]);
+  }, []);
+
+  // Initial setup: fetch country, load recent searches, and focus input
   useEffect(() => {
     const fetchCountry = async () => {
       const stored = await SecureStore.getItemAsync('user_country');
@@ -38,7 +103,9 @@ export default function SearchScreen() {
     };
     fetchCountry();
     // Focus input on mount
+    loadRecentSearches();
     setTimeout(() => inputRef.current?.focus(), 100);
+    setIsInitialLoad(false);
   }, []);
 
   // Suggestions Logic
@@ -54,15 +121,20 @@ export default function SearchScreen() {
       setIsFetchingSuggestions(true);
       try {
         const [stockRes, pharmacyRes, hospitalRes, doctorRes, insuranceRes] = await Promise.all([
-          supabase.from('stock').select('name, image').ilike('name', `%${query}%`).limit(3),
-          supabase.from('pharmacy_applications').select('name, image').ilike('name', `%${query}%`).limit(2),
-          supabase.from('hospital_applications').select('name, image')
+          supabase.from('stock').select('name, image').ilike('name', `%${query}%`).limit(10),
+          supabase.from('pharmacy_applications').select('name, image').ilike('name', `%${query}%`).eq('status', 'approved').limit(5),
+          supabase.from('hospital_applications').select('name, image, available_blood_types, medical_equipment')
             .or(`name.ilike.%${query}%,available_blood_types.ilike.%${query}%,medical_equipment.ilike.%${query}%`)
-            .limit(2),
+            .eq('status', 'approved')
+            .limit(5),
           supabase.from('doctor_applications').select('name, specialty, image')
             .or(`name.ilike.%${query}%,specialty.ilike.%${query}%`)
-            .limit(2),
-          supabase.from('insurance_applications').select('name, image').ilike('name', `%${query}%`).limit(2),
+            .eq('status', 'approved')
+            .limit(10),
+          supabase.from('insurance_applications').select('name, image')
+            .ilike('name', `%${query}%`)
+            .eq('status', 'approved')
+            .limit(5),
         ]);
 
         if (!active) return;
@@ -89,12 +161,14 @@ export default function SearchScreen() {
     };
   }, [query, isSearching]);
 
-  const performFinalSearch = async (searchTerm: string) => {
+  const performFinalSearch = async (searchTerm: string, initialType?: string, initialImage?: string) => {
     if (!searchTerm.trim() || !country) return;
     
     Keyboard.dismiss();
     setIsLoading(true);
+    setSearchError(null); // Clear previous errors
     setIsSearching(true);
+    saveRecentSearch({ name: searchTerm, type: initialType || 'general', image: initialImage }); // Save the search term with type and image
     setSuggestions([]);
 
     // Multi-search logic
@@ -108,11 +182,11 @@ export default function SearchScreen() {
                 .ilike('name', `%${names.join('%')}%`) // Simple multi-match
                 .eq('in_stock', true)
                 .ilike('pharmacy.country', country || ''),
-            supabase.from('pharmacy_applications').select('*').ilike('country', country || '').ilike('name', term),
-            supabase.from('hospital_applications').select('*').ilike('country', country || '')
+            supabase.from('pharmacy_applications').select('*').ilike('country', country || '').eq('status', 'approved').ilike('name', term),
+            supabase.from('hospital_applications').select('*').ilike('country', country || '').eq('status', 'approved')
                 .or(`name.ilike.${term},available_blood_types.ilike.${term},medical_equipment.ilike.${term}`),
-            supabase.from('doctor_applications').select('*').ilike('country', country || '').or(`name.ilike.${term},specialty.ilike.${term}`),
-            supabase.from('insurance_applications').select('*').ilike('country', country || '').ilike('name', term),
+            supabase.from('doctor_applications').select('*').ilike('country', country || '').eq('status', 'approved').or(`name.ilike.${term},specialty.ilike.${term}`),
+            supabase.from('insurance_applications').select('*').ilike('country', country || '').eq('status', 'approved').ilike('name', term),
         ]);
 
         // Group medicines by name to show "Available in X pharmacies"
@@ -167,10 +241,11 @@ export default function SearchScreen() {
         const processImages = (data: any[], prefix: string, type: string) => (data || []).map(i => ({
             ...i,
             type,
-            speciality: i.specialty || i.speciality, // Map specialty column for doctors
+            speciality: i.specialty, // Map specialty column for doctors
             image: i.image ? (i.image.startsWith('http') ? i.image : `${prefix}${i.image}`) : null
         }));
 
+        setSearchError(null); // Clear error if search is successful
         setResults({
             medicines: Array.from(medicinesMap.values()),
             pharmacies: processImages(pharms.data || [], PHARMACY_URL_PREFIX, 'pharmacy'),
@@ -179,6 +254,7 @@ export default function SearchScreen() {
             insurances: processImages(ins.data || [], INSURANCE_URL_PREFIX, 'insurance'),
         });
     } catch (err) {
+        setSearchError("Connexion is weak, go back and search again");
         console.error(err);
     } finally {
         setIsLoading(false);
@@ -190,6 +266,7 @@ export default function SearchScreen() {
     setIsSearching(false);
     setIsFetchingSuggestions(false);
     setResults(null);
+    setSearchError(null); // Clear error when clearing search
     inputRef.current?.focus();
   };
 
@@ -227,7 +304,17 @@ export default function SearchScreen() {
       {isLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Searching the database...</Text>
+          <Text style={styles.loadingText}>Gahungu ariko arabikuronderera...</Text>
+        </View>
+      ) : searchError ? (
+        <View style={styles.center}>
+          <Icon name="wifi-off" size={60} color="#BDBDBD" />
+          <Text style={styles.errorText}>{searchError}</Text>
+          <Text style={styles.emptyText}>Please check your internet connection and try again.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => performFinalSearch(query)}>
+            <Icon name="refresh" size={20} color="#fff" style={{ marginRight: 5 }} />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : isSearching && results ? (
         <SearchResults 
@@ -237,14 +324,51 @@ export default function SearchScreen() {
         />
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScrollBeginDrag={() => Keyboard.dismiss()}
+          ListHeaderComponent={
+            (query.length === 0 && recentSearches.length > 0 && !isFetchingSuggestions && !isInitialLoad) ? (
+              <View style={styles.recentSearchesContainer}>
+                <View style={styles.recentSearchesHeader}>
+                  <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
+                  <TouchableOpacity onPress={clearRecentSearches} style={styles.clearAllButton}>
+                    <Text style={styles.clearAllButtonText}>Clear All</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.recentSearchesGrid}> 
+                  {recentSearches.map((item, index) => {
+                    const imageSource = getImageSourceForType(item.type, item.image);
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.recentSearchChip}
+                        onPress={() => {
+                          setQuery(item.name);
+                          performFinalSearch(item.name, item.type, item.image);
+                        }}
+                      >
+                        {imageSource ? (
+                          <Image source={imageSource} style={styles.recentSearchImage} />
+                        ) : (
+                          null // Removed the Search icon, only show image or nothing
+                        )}
+                        <Text style={styles.recentSearchText} numberOfLines={1}>{item.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null
+          }
           data={suggestions}
           keyExtractor={(item) => `${item.type}-${item.name}`}
           renderItem={({ item }) => (
             <TouchableOpacity 
                 style={styles.suggestionItem} 
-                onPress={() => {
-                    setQuery(item.name);
-                    performFinalSearch(item.name);
+                onPress={() => { // Pass type and image when a suggestion is selected
+                    setQuery(item.name); 
+                    performFinalSearch(item.name, item.type, item.image);
                 }}
             >
               {item.image ? (
@@ -267,11 +391,13 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
           ListEmptyComponent={
-            query.length < 2 ? (
-                <View style={styles.center}>
+            query.length < 2 ? ( // If query is less than 2 characters
+                (recentSearches.length === 0 && !isInitialLoad) ? ( // And no recent searches or not initial load
+                  <View style={styles.center}>
                     <Icon name="search" size={60} color="#BDBDBD" />
                     <Text style={styles.emptyText}>Type at least 2 characters to see suggestions</Text>
                 </View>
+                ) : null // Otherwise, render nothing (null)
             ) : null
           }
         />
@@ -359,5 +485,84 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#9E9E9E',
     fontSize: 14,
+  },
+  errorText: {
+    marginTop: 15,
+    color: '#F44336',
+    fontSize: 14,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   }
+  ,
+  recentSearchesContainer: {
+    paddingTop: 10,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  recentSearchesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  recentSearchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  clearAllButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearAllButtonText: {
+    fontSize: 14,
+    color: '#2874F0',
+  },
+  recentSearchesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12, // Adjusted for image padding
+    gap: 8,
+  },
+  recentSearchChip: {
+    width: (Dimensions.get('window').width - 24 - 16 - 10) / 3, // Adjusted for 3 items per row with gaps
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    flexDirection: 'row', // Added for image beside text
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+  recentSearchImage: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: 6,
+  },
+  recentSearchIcon: {
+    marginRight: 6,
+  },
+  recentSearchText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#616161',
+  },
 });

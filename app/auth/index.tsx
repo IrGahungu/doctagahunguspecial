@@ -166,7 +166,7 @@ const AuthScreen = () => {
                   <Text style={styles.hintText}>Tanguza kode y'Igihugu urimwo nkuku: +25777990118</Text>
                   <TextInput
                     placeholder="Enter your WhatsApp number"
-                    placeholderTextColor="gray"
+                    placeholderTextColor="#757575"
                     value={whatsappNumber}
                     onChangeText={(text) => {
                       setWhatsappNumber(text);
@@ -186,7 +186,7 @@ const AuthScreen = () => {
                   <View style={[styles.inputContainer, !!errors.password && styles.inputError]}>
                     <TextInput
                       placeholder="Enter your password"
-                      placeholderTextColor="gray"
+                      placeholderTextColor="#757575"
                       value={password}
                       onChangeText={(text) => {
                         setPassword(text);
@@ -302,7 +302,8 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 20,
     borderWidth: 1,
-    fontSize: 16,
+    fontSize: 14,
+    letterSpacing: 0,
     borderColor: "lightgray",
   },
   inputContainer: {
@@ -316,8 +317,10 @@ const styles = StyleSheet.create({
   },
   inputField: {
     flex: 1,
-    paddingVertical: 15,
-    fontSize: 16,
+    paddingVertical: 15, // Keeping vertical padding for the container touch area
+    fontSize: 14,
+    letterSpacing: 0,
+    padding: 0,
   },
   eyeIcon: {
     paddingLeft: 10,
