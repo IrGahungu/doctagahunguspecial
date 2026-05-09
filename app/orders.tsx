@@ -1,5 +1,5 @@
-import { useState, useEffect,useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextStyle, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextStyle, ActivityIndicator, Animated } from 'react-native';
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronRight, ArrowLeft } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -16,14 +16,59 @@ type Order = {
   total_amount: number;
 };
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const OrderSkeleton = () => (
+  <View style={styles.listContainer}>
+    {[1, 2, 3, 4].map((i) => (
+      <SkeletonPulse key={i}>
+        <View style={[styles.orderItem, { height: 100 }]}>
+          <View style={styles.orderInfo}>
+            <View style={[styles.skeleton, { width: '60%', height: 16, marginBottom: 8, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: '40%', height: 14, marginBottom: 8, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: '50%', height: 14, borderRadius: 4 }]} />
+          </View>
+          <View style={[styles.skeleton, { width: 24, height: 24, borderRadius: 12 }]} />
+        </View>
+      </SkeletonPulse>
+    ))}
+  </View>
+);
+
 export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setHasError(false);
     try {
       const token = await SecureStore.getItemAsync('token');
       if (!token) {
@@ -52,14 +97,17 @@ export default function OrdersScreen() {
           // Log both the parsed error and the raw text
           console.error('Failed to fetch orders. Server says:', data.error);
           console.error('Raw server response:', responseText);
+          setHasError(true);
         }
       } catch (jsonError) {
         console.error('Failed to parse JSON:', jsonError);
         console.error('Raw server response that failed parsing:', responseText);
+        setHasError(true);
       }
     } catch (err) {
       // This will catch network errors or JSON parsing errors
       console.error('Network or parsing error while fetching orders:', err);
+      setHasError(true);
     } finally {
       setLoading(false);
     }
@@ -114,7 +162,14 @@ export default function OrdersScreen() {
         <Text style={styles.headerTitle}>My Orders</Text>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#4CAF50" style={{ marginTop: 50 }} />
+        <OrderSkeleton />
+      ) : hasError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load orders. Please check your connection.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchOrders}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={orders}
@@ -217,5 +272,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Roboto-Regular',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
   },
 });

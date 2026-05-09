@@ -744,7 +744,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                       <button
                         onClick={() => handleApprove(app.id)}
                         disabled={updatingId === app.id}
-                          className="w-full px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:bg-gray-300 transition-colors"
+                          className="btn-approve w-full"
                         >
                           <div className="flex justify-center">{updatingId === app.id ? <Spinner /> : 'Approve'}</div>
                         </button>
@@ -753,7 +753,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                       <button
                         onClick={() => handleReject(app.id)}
                         disabled={updatingId === app.id}
-                          className="w-full px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:bg-gray-300 transition-colors"
+                          className="btn-reject w-full"
                         >
                           <div className="flex justify-center">{updatingId === app.id ? <Spinner /> : 'Reject'}</div>
                         </button>
@@ -778,10 +778,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
             <h3 className="text-lg font-bold mb-2">Confirm Approval</h3>
             <p className="text-gray-600 mb-6">Are you sure you want to approve this doctor's application? They will gain access to the platform immediately.</p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setIsApproveModalOpen(false)} className="px-4 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50">
+              <button onClick={() => setIsApproveModalOpen(false)} className="btn-cancel">
                 Cancel
               </button>
-              <button onClick={submitApproval} className="px-4 py-2 rounded-md bg-green-600 text-white font-semibold text-sm hover:bg-green-700 disabled:opacity-50" disabled={updatingId === applicationToApprove}>
+              <button onClick={submitApproval} className="btn-approve" disabled={updatingId === applicationToApprove}>
                 {updatingId === applicationToApprove ? 'Processing...' : 'Yes, Approve'}
               </button>
             </div>
@@ -800,10 +800,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                     placeholder="Explain why the application is being rejected..."
                 />
                 <div className="flex justify-end gap-4 mt-4">
-                    <button onClick={() => setIsRejectModalOpen(false)} className="px-4 py-2 rounded-md border border-slate-300 text-sm hover:bg-slate-50">
+                    <button onClick={() => setIsRejectModalOpen(false)} className="btn-cancel">
                         Cancel
                     </button>
-                    <button onClick={submitRejection} className="px-4 py-2 rounded-md bg-red-600 text-white font-semibold text-sm hover:bg-red-700 disabled:bg-gray-400" disabled={updatingId === applicationToReject}>
+                    <button onClick={submitRejection} className="btn-reject" disabled={updatingId === applicationToReject}>
                         {updatingId === applicationToReject ? 'Submitting...' : 'Submit Rejection'}
                     </button>
                 </div>

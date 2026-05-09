@@ -112,8 +112,8 @@ export default function BusesTable() {
                 </td>
                 <td className="p-4 font-bold text-green-600">BIF {bus.price.toLocaleString()}</td>
                 <td className="p-4 text-center space-x-3">
-                  <button onClick={() => openEdit(bus)} className="text-blue-600 hover:underline font-semibold">Edit</button>
-                  <button onClick={() => handleDelete(bus.id)} className="text-red-600 hover:underline font-semibold">Delete</button>
+                  <button onClick={() => openEdit(bus)} className="btn-edit">Edit</button>
+                  <button onClick={() => handleDelete(bus.id)} className="btn-delete">Delete</button>
                 </td>
               </tr>
             ))}

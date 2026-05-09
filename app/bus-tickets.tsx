@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Bus, MapPin, Calendar, Clock, Ticket as TicketIcon, Info, Download } from 'lucide-react-native';
@@ -26,6 +26,51 @@ type BusTicket = {
     bus_type: string;
   };
 };
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const BusTicketSkeleton = () => (
+  <View style={styles.listContainer}>
+    {[1, 2].map((i) => (
+      <SkeletonPulse key={i}>
+        <View style={[styles.ticketCard, { height: 200 }]}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.skeleton, { width: '50%', height: 20, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: 80, height: 24, borderRadius: 12 }]} />
+          </View>
+          <View style={[styles.skeleton, { width: '100%', height: 1, marginVertical: 15 }]} />
+          <View style={{ gap: 10 }}>
+            <View style={[styles.skeleton, { width: '40%', height: 16, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: '60%', height: 16, borderRadius: 4 }]} />
+          </View>
+        </View>
+      </SkeletonPulse>
+    ))}
+  </View>
+);
 
 const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
   const viewRef = useRef<View>(null);
@@ -151,11 +196,14 @@ export default function BusTicketsScreen() {
   const router = useRouter();
   const [tickets, setTickets] = useState<BusTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [newTicketIds, setNewTicketIds] = useState<Set<string>>(new Set());
 
   const fetchTickets = useCallback(async () => {
+    setLoading(true);
+    setHasError(false);
     try {
       let currentUserId = userId;
       if (!currentUserId) {
@@ -200,6 +248,7 @@ export default function BusTicketsScreen() {
       setTickets(data as any || []);
     } catch (error) {
       console.error('Error fetching tickets:', error);
+      setHasError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -260,8 +309,13 @@ export default function BusTicketsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+        <BusTicketSkeleton />
+      ) : hasError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load bus tickets. Please check your connection.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchTickets}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -293,7 +347,15 @@ export default function BusTicketsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E0F7FA' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  backButton: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#eee', justifyContent: 'center', alignItems: 'center' },
+  backButton: { 
+    width: 40,
+    height: 40,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center', 
+  },
   headerTitle: { fontSize: 20, fontFamily: 'Roboto-Bold', color: '#212121' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContainer: { padding: 16 },
@@ -353,5 +415,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontFamily: 'Roboto-Bold',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Roboto-Regular',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
   },
 });

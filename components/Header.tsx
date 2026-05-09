@@ -141,8 +141,73 @@ export default function Header() {
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [networkStatus, setNetworkStatus] = useState<'Excellent' | 'Not Good' | 'Checking...'>('Checking...');
   const [country, setCountry] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+  const blinkAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const blink = Animated.loop(
+      Animated.sequence([
+        Animated.timing(blinkAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    blink.start();
+    return () => blink.stop();
+  }, [blinkAnim]);
+
+  // Rotation animation for the refresh icon
+  useEffect(() => {
+    if (networkStatus === 'Checking...') {
+      Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      rotateAnim.stopAnimation();
+      rotateAnim.setValue(0);
+    }
+  }, [networkStatus]);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const checkNetwork = async () => {
+    setNetworkStatus('Checking...');
+    const start = Date.now();
+    try {
+      // Perform a lightweight HEAD request to check latency
+      const response = await fetch(`${API_BASE_URL}/`, { 
+        method: 'HEAD', 
+        cache: 'no-cache' 
+      });
+      const duration = Date.now() - start;
+      
+      if (response.ok && duration < 600) {
+        setNetworkStatus('Excellent');
+      } else {
+        setNetworkStatus('Not Good');
+      }
+    } catch (err) {
+      setNetworkStatus('Not Good');
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -196,8 +261,17 @@ export default function Header() {
   useFocusEffect(
     React.useCallback(() => {
       fetchProfile();
+      checkNetwork();
     }, [])
   );
+
+  // Periodic network check every 15 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkNetwork();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top + 10 }]}>
@@ -238,35 +312,53 @@ export default function Header() {
 
       <View style={styles.headerTopSection}>
         <View style={styles.headerRow}>
-          {isLoggedIn ? (
-            <>
+          <View style={styles.leftInfoContainer}>
+            {isLoggedIn ? (
               <Text style={styles.welcomeText}>
                 Murahawe ikaze kwa Dr. Gahungu: {' '}
                 {isLoading ? (
-                  <View style={styles.loadingIndicatorContainer}>
-                    <ActivityIndicator size="small" color="#4CAF50" />
-                  </View>
+                  <ActivityIndicator size="small" color="#4CAF50" />
                 ) : (
                   fullname
                 )}
               </Text>
-              <TouchableOpacity
-                style={styles.walletContainer}
-                //onPress={() => router.push('/wallet/add-money')}
-                activeOpacity={0.7}
-              >
-                <Icon name="wallet" size={24} color="#4CAF50" />
-                <Text style={styles.walletAmount}>
-                   {walletBalance.toLocaleString()} {getCurrency(country)}
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.welcomeText}>
-                Murahawe ikaze kwa Dr. Gahungu
+            ) : (
+              <Text style={styles.welcomeText}>Murahawe ikaze kwa Dr. Gahungu</Text>
+            )}
+
+            <View style={[styles.networkTester, { borderColor: networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336' }]}>
+              <Animated.View style={[
+                styles.statusDot, 
+                { 
+                  backgroundColor: networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336',
+                  opacity: blinkAnim 
+                }
+              ]} />
+              <Text style={[styles.networkText, { color: networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336' }]}>
+                Net: {networkStatus}
               </Text>
-            </>
+              <TouchableOpacity 
+                onPress={checkNetwork} 
+                style={styles.refreshButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <Icon name="refresh" size={12} color={networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336'} />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {isLoggedIn && (
+            <TouchableOpacity
+              style={styles.walletContainer}
+              activeOpacity={0.7}
+            >
+              <Icon name="wallet" size={24} color="#4CAF50" />
+              <Text style={styles.walletAmount}>
+                 {walletBalance.toLocaleString()} {getCurrency(country)}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
         {isLoggedIn && country && (
@@ -307,12 +399,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  leftInfoContainer: {
+    flex: 1,
+    alignItems: 'flex-start',
+  },
+  networkTester: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 2,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 3,
+  },
+  networkText: {
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  refreshButton: {
+    marginLeft: 4,
+  },
   welcomeText: {
     fontSize: 10,
     fontWeight: 'bold',
     color: '#2874F0',
-    textAlign: 'center',
-    flex: 1,
   },
   walletContainer: {
     flexDirection: 'row',

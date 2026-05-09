@@ -13,26 +13,54 @@ const { width } = Dimensions.get('window');
 
 const isVideo = (url: string) => /\.(mp4|mov|avi|mkv|webm)$/i.test(url);
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
 
 const SkeletonStory = () => (
-  <View style={styles.storyContainer}>
-    <View style={[styles.storyRing, { borderColor: '#e0e0e0' }]}>
-      <View style={[styles.storyAvatar, styles.skeleton]} />
+  <SkeletonPulse>
+    <View style={styles.storyContainer}>
+      <View style={[styles.storyRing, { borderColor: '#e0e0e0' }]}>
+        <View style={[styles.storyAvatar, styles.skeleton]} />
+      </View>
+      <View style={[styles.skeleton, { width: 40, height: 10, borderRadius: 4 }]} />
     </View>
-    <View style={[styles.skeleton, { width: 40, height: 10, borderRadius: 4 }]} />
-  </View>
+  </SkeletonPulse>
 );
 
 const SkeletonPost = () => (
-  <View style={styles.postContainer}>
-    <View style={styles.postHeader}>
-      <View style={styles.postHeaderLeft}>
-        <View style={[styles.postAvatar, styles.skeleton]} />
-        <View style={[styles.skeleton, { width: 100, height: 14, borderRadius: 4 }]} />
+  <SkeletonPulse>
+    <View style={styles.postContainer}>
+      <View style={styles.postHeader}>
+        <View style={styles.postHeaderLeft}>
+          <View style={[styles.postAvatar, styles.skeleton]} />
+          <View style={[styles.skeleton, { width: 100, height: 14, borderRadius: 4 }]} />
+        </View>
       </View>
+      <View style={[styles.postImage, styles.skeleton]} />
     </View>
-    <View style={[styles.postImage, styles.skeleton]} />
-  </View>
+  </SkeletonPulse>
 );
 
 const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onNextImage }: { 
@@ -343,6 +371,10 @@ export default function ExploreScreen() {
         fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers })
       ]);
 
+        if (!storiesRes.ok || !postsRes.ok) {
+          throw new Error('Failed to fetch essential explore data');
+        }
+
         if (configRes.ok) {
           const cfg = await configRes.json();
           setConfig({
@@ -388,10 +420,12 @@ export default function ExploreScreen() {
           ...p,
           images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images
         })));
+
+        setIsLoading(false);
       } catch (err) {
         console.error("Error fetching explore data:", err);
-      } finally {
-        setIsLoading(false);
+        // Keep showing skeleton and retry fetching after 5 seconds if a failure occurs
+        setTimeout(fetchData, 5000);
       }
     };
 

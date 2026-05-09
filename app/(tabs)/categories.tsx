@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions, Animated } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import Header from '@/components/Header';
 import { useRouter } from 'expo-router';
@@ -8,12 +8,39 @@ import { supabase } from '@/lib/supabase';
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 16 padding on each side, 16 gap
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
 // Skeleton component for a single category card
 const SkeletonCategoryCard: React.FC = () => (
-  <View style={[styles.categoryCard, styles.skeletonCard, { width: cardWidth }]}>
-    <View style={styles.skeletonIcon} />
-    <View style={styles.skeletonName} />
-  </View>
+  <SkeletonPulse>
+    <View style={[styles.categoryCard, styles.skeletonCard, { width: cardWidth }]}>
+      <View style={styles.skeletonIcon} />
+      <View style={styles.skeletonName} />
+    </View>
+  </SkeletonPulse>
 );
 
 // Skeleton component for the category grid

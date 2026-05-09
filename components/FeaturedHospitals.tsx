@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Pressable, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, Pressable, Platform, Animated } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
@@ -14,20 +14,107 @@ type FeaturedHospital = {
   country?: string;
 };
 
-const SkeletonCard = () => (
-  <View style={styles.card}>
-    <View style={[styles.image, styles.skeleton]} />
-    <View style={styles.details}>
-      <View style={[styles.skeleton, { height: 20, width: '80%', borderRadius: 4, alignSelf: 'center' }]} />
+const HospitalSkeleton = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={[styles.skeleton, { opacity: pulseAnim }, styles.image]} />;
+};
+
+const SkeletonCard = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.8, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.imageContainer}>
+        <HospitalSkeleton />
+      </View>
+      <View style={styles.details}>
+        <Animated.View style={[styles.skeletonText, { width: '80%', alignSelf: 'center', opacity: pulseAnim }]} />
+      </View>
     </View>
-  </View>
-);
+  );
+};
+
+const HospitalItem = ({ item, baseUrl }: { item: FeaturedHospital; baseUrl: string }) => {
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        pressed && Platform.OS !== 'android' && { opacity: 0.85 },
+      ]}
+      android_ripple={{ color: '#e0e0e0' }}
+      onPress={() => {
+        console.log('Navigating to hospital:', item.id, item.name);
+        router.push({
+          pathname: '/hospital/[id]' as const,
+          params: {
+            id: item.id,
+            name: item.name || '',
+            image: item.image || ''
+          },
+        });
+      }}
+    >
+      <View style={styles.imageContainer}>
+        {hasError || !item.image ? (
+          <View style={[styles.image, styles.placeholderImage]}>
+            <Icon name="local-hospital" size={40} color="#ccc" />
+          </View>
+        ) : (
+          <>
+            <Image source={{ uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image }} style={styles.image} resizeMode="cover" onLoadStart={() => setIsImageLoading(true)} onLoadEnd={() => setIsImageLoading(false)} onError={() => setHasError(true)} />
+            {isImageLoading && <View style={styles.loadingOverlay}><HospitalSkeleton /></View>}
+          </>
+        )}
+      </View>
+      <View style={styles.details}>
+        <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
+        <View style={styles.detailsButton}>
+          <Text style={styles.detailsButtonText}>See Details</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+};
 
 interface Props {
   baseUrl?: string;
 }
 
-export default function FeaturedHospitalss({ baseUrl = "" }: Props) {
+export default function FeaturedHospitals({ baseUrl = "" }: Props) {
   const [hospitals, setHospitals] = useState<FeaturedHospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
@@ -80,44 +167,13 @@ export default function FeaturedHospitalss({ baseUrl = "" }: Props) {
   }, [country]);
 
   const renderItem = ({ item }: { item: FeaturedHospital }) => (
-    <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        pressed && Platform.OS !== 'android' && { opacity: 0.85 },
-      ]}
-      android_ripple={{ color: '#e0e0e0' }}
-      onPress={() => {
-        console.log('Navigating to hospital:', item.id, item.name);
-        router.push({
-          pathname: '/hospital/[id]' as const,
-          params: {
-            id: item.id,
-            name: item.name || '',
-            image: item.image || ''
-          },
-        });
-      }}
-    >
-      {item.image ? (
-        <Image source={{ uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image }} style={styles.image} resizeMode="cover" />
-      ) : (
-        <View style={[styles.image, styles.placeholderImage]}>
-          <Icon name="shield" size={40} color="#ccc" />
-        </View>
-      )}
-      <View style={styles.details}>
-        <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
-        <View style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>See Details</Text>
-        </View>
-      </View>
-    </Pressable>
+    <HospitalItem item={item} baseUrl={baseUrl} />
   );
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.header}>Featured Hospitalss</Text>
+        <Text style={styles.header}>Featured Hospitals</Text>
         <View style={styles.list}>
           <SkeletonCard />
           <SkeletonCard />
@@ -178,11 +234,25 @@ const styles = StyleSheet.create({
     elevation: 4,
     overflow: Platform.OS === 'ios' ? 'visible' : 'hidden',
   },
+  imageContainer: {
+    width: '100%',
+    height: 120,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    overflow: 'hidden',
+  },
   image: { 
     width: '100%', 
     height: 120, 
     borderTopLeftRadius: 12, 
     borderTopRightRadius: 12 
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 12,
   },
   details: { 
     padding: 12 
@@ -212,6 +282,15 @@ const styles = StyleSheet.create({
   },
   skeleton: {
     backgroundColor: '#e0e0e0',
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  skeletonText: {
+    height: 16,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 4,
   },
   noDataText: {
     textAlign: 'center',

@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Image, StyleSheet, Dimensions, ScrollView, TouchableOpacity, NativeSyntheticEvent, NativeScrollEvent, Text } from 'react-native';
+import {
+  View,
+  Image,
+  StyleSheet,
+  Dimensions,
+  ScrollView,
+  TouchableOpacity,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  Text,
+  Animated
+} from 'react-native';
 import { supabase } from "@/lib/supabase";
 import * as SecureStore from "expo-secure-store";
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -19,6 +30,86 @@ type Banner = {
 interface CarouselProps {
   baseUrl?: string;
 }
+
+const BannerSkeleton = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  // The skeleton style already defines width, height, and background.
+  return <Animated.View style={[styles.skeleton, { opacity: pulseAnim }]} />;
+};
+
+const BannerItem = ({ item, baseUrl }: { item: Banner; baseUrl: string }) => {
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
+
+  const imageUrl =
+    item.image && !item.image.startsWith('http')
+      ? `${baseUrl}${item.image}`
+      : item.image;
+
+  const handleRetry = () => {
+    setHasError(false);
+    setIsImageLoading(true);
+    setRetryKey(prev => prev + 1);
+  };
+
+  return (
+    <TouchableOpacity activeOpacity={0.9} style={styles.slide}>
+      <View style={styles.imageWrapper}>
+        {hasError || !item.image ? (
+          <View style={[styles.image, styles.placeholderImage]}>
+            <Icon name={!item.image ? "image" : "broken-image"} size={60} color="#ccc" />
+            {hasError && (
+              <TouchableOpacity onPress={handleRetry} style={styles.retryButton}>
+                <Icon name="refresh" size={20} color="#fff" />
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          <View style={styles.imageContainer}>
+            <Image
+              key={retryKey}
+              source={{ uri: imageUrl }}
+              style={styles.image}
+              onLoadStart={() => setIsImageLoading(true)}
+              onLoadEnd={() => setIsImageLoading(false)}
+              onError={() => {
+                setHasError(true);
+                setIsImageLoading(false);
+              }}
+            />
+            {isImageLoading && (
+              <View style={styles.loadingOverlay}>
+                <BannerSkeleton />
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -107,7 +198,11 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={[styles.slide, styles.imageWrapper, { backgroundColor: '#e0e0e0' }]} />
+        <View style={styles.slide}>
+          <View style={styles.imageWrapper}>
+            <BannerSkeleton />
+          </View>
+        </View>
       </View>
     );
   }
@@ -139,25 +234,7 @@ const Carousel: React.FC<CarouselProps> = ({ baseUrl = "" }) => {
         scrollEventThrottle={16}
       >
         {banners.map((item) => (
-          <TouchableOpacity key={item.id} activeOpacity={0.9} style={styles.slide}>
-            <View style={styles.imageWrapper}>
-              {item.image ? (
-                <Image
-                  source={{
-                    uri:
-                      item.image && !item.image.startsWith('http')
-                        ? `${baseUrl}${item.image}`
-                        : item.image,
-                  }}
-                  style={styles.image}
-                />
-              ) : (
-                <View style={[styles.image, styles.placeholderImage]}>
-                  <Icon name="image" size={60} color="#ccc" />
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
+          <BannerItem key={item.id} item={item} baseUrl={baseUrl} />
         ))}
       </ScrollView>
 
@@ -195,6 +272,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'gray',
     borderRadius: 20,
   },
+  imageContainer: {
+    flex: 1,
+  },
   image: {
     width: '100%',
     height: '100%',
@@ -206,6 +286,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginTop: 10,
+  },
+  retryText: {
+    color: '#fff',
+    marginLeft: 5,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  skeleton: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E0E0E0',
+    borderRadius: 20,
   },
   pagination: {
     flexDirection: 'row',

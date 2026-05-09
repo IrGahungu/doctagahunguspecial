@@ -1,27 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   Image, 
   ScrollView, 
-  TouchableOpacity 
+  TouchableOpacity,
+  Animated
 } from 'react-native';
 import { DealOfTheDay } from '@/types';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const SkeletonCard = () => (
-  <View style={styles.dealCard}>
-    <View style={[styles.dealImage, { backgroundColor: '#e0e0e0' }]} />
-    <View style={styles.dealInfo}>
-      <View style={{ height: 16, width: '80%', backgroundColor: '#e0e0e0', borderRadius: 4, marginBottom: 4 }} />
-      <View style={{ height: 16, width: '60%', backgroundColor: '#e0e0e0', borderRadius: 4, marginBottom: 4 }} />
-      <View style={{ height: 14, width: '90%', backgroundColor: '#e0e0e0', borderRadius: 4 }} />
+const DealSkeleton = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={[styles.skeleton, { opacity: pulseAnim }, styles.dealImage]} />;
+};
+
+const SkeletonCard = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.8, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return (
+    <View style={styles.dealCard}>
+      <View style={styles.imageContainer}>
+        <DealSkeleton />
+      </View>
+      <View style={styles.dealInfo}>
+        <Animated.View style={[styles.skeletonText, { width: '80%', opacity: pulseAnim }]} />
+        <Animated.View style={[styles.skeletonText, { width: '60%', opacity: pulseAnim }]} />
+        <Animated.View style={[styles.skeletonText, { width: '90%', opacity: pulseAnim }]} />
+      </View>
     </View>
-  </View>
-);
+  );
+};
+
+const DealItem = ({ deal, baseUrl }: { deal: DealOfTheDay; baseUrl: string }) => {
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <TouchableOpacity style={styles.dealCard}>
+      <View style={styles.imageContainer}>
+        {hasError || !deal.image ? (
+          <View style={[styles.dealImage, styles.placeholderImage]}>
+            <Icon name="local-offer" size={40} color="#ccc" />
+          </View>
+        ) : (
+          <View style={styles.imageContainer}>
+            <Image 
+              source={{ uri: deal.image && !deal.image.startsWith('http') ? `${baseUrl}${deal.image}` : deal.image }} 
+              style={styles.dealImage}
+              onLoadStart={() => setIsImageLoading(true)}
+              onLoadEnd={() => setIsImageLoading(false)}
+              onError={() => {
+                setHasError(true);
+                setIsImageLoading(false);
+              }}
+            />
+            {isImageLoading && (
+              <View style={styles.loadingOverlay}>
+                <DealSkeleton />
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+      <View style={styles.dealInfo}>
+        <Text style={styles.dealTitle}>{deal.title}</Text>
+        <Text style={styles.dealDiscount}>{deal.discount}</Text>
+        <Text style={styles.dealTagline}>{deal.tagline}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 interface DealSectionProps {
   title: string;
@@ -36,6 +119,7 @@ const DealSection: React.FC<DealSectionProps> = ({
 }) => {
   const [deals, setDeals] = useState<DealOfTheDay[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +136,7 @@ const DealSection: React.FC<DealSectionProps> = ({
 
     const fetchDeals = async () => {
       setLoading(true);
+      setFetchError(false);
       const { data, error } = await supabase
         .from('deals')
         .select('*')
@@ -60,6 +145,7 @@ const DealSection: React.FC<DealSectionProps> = ({
 
       if (error) {
         console.error('Error fetching deals:', error.message);
+        setFetchError(true);
       } else if (data) {
         setDeals(data as DealOfTheDay[]);
       }
@@ -69,7 +155,7 @@ const DealSection: React.FC<DealSectionProps> = ({
     fetchDeals();
   }, [country]);
 
-  if (loading) {
+  if (loading || fetchError) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -82,7 +168,7 @@ const DealSection: React.FC<DealSectionProps> = ({
     );
   }
 
-  if (deals.length === 0) {
+  if (!fetchError && deals.length === 0) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>{title}</Text>
@@ -103,25 +189,7 @@ const DealSection: React.FC<DealSectionProps> = ({
         contentContainerStyle={styles.scrollContent}
       >
         {deals.map((deal) => (
-          <TouchableOpacity key={deal.id} style={styles.dealCard}>
-            {deal.image ? (
-              <Image 
-                source={{ 
-                  uri: deal.image && !deal.image.startsWith('http') ? `${baseUrl}${deal.image}` : deal.image 
-                }} 
-                style={styles.dealImage} 
-              />
-            ) : (
-              <View style={[styles.dealImage, styles.placeholderImage]}>
-                <Icon name="local-offer" size={40} color="#ccc" />
-              </View>
-            )}
-            <View style={styles.dealInfo}>
-              <Text style={styles.dealTitle}>{deal.title}</Text>
-              <Text style={styles.dealDiscount}>{deal.discount}</Text>
-              <Text style={styles.dealTagline}>{deal.tagline}</Text>
-            </View>
-          </TouchableOpacity>
+          <DealItem key={deal.id} deal={deal} baseUrl={baseUrl} />
         ))}
       </ScrollView>
     </View>
@@ -167,10 +235,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
   },
+  imageContainer: {
+    width: '100%',
+    height: 140,
+  },
   placeholderImage: {
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 12,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+  },
+  skeletonText: {
+    height: 16,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 4,
   },
   dealInfo: {
     alignItems: 'center',

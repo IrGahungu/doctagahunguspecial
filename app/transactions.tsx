@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, ScrollView, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, ArrowUpRight, ArrowDownLeft, History, FileText } from 'lucide-react-native';
@@ -18,10 +18,56 @@ type Transaction = {
   status: string;
 };
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const TransactionSkeleton = () => (
+  <View style={styles.listContent}>
+    {[1, 2, 3, 4, 5].map((i) => (
+      <SkeletonPulse key={i}>
+        <View style={[styles.transactionCard, { height: 70 }]}>
+          <View style={[styles.skeleton, { width: 40, height: 40, borderRadius: 20, marginRight: 12 }]} />
+          <View style={styles.detailsContainer}>
+            <View style={[styles.skeleton, { width: '60%', height: 16, marginBottom: 8, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: '40%', height: 12, borderRadius: 4 }]} />
+          </View>
+          <View style={styles.amountContainer}>
+            <View style={[styles.skeleton, { width: 60, height: 16, marginBottom: 6, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: 40, height: 10, borderRadius: 4 }]} />
+          </View>
+        </View>
+      </SkeletonPulse>
+    ))}
+  </View>
+);
+
 export default function TransactionsScreen() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(new Date());
   const [userId, setUserId] = useState<string | null>(null);
@@ -134,6 +180,7 @@ export default function TransactionsScreen() {
   const fetchTransactions = useCallback(async () => {
     try {
       setIsLoading(true);
+      setHasError(false);
       const token = await SecureStore.getItemAsync("token");
       
       if (!token) {
@@ -167,6 +214,7 @@ export default function TransactionsScreen() {
       }
     } catch (err) {
       console.error('Error fetching transactions:', err);
+      setHasError(true);
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -287,8 +335,13 @@ export default function TransactionsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+        <TransactionSkeleton />
+      ) : hasError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load transactions. Please check your connection.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchTransactions}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -428,4 +481,32 @@ const styles = StyleSheet.create({
   amount: { fontSize: 16, fontFamily: 'Roboto-Bold' },
   status: { fontSize: 10, color: '#4CAF50', fontFamily: 'Roboto-Medium', marginTop: 2 },
   emptyText: { textAlign: 'center', marginTop: 50, color: '#757575', fontFamily: 'Roboto-Regular' },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Roboto-Regular',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
+  },
 });

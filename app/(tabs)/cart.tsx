@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Animated, Dimensions } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ShoppingCart, ArrowLeft, Plus, Minus, CreditCard, Wallet } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,66 @@ import { API_BASE_URL } from '@/config';
 import { supabase } from '@/lib/supabase';
 
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
+const { width } = Dimensions.get('window');
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const CartSkeleton = () => (
+  <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+    <View style={{ padding: 16 }}>
+      {[1, 2].map((i) => (
+        <SkeletonPulse key={i}>
+          <View style={styles.cartItem}>
+            <View style={[styles.productImage, styles.skeleton]} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <View style={[styles.skeleton, { width: '60%', height: 16, marginBottom: 8, borderRadius: 4 }]} />
+              <View style={[styles.skeleton, { width: '40%', height: 14, marginBottom: 12, borderRadius: 4 }]} />
+              <View style={[styles.skeleton, { width: 80, height: 32, borderRadius: 16 }]} />
+            </View>
+          </View>
+        </SkeletonPulse>
+      ))}
+    </View>
+    
+    <SkeletonPulse>
+      <View style={[styles.subtotalCard, { height: 100, justifyContent: 'center', gap: 10 }]}>
+        <View style={[styles.skeleton, { width: '100%', height: 14, borderRadius: 4 }]} />
+        <View style={[styles.skeleton, { width: '100%', height: 14, borderRadius: 4 }]} />
+        <View style={[styles.skeleton, { width: '100%', height: 16, borderRadius: 4 }]} />
+      </View>
+    </SkeletonPulse>
+
+    <SkeletonPulse>
+      <View style={[styles.paymentCard, { height: 120, justifyContent: 'center', gap: 10 }]}>
+        <View style={[styles.skeleton, { width: '100%', height: 45, borderRadius: 10 }]} />
+        <View style={[styles.skeleton, { width: '100%', height: 45, borderRadius: 10 }]} />
+      </View>
+    </SkeletonPulse>
+  </ScrollView>
+);
 
 const currencyMap: { [country: string]: string } = {
   Burundi: 'FBU',
@@ -37,57 +97,62 @@ export default function CartScreen() {
   // Wallet balance state
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
   const [serviceFee, setServiceFee] = useState<number>(500);
 
   // ✅ Fetch wallet balance from /me
-  useEffect(() => {
-    const fetchWalletBalance = async () => {
-      try {
-        const token = await SecureStore.getItemAsync('token');
-        const storedCountry = await SecureStore.getItemAsync('user_country');
-        setCountry(storedCountry);
-        if (!token) {
-          console.log('⚠️ No token found, user may not be logged in.');
-          setLoadingBalance(false);
-          return;
-        }
-
-        const res = await fetch(`${API_BASE_URL}/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const data = await res.json();
-
-        if (res.ok && data.wallet_balance !== undefined) {
-          setWalletBalance(Number(data.wallet_balance));
-          console.log('💰 Wallet balance fetched:', data.wallet_balance);
-        } else {
-          console.error('❌ Failed to fetch balance:', data.error || data);
-        }
-
-        // Fetch dynamic service fee for medicine
-        if (storedCountry) {
-          const { data: feeData, error: feeError } = await supabase
-            .from('service_fees')
-            .select('fee')
-            .eq('country', storedCountry)
-            .eq('service_type', 'medicine')
-            .single();
-          
-          if (!feeError && feeData) {
-            setServiceFee(Number(feeData.fee));
-          }
-        }
-      } catch (err) {
-        console.error('Balance fetch error:', err);
-      } finally {
+  const fetchWalletBalance = useCallback(async () => {
+    setLoadingBalance(true);
+    setHasError(false);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const storedCountry = await SecureStore.getItemAsync('user_country');
+      setCountry(storedCountry);
+      if (!token) {
+        console.log('⚠️ No token found, user may not be logged in.');
         setLoadingBalance(false);
+        return;
       }
-    };
 
-    fetchWalletBalance();
+      const res = await fetch(`${API_BASE_URL}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.wallet_balance !== undefined) {
+        setWalletBalance(Number(data.wallet_balance));
+        console.log('💰 Wallet balance fetched:', data.wallet_balance);
+      } else {
+        console.error('❌ Failed to fetch balance:', data.error || data);
+        setHasError(true);
+      }
+
+      // Fetch dynamic service fee for medicine
+      if (storedCountry) {
+        const { data: feeData, error: feeError } = await supabase
+          .from('service_fees')
+          .select('fee')
+          .eq('country', storedCountry)
+          .eq('service_type', 'medicine')
+          .single();
+        
+        if (!feeError && feeData) {
+          setServiceFee(Number(feeData.fee));
+        }
+      }
+    } catch (err) {
+      console.error('Balance fetch error:', err);
+      setHasError(true);
+    } finally {
+      setLoadingBalance(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchWalletBalance();
+  }, [fetchWalletBalance]);
 
   // Calculate subtotal and service fee
   const subtotal = items.reduce(
@@ -149,9 +214,13 @@ export default function CartScreen() {
       </View>
 
       {loadingBalance ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" />
-          <Text>Loading wallet balance...</Text>
+        <CartSkeleton />
+      ) : hasError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load wallet data. Please check your connection.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchWalletBalance}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView style={styles.content}>
@@ -413,4 +482,32 @@ const styles = StyleSheet.create({
     marginHorizontal: 45,
   },
   paymentButtonText: { fontFamily: 'Roboto-Bold', fontSize: 16, color: '#fff' },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Roboto-Regular',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
+  },
 });

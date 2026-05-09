@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, RefreshControl, Alert, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,51 @@ type Booking = {
   created_at: string;
   ticket_number?: string;
 };
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const AppointmentSkeleton = () => (
+  <View style={styles.listContent}>
+    {[1, 2, 3].map((i) => (
+      <SkeletonPulse key={i}>
+        <View style={[styles.card, { height: 180 }]}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.skeleton, { width: '60%', height: 20, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: 80, height: 24, borderRadius: 12 }]} />
+          </View>
+          <View style={[styles.skeleton, { width: '100%', height: 1, marginVertical: 12 }]} />
+          <View style={{ gap: 10 }}>
+            <View style={[styles.skeleton, { width: '40%', height: 16, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: '50%', height: 16, borderRadius: 4 }]} />
+          </View>
+        </View>
+      </SkeletonPulse>
+    ))}
+  </View>
+);
 
 const getMainStatusColor = (status: string) => {
   const s = status?.toLowerCase() || '';
@@ -159,11 +204,14 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
 export default function AppointmentsScreen() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
   const fetchBookings = useCallback(async () => {
+    setLoading(true);
+    setHasError(false);
     try {
       let currentUserId = userId;
       
@@ -201,11 +249,13 @@ export default function AppointmentsScreen() {
 
       if (error) {
         console.error('Error fetching bookings:', error.message);
+        setHasError(true);
       } else {
         setBookings(data || []);
       }
     } catch (error) {
       console.error('Error in fetchBookings:', error);
+      setHasError(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -257,8 +307,13 @@ export default function AppointmentsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+        <AppointmentSkeleton />
+      ) : hasError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load appointments. Please check your connection.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchBookings}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : bookings.length === 0 ? (
         <View style={styles.center}>
@@ -438,5 +493,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#757575',
     fontFamily: 'Roboto-Regular',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Roboto-Regular',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
   },
 });

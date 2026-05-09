@@ -398,13 +398,13 @@ export default function UsersTable() {
                     <div className="flex flex-col gap-2">
                       {editingUserId === u.id ? (
                         <>
-                          <button onClick={() => handleUpdate(u.id)} disabled={isSubmitting} className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm disabled:bg-green-300">Save</button>
-                          <button onClick={handleCancelClick} disabled={isSubmitting} className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm disabled:bg-gray-300">Cancel</button>
+                          <button onClick={() => handleUpdate(u.id)} disabled={isSubmitting} className="btn-save">Save</button>
+                          <button onClick={handleCancelClick} disabled={isSubmitting} className="btn-cancel">Cancel</button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => handleEditClick(u)} disabled={isSubmitting} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm disabled:bg-blue-300">Edit</button>
-                          <button onClick={() => handleDelete(u.id)} disabled={isSubmitting} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm disabled:bg-red-300">
+                          <button onClick={() => handleEditClick(u)} disabled={isSubmitting} className="btn-edit">Edit</button>
+                          <button onClick={() => handleDelete(u.id)} disabled={isSubmitting} className="btn-delete">
                             Delete
                           </button>
                         </>

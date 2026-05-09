@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronRight, User, ShoppingBag, Star, Headphones, Settings, KeyRound, Calendar, History, Bus, Pill } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
@@ -19,6 +19,58 @@ type UserProfile = {
   wallet_balance?: number;
   engagement_points?: number;
 };
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const AccountSkeleton = () => (
+  <ScrollView style={styles.content} contentContainerStyle={styles.scrollContentContainer}>
+    <SkeletonPulse>
+      <View style={[styles.monetizationCard, { height: 100 }]}>
+        <View style={[styles.skeleton, { width: '50%', height: 18, marginBottom: 15, borderRadius: 4 }]} />
+        <View style={[styles.skeleton, { width: '100%', height: 10, marginBottom: 15, borderRadius: 5 }]} />
+        <View style={[styles.skeleton, { width: '30%', height: 12, alignSelf: 'flex-end', borderRadius: 4 }]} />
+      </View>
+    </SkeletonPulse>
+
+    <View style={styles.menuSection}>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <SkeletonPulse key={i}>
+          <View style={styles.menuItem}>
+            <View style={[styles.skeleton, { width: 24, height: 24, borderRadius: 12, marginRight: 16 }]} />
+            <View style={{ flex: 1 }}>
+              <View style={[styles.skeleton, { width: '40%', height: 16, marginBottom: 6, borderRadius: 4 }]} />
+              <View style={[styles.skeleton, { width: '70%', height: 12, borderRadius: 4 }]} />
+            </View>
+            <View style={[styles.skeleton, { width: 20, height: 20, borderRadius: 10 }]} />
+          </View>
+        </SkeletonPulse>
+      ))}
+    </View>
+  </ScrollView>
+);
 
 export default function AccountScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -188,19 +240,21 @@ export default function AccountScreen() {
   return (
     <View style={styles.container}>
       <Header />
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContentContainer}>
-
-        <TouchableOpacity 
-          style={styles.monetizationCard} 
-          onPress={() => router.push({
-            pathname: '/wallet-details',
-            params: { 
-              engagementPoints: engagementPoints.toString(), 
-              monetizationGoal: monetizationGoal.toString(),
-              ...dailyStats 
-            }
-          })}
-        >
+      {isLoading ? (
+        <AccountSkeleton />
+      ) : (
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContentContainer}>
+          <TouchableOpacity 
+            style={styles.monetizationCard} 
+            onPress={() => router.push({
+              pathname: '/wallet-details',
+              params: { 
+                engagementPoints: engagementPoints.toString(), 
+                monetizationGoal: monetizationGoal.toString(),
+                ...dailyStats 
+              }
+            })}
+          >
           <View style={styles.monetizationHeader}>
             <Text style={styles.monetizationTitle}>Monetization Goal</Text>
             <Text style={styles.monetizationValue}>{Math.round(Math.min(engagementPoints / monetizationGoal, 1) * 100)}%</Text>
@@ -258,7 +312,8 @@ export default function AccountScreen() {
         </View>
 
         <Text style={styles.versionText}>Version 1.0.0</Text>
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -366,5 +421,8 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 12,
     fontWeight: "bold",
+  },
+  skeleton: {
+    backgroundColor: "#e0e0e0",
   },
 });

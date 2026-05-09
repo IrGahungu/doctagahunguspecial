@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, Pressable, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Image, Pressable, StyleSheet, Platform, Animated } from 'react-native';
 import { router } from 'expo-router';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '@/lib/supabase';
@@ -20,14 +20,97 @@ type SimplePharmacy = {
   image: string | null;
 };
 
+const PharmacySkeleton = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={[styles.skeleton, { opacity: pulseAnim }, styles.image]} />;
+};
+
 const SkeletonCard = () => (
   <View style={[styles.cardBase, styles.defaultCard]}>
-    <View style={[styles.image, styles.skeleton]} />
+    <View style={styles.imageContainer}>
+      <PharmacySkeleton />
+    </View>
     <View style={styles.details}>
-      <View style={[styles.skeleton, { height: 20, width: '80%', borderRadius: 4, alignSelf: 'center' }]} />
+      <View style={[styles.skeletonText, { width: '80%', alignSelf: 'center' }]} />
+      <View style={[styles.skeletonText, { width: '60%', alignSelf: 'center', marginTop: 4 }]} />
     </View>
   </View>
 );
+
+const PharmacyItem = ({ item, baseUrl }: { item: SimplePharmacy; baseUrl: string }) => {
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.cardBase, styles.defaultCard, pressed && Platform.OS !== 'android' && { opacity: 0.85 }]}
+      android_ripple={{ color: '#e0e0e0' }}
+      onPress={() => {
+        console.log('Navigating to pharmacy:', item.id, item.name);
+        router.push({
+          pathname: '/pharmacy/[id]',
+          params: { id: item.id }
+        });
+      }}
+    >
+      <View style={styles.imageContainer}>
+        {hasError || !item.image ? (
+          <View style={[styles.image, styles.placeholderImage]}>
+            <Icon name="local-pharmacy" size={40} color="#ccc" />
+          </View>
+        ) : (
+          <>
+            <Image 
+              source={{ uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image }} 
+              style={styles.image} 
+              resizeMode="cover" 
+              onLoadStart={() => setIsImageLoading(true)} 
+              onLoadEnd={() => {
+                setIsImageLoading(false);
+                setHasError(false);
+              }} 
+              onError={() => {
+                setHasError(true);
+                setIsImageLoading(false);
+              }} 
+            />
+            {isImageLoading && (
+              <View style={styles.loadingOverlay}>
+                <PharmacySkeleton />
+              </View>
+            )}
+          </>
+        )}
+      </View>
+      <View style={styles.details}>
+        <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+        <View style={styles.detailsButton}>
+          <Text style={styles.detailsButtonText}>See Details</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+};
 
 export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: Props) {
   const [items, setItems] = useState<SimplePharmacy[]>([]);
@@ -77,6 +160,26 @@ export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: P
     rows.push(items.slice(i, i + 2));
   }
 
+  if (loading) {
+    return (
+      <View style={styles.section}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{title}</Text>
+        </View>
+        <>
+          <View style={styles.row}>
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+          <View style={styles.row}>
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        </>
+      </View>
+    );
+  }
+
   if (!loading && items.length === 0) {
     return (
       <View style={styles.section}>
@@ -91,51 +194,13 @@ export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: P
         <Text style={styles.title}>{title}</Text>
         {onViewAll && <Pressable onPress={onViewAll}><Text style={styles.viewAll}>View All</Text></Pressable>}
       </View>
-      {loading ? (
-        <>
-          <View style={styles.row}>
-            <SkeletonCard />
-            <SkeletonCard />
-          </View>
-          <View style={styles.row}>
-            <SkeletonCard />
-            <SkeletonCard />
-          </View>
-        </>
-      ) : (
-        rows.map((row, rowIndex) => (
-          <View key={rowIndex} style={styles.row}>
-            {row.map((item) => (
-              <Pressable
-                key={item.id}
-                style={({ pressed }) => [styles.cardBase, styles.defaultCard, pressed && Platform.OS !== 'android' && { opacity: 0.85 }]}
-                android_ripple={{ color: '#e0e0e0' }}
-                onPress={() => {
-                  console.log('Navigating to pharmacy:', item.id, item.name);
-                  router.push({
-                    pathname: '/pharmacy/[id]',
-                    params: { id: item.id }
-                  });
-                }}
-              >
-                {item.image ? (
-                  <Image source={{ uri: item.image && !item.image.startsWith('http') ? `${baseUrl}${item.image}` : item.image }} style={styles.image} resizeMode="cover" />
-                ) : (
-                  <View style={[styles.image, styles.placeholderImage]}>
-                    <Icon name="local-pharmacy" size={40} color="#ccc" />
-                  </View>
-                )}
-                <View style={styles.details}>
-                  <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-                  <View style={styles.detailsButton}>
-                    <Text style={styles.detailsButtonText}>See Details</Text>
-                  </View>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        ))
-      )}
+      {rows.map((row, rowIndex) => (
+        <View key={rowIndex} style={styles.row}>
+          {row.map((item) => (
+            <PharmacyItem key={item.id} item={item} baseUrl={baseUrl} />
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -156,7 +221,6 @@ const styles = StyleSheet.create({
     paddingTop: 12 
   },
   title: { 
-    fontFamily: 'Roboto-Bold',
     fontSize: 16,
     color: '#212121',
     alignItems: 'center',
@@ -182,22 +246,44 @@ const styles = StyleSheet.create({
     elevation: 4, 
     overflow: Platform.OS === 'ios' ? 'visible' : 'hidden' 
   },
-  defaultCard: { 
-    height: 220 
-  },
   image: { 
     width: '100%', 
     height: 120, 
     borderTopLeftRadius: 12, 
     borderTopRightRadius: 12 
   },
+  imageContainer: {
+    width: '100%',
+    height: 120,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    overflow: 'hidden',
+  },
   placeholderImage: {
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
   skeleton: {
     backgroundColor: '#e0e0e0',
+    width: '100%',
+    height: '100%',
+    borderRadius: 12, // Match card border radius
+  },
+  skeletonText: {
+    height: 16,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  defaultCard: { 
+    height: 220 
   },
   details: {
     flex: 1,
@@ -220,7 +306,6 @@ const styles = StyleSheet.create({
   detailsButtonText: {
     color: 'white',
     fontSize: 12,
-    fontFamily: 'Roboto-Medium',
   },
   noDataText: {
     textAlign: 'center',

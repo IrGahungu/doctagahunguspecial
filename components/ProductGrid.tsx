@@ -1,9 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  Image, 
+  TouchableOpacity, 
+  Dimensions, 
+  Platform,
+  Animated 
+} from 'react-native';
 import { router } from 'expo-router';
 import { Product } from '@/types';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const { width } = Dimensions.get('window');
 const numColumns = 2;
@@ -28,6 +39,99 @@ const currencyMap: { [country: string]: string } = {
 
 const getCurrency = (country: string | null): string => {
   return country ? currencyMap[country] || 'USD' : 'USD';
+};
+
+const ProductSkeleton = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={[styles.skeleton, { opacity: pulseAnim }]} />;
+};
+
+const SkeletonCard = () => (
+  <View style={styles.productCard}>
+    <View style={styles.imageContainer}>
+      <ProductSkeleton />
+    </View>
+    <View style={styles.productInfo}>
+      <View style={[styles.skeleton, { height: 14, width: '80%', marginBottom: 4, borderRadius: 4 }]} />
+      <View style={[styles.skeleton, { height: 28, width: '100%', borderRadius: 8 }]} />
+    </View>
+  </View>
+);
+
+const ProductItem = ({ 
+  item, 
+  baseUrl, 
+  onPress 
+}: { 
+  item: Product; 
+  baseUrl: string; 
+  onPress: (p: Product) => void 
+}) => {
+  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  const imageUrl = item.image && !item.image.toString().startsWith('http') 
+    ? `${baseUrl}${item.image}` 
+    : item.image?.toString();
+
+  return (
+    <TouchableOpacity style={styles.productCard} onPress={() => onPress(item)}>
+      <View style={styles.imageContainer}>
+        {hasError || !item.image ? (
+          <View style={[styles.productImage, styles.placeholderImage]}>
+            <Icon name="medication" size={40} color="#ccc" />
+          </View>
+        ) : (
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.productImage}
+              onLoadStart={() => setIsImageLoading(true)}
+              onLoadEnd={() => setIsImageLoading(false)}
+              onError={() => {
+                setHasError(true);
+                setIsImageLoading(false);
+              }}
+              resizeMode="cover"
+            />
+            {isImageLoading && (
+              <View style={styles.loadingOverlay}>
+                <ProductSkeleton />
+              </View>
+            )}
+          </View>
+        )}
+      </View>
+      <View style={styles.productInfo}>
+        <Text numberOfLines={2} style={styles.productTitle}>
+          {item.title || item.name}
+        </Text>
+        <View style={styles.detailsButton}>
+          <Text style={styles.detailsButtonText}>See Details</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 };
 
 const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp, scrollEnabled = false, baseUrl = "" }) => {
@@ -153,38 +257,18 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
     });
   };
 
-  const renderProduct = ({ item }: { item: Product }) => {
-
+  if (loading) {
     return (
-      <TouchableOpacity
-        style={styles.productCard}
-        onPress={() => handleProductPress(item)}
-      >
-        {item.image ? (
-          <Image
-            source={{ uri: item.image && !item.image.toString().startsWith('http') ? `${baseUrl}${item.image}` : item.image.toString() }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No Image</Text>
-          </View>
-        )}
-
-        <View style={styles.productInfo}>
-          <Text numberOfLines={2} style={styles.productTitle}>
-            {item.title || item.name} {/* Fallback to name if title is empty */}
-          </Text>
-          <View style={styles.detailsButton}>
-            <Text style={styles.detailsButtonText}>See Details</Text>
-          </View>
+      <View style={styles.container}>
+        {title && <Text style={styles.sectionTitle}>{title}</Text>}
+        <View style={[styles.gridContainer, styles.columnWrapper]}>
+          <SkeletonCard /><SkeletonCard />
         </View>
-      </TouchableOpacity>
+      </View>
     );
-  };
+  }
 
-  if (!loading && products.length === 0) {
+  if (products.length === 0) {
     return (
       <View style={styles.container}>
         {title && <Text style={styles.sectionTitle}>{title}</Text>}
@@ -198,7 +282,9 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
 
       <FlatList
         data={products}
-        renderItem={renderProduct}
+        renderItem={({ item }) => (
+          <ProductItem item={item} baseUrl={baseUrl} onPress={handleProductPress} />
+        )}
         keyExtractor={(item) => item.id.toString()}
         numColumns={numColumns}
         scrollEnabled={scrollEnabled}
@@ -248,6 +334,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
+  imageContainer: {
+    width: '100%',
+    height: 150,
+  },
   placeholderImage: {
     width: '100%',
     height: 150,
@@ -256,6 +346,15 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
+    width: '100%',
+    height: '100%',
   },
   placeholderText: {
     fontSize: 12,

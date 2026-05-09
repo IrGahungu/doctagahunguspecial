@@ -1,15 +1,56 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from "react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, StyleSheet, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, KeyRound } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from "@/config";
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const PinSkeleton = () => (
+  <View style={styles.content}>
+    <SkeletonPulse>
+      <View style={[styles.skeleton, { width: 60, height: 60, borderRadius: 30, alignSelf: 'center', marginBottom: 20 }]} />
+      <View style={[styles.skeleton, { width: '60%', height: 24, alignSelf: 'center', marginBottom: 8, borderRadius: 4 }]} />
+      <View style={[styles.skeleton, { width: '80%', height: 16, alignSelf: 'center', marginBottom: 32, borderRadius: 4 }]} />
+      
+      <View style={[styles.skeleton, { width: 100, height: 14, marginBottom: 8, borderRadius: 4 }]} />
+      <View style={[styles.skeleton, { width: '100%', height: 50, borderRadius: 8, marginBottom: 16 }]} />
+      
+      <View style={[styles.skeleton, { width: '100%', height: 50, borderRadius: 20, marginTop: 20 }]} />
+    </SkeletonPulse>
+  </View>
+);
+
 const PinManagementScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [hasPin, setHasPin] = useState(true);
+  const [isCheckingPin, setIsCheckingPin] = useState(params.forceChangeDefaultPin !== 'true');
   const [isPinVerified, setIsPinVerified] = useState(false);
   const [oldPin, setOldPin] = useState("");
   const [newPin, setNewPin] = useState("");
@@ -22,6 +63,7 @@ const PinManagementScreen = () => {
   // Check if user already has a PIN
   useEffect(() => {
     const checkHasPin = async () => {
+      setIsCheckingPin(true);
       try {
         const token = await SecureStore.getItemAsync("token");
         if (!token) return;
@@ -38,6 +80,8 @@ const PinManagementScreen = () => {
         }
       } catch (err) {
         console.error("Error checking PIN:", err);
+      } finally {
+        setIsCheckingPin(false);
       }
     };
 
@@ -123,10 +167,15 @@ const PinManagementScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{hasPin ? 'Change PIN' : 'Create PIN'}</Text>
+        <Text style={styles.headerTitle}>
+          {isCheckingPin ? '...' : (hasPin ? 'Change PIN' : 'Create PIN')}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
+      {isCheckingPin ? (
+        <PinSkeleton />
+      ) : (
       <View style={styles.content}>
         <KeyRound size={60} color="#4CAF50" style={{ alignSelf: 'center', marginBottom: 20 }} />
 
@@ -181,6 +230,7 @@ const PinManagementScreen = () => {
           </>
         )}
       </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -197,6 +247,9 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, marginBottom: 16, fontSize: 18, textAlign: 'center', letterSpacing: 10 },
   saveButton: { backgroundColor: '#4CAF50', paddingVertical: 14, borderRadius: 20, alignItems: 'center', marginTop: 20 },
   saveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
+  },
 });
 
 export default PinManagementScreen;

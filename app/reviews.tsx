@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ScrollView, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Star, Plus, Pencil, Trash2 } from 'lucide-react-native';
@@ -23,6 +23,51 @@ const renderStars = (rating: number) => {
   }
   return <View style={styles.starContainer}>{stars}</View>;
 };
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const ReviewSkeleton = () => (
+  <View style={styles.listContent}>
+    {[1, 2, 3].map((i) => (
+      <SkeletonPulse key={i}>
+        <View style={[styles.reviewCard, { height: 120 }]}>
+          <View style={styles.reviewMetadata}>
+            <View style={[styles.skeleton, { width: 60, height: 12, borderRadius: 4 }]} />
+          </View>
+          <View style={styles.reviewHeader}>
+            <View style={[styles.skeleton, { width: '40%', height: 18, borderRadius: 4 }]} />
+            <View style={[styles.skeleton, { width: 80, height: 16, borderRadius: 4 }]} />
+          </View>
+          <View style={[styles.skeleton, { width: '100%', height: 14, marginTop: 10, borderRadius: 4 }]} />
+          <View style={[styles.skeleton, { width: '80%', height: 14, marginTop: 6, borderRadius: 4 }]} />
+        </View>
+      </SkeletonPulse>
+    ))}
+  </View>
+);
 
 const ReviewItem = ({ item, currentUserId, onEdit, onDelete }: { 
   item: any; 
@@ -66,6 +111,7 @@ export default function ReviewsScreen() {
   const router = useRouter();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
@@ -102,14 +148,19 @@ export default function ReviewsScreen() {
   };
 
   const fetchReviews = useCallback(async () => {
+    setLoading(true);
+    setHasError(false);
     try {
       const response = await fetch(`${API_BASE_URL}/reviews`);
       if (response.ok) {
         const data = await response.json();
         setReviews(data);
+      } else {
+        setHasError(true);
       }
     } catch (error) {
       console.error('Fetch reviews error:', error);
+      setHasError(true);
     } finally {
       setLoading(false);
     }
@@ -252,7 +303,14 @@ export default function ReviewsScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#4CAF50" style={{ marginTop: 50 }} />
+        <ReviewSkeleton />
+      ) : hasError ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load reviews. Please check your connection.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchReviews}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
           data={reviews}
@@ -564,5 +622,33 @@ const styles = StyleSheet.create({
     color: '#455A64',
     lineHeight: 18,
     fontStyle: 'italic',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#757575',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'Roboto-Regular',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 2,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontFamily: 'Roboto-Bold',
+    fontSize: 16,
+  },
+  skeleton: {
+    backgroundColor: '#e0e0e0',
   },
 });

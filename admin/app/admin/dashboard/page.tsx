@@ -1619,15 +1619,15 @@ export default function AdminDashboard() {
                             <td className="p-3">
                               {editingFeeId === rowId ? (
                                 <div className="flex gap-2">
-                                  <button onClick={() => handleUpdateServiceFee(fee.id)} className="text-blue-600 font-bold hover:underline">
+                                  <button onClick={() => handleUpdateServiceFee(fee.id)} className="btn-save">
                                     {loadingId === fee.id ? "Saving..." : "Save"}
                                   </button>
-                                  <button onClick={() => setEditingFeeId(null)} className="text-gray-500 hover:underline">Cancel</button>
+                                  <button onClick={() => setEditingFeeId(null)} className="btn-cancel">Cancel</button>
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => { setEditingFeeId(rowId); setTempFeeValue(fee.fee.toString()); }}
-                                  className="text-indigo-600 hover:underline"
+                                  className="btn-edit"
                                 >
                                   Edit Fee
                                 </button>
@@ -1709,7 +1709,7 @@ export default function AdminDashboard() {
                       />
                       <button
                         onClick={() => handleUpdateSettingValue('min_ep_required', newThresholdInput)}
-                        className="bg-violet-600 text-white px-6 rounded-xl font-bold hover:bg-violet-700 active:scale-95 transition-all shadow-md shadow-violet-100 min-w-[140px]"
+                        className="btn-save min-w-[140px]"
                       >Save</button>
                     </div>
                   </div>
@@ -1727,7 +1727,7 @@ export default function AdminDashboard() {
                       />
                       <button
                         onClick={() => handleUpdateEpReward('monetization_goal', epRewards.monetization_goal)}
-                        className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-100 min-w-[140px]"
+                        className="btn-save min-w-[140px]"
                       >Save</button>
                     </div>
                     <p className="text-xs text-gray-400 mt-3 italic">This goal appears on the user's account progress bar.</p>
@@ -1773,7 +1773,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleUpdateEpReward(item.key, epRewards[item.key as keyof typeof epRewards])}
                           disabled={isRefreshing}
-                          className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-100 disabled:opacity-50 min-w-[120px]"
+                          className="btn-save min-w-[120px]"
                         >
                           {isRefreshing ? <Spinner /> : "Update"}
                         </button>
@@ -1798,7 +1798,7 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => handleUpdateEpReward('story_duration', epRewards.story_duration)}
                         disabled={isRefreshing}
-                        className="bg-emerald-600 text-white px-6 rounded-xl font-bold hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-100 disabled:opacity-50 min-w-[120px]"
+                        className="btn-save min-w-[120px]"
                       >
                         {isRefreshing ? <Spinner /> : "Update"}
                       </button>
@@ -2037,14 +2037,14 @@ export default function AdminDashboard() {
                           <td className="p-2 space-x-2">
                             <button
                               onClick={() => openEditCategoryModal(cat)}
-                              className="text-blue-600 hover:underline"
+                              className="btn-edit"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleCategoryDelete(cat.id)}
                               disabled={loadingId === cat.id}
-                              className="text-red-600 hover:underline"
+                              className="btn-delete"
                             >
                               {loadingId === cat.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
@@ -2123,13 +2123,13 @@ export default function AdminDashboard() {
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => handleSaveReply(review.id)}
-                                    className="bg-blue-600 text-white px-2 py-1 rounded text-[10px]"
+                                    className="btn-save"
                                   >
                                     Save
                                   </button>
                                   <button
                                     onClick={() => setReplyingToId(null)}
-                                    className="bg-gray-200 text-gray-700 px-2 py-1 rounded text-[10px]"
+                                    className="btn-cancel"
                                   >
                                     Cancel
                                   </button>
@@ -2144,14 +2144,14 @@ export default function AdminDashboard() {
                             <div className="flex flex-col gap-1">
                               <button
                                 onClick={() => { setReplyingToId(review.id); setAdminReplyText(review.admin_reply || ""); }}
-                                className="text-blue-600 hover:underline text-left"
+                                className="btn-edit"
                               >
                                 {review.admin_reply ? "Edit Reply" : "Reply"}
                               </button>
                               <button
                                 onClick={() => handleReviewDelete(review.id)}
                                 disabled={loadingId === review.id}
-                                className="text-red-600 hover:underline flex items-center gap-1"
+                                className="btn-delete flex items-center gap-1"
                               >
                                 {loadingId === review.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                               </button>
@@ -2246,14 +2246,14 @@ export default function AdminDashboard() {
                           <td className="p-2 space-x-2">
                             <button
                               onClick={() => openEditPharmacyModal(phar)}
-                              className="text-blue-600 hover:underline"
+                              className="btn-edit"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handlePharmacyDelete(phar.id)}
                               disabled={loadingId === phar.id}
-                              className="text-red-600 hover:underline"
+                              className="btn-delete"
                             >
                               {loadingId === phar.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
@@ -2350,8 +2350,8 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditHospitalModal(hosp)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="text-red-600 hover:underline">
+                            <button onClick={() => openEditHospitalModal(hosp)} className="btn-edit">Edit</button>
+                            <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="btn-delete">
                               {loadingId === hosp.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2421,8 +2421,8 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditInsuranceModal(ins)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="text-red-600 hover:underline">
+                            <button onClick={() => openEditInsuranceModal(ins)} className="btn-edit">Edit</button>
+                            <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="btn-delete">
                               {loadingId === ins.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2482,8 +2482,8 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-2">{banner.link}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditBannerModal(banner)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="text-red-600 hover:underline">
+                            <button onClick={() => openEditBannerModal(banner)} className="btn-edit">Edit</button>
+                            <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="btn-delete">
                               {loadingId === banner.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2547,8 +2547,8 @@ export default function AdminDashboard() {
                           <td className="p-2">{deal.discount}</td>
                           <td className="p-2">{deal.tagline}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditDealModal(deal)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="text-red-600 hover:underline">
+                            <button onClick={() => openEditDealModal(deal)} className="btn-edit">Edit</button>
+                            <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="btn-delete">
                               {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2618,8 +2618,8 @@ export default function AdminDashboard() {
                           <td className="p-2">{doc.booking_type}</td>
                           <td className="p-2">{doc.availability && doc.availability.length > 0 ? 'Yes' : 'No'}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditDoctorModal(doc)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="text-red-600 hover:underline">
+                            <button onClick={() => openEditDoctorModal(doc)} className="btn-edit">Edit</button>
+                            <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="btn-delete">
                               {loadingId === doc.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2716,8 +2716,8 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-2 space-x-2">
                             <button onClick={() => viewStats('story', story.id, story.name)} className="text-green-600 hover:underline">Stats</button>
-                            <button onClick={() => openEditStoryModal(story)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handleStoryDelete(story.id)} className="text-red-600 hover:underline">Delete</button>
+                            <button onClick={() => openEditStoryModal(story)} className="btn-edit">Edit</button>
+                            <button onClick={() => handleStoryDelete(story.id)} className="btn-delete">Delete</button>
                           </td>
                         </tr>
                       ))}
@@ -2837,8 +2837,8 @@ export default function AdminDashboard() {
                           <td className="p-2 space-x-2">
                             <button onClick={() => viewStats('post-likes', post.id, post.title)} className="text-green-600 hover:underline">Likes</button>
                             <button onClick={() => viewStats('post-views', post.id, post.title)} className="text-purple-600 hover:underline">Views</button>
-                            <button onClick={() => openEditPostModal(post)} className="text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => handlePostDelete(post.id)} className="text-red-600 hover:underline">Delete</button>
+                            <button onClick={() => openEditPostModal(post)} className="btn-edit">Edit</button>
+                            <button onClick={() => handlePostDelete(post.id)} className="btn-delete">Delete</button>
                           </td>
                         </tr>
                       ))}
