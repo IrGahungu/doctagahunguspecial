@@ -1,16 +1,62 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bus, Calendar as CalendarIcon, MapPin } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '@/lib/supabase';
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const BusResultsSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.content}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={styles.busCard}>
+          <View style={styles.cardTop}>
+            <View>
+              <View style={[styles.skeletonLine, { width: 120, height: 20, marginBottom: 8 }]} />
+              <View style={[styles.skeletonLine, { width: 80, height: 14 }]} />
+            </View>
+            <View style={[styles.skeletonLine, { width: 100, height: 20 }]} />
+          </View>
+          <View style={[styles.skeletonLine, { width: '100%', height: 60, marginVertical: 20, borderRadius: 8 }]} />
+          <View style={[styles.skeletonLine, { width: '100%', height: 45, borderRadius: 12 }]} />
+        </View>
+      ))}
+    </View>
+  </SkeletonPulse>
+);
+
 export default function BusResultsScreen() {
   const router = useRouter();
   const { from, to, date } = useLocalSearchParams<{ from: string, to: string, date: string }>();
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBuses = async () => {
@@ -27,6 +73,7 @@ export default function BusResultsScreen() {
       console.log('🔍 Searching Supabase for:', { searchFrom, searchTo, searchDate });
 
       try {
+        setError(null);
         let query = supabase
           .from('buses')
           .select('*')
@@ -41,10 +88,12 @@ export default function BusResultsScreen() {
 
         if (error) throw error;
         console.log('✅ Found buses:', data?.length || 0);
+        setError(null);
         setResults(data || []);
       } catch (err: any) {
         console.error('Error fetching buses:', err.message);
         Toast.show({ type: 'error', text1: 'Fetch Error', text2: 'Could not load bus schedules.' });
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -85,11 +134,8 @@ export default function BusResultsScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Finding best routes...</Text>
-        </View>
+      {loading || (error && results.length === 0) ? (
+        <BusResultsSkeleton />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.resultsCount}>{results.length} Buses Available</Text>
@@ -157,6 +203,10 @@ const styles = StyleSheet.create({
   content: { padding: 16 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#757575', fontFamily: 'Roboto-Medium' },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+  },
   resultsCount: { fontSize: 14, color: '#757575', marginBottom: 16, fontFamily: 'Roboto-Medium' },
   busCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 3 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },

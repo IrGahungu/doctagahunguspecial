@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, TouchableOpacity, ActivityIndicator, Animated } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from '@/components/Toast';
@@ -7,6 +7,21 @@ import { useToastStore } from '@/stores/toastStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/lib/supabase';
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
@@ -110,7 +125,9 @@ export default function PaymentScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Doctor Service Fee</Text>
             {loadingFee ? (
-              <ActivityIndicator size="small" color="#4CAF50" />
+              <SkeletonPulse>
+                <View style={[styles.skeletonLine, { width: 80, height: 16 }]} />
+              </SkeletonPulse>
             ) : (
               <Text style={styles.detailValue}>BIF {serviceFee.toLocaleString()}</Text>
             )}
@@ -265,5 +282,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Roboto-Medium',
     color: '#fff',
     textAlign: 'center',
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });

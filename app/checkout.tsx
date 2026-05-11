@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
+import { Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Wallet } from 'lucide-react-native';
@@ -18,6 +19,50 @@ import Toast from 'react-native-toast-message';
 import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
 import ConfettiCannon from 'react-native-confetti-cannon';
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const CheckoutSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.content}>
+      <View style={[styles.summaryCard, { height: 180 }]}>
+        <View style={[styles.skeletonLine, { width: '60%', height: 18, marginBottom: 15 }]} />
+        <View style={[styles.skeletonLine, { width: '80%', height: 14, marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { width: '70%', height: 14, marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { width: '90%', height: 18, marginTop: 10 }]} />
+      </View>
+
+      <View style={[styles.paymentMethodCard, { height: 60, marginBottom: 24 }]}>
+        <View style={[styles.skeletonLine, { width: 30, height: 30, borderRadius: 15, marginRight: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '50%', height: 20 }]} />
+      </View>
+      <View style={[styles.skeletonLine, { width: '100%', height: 55, borderRadius: 15 }]} />
+    </View>
+  </SkeletonPulse>
+);
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -220,42 +265,43 @@ export default function CheckoutScreen() {
         <Text style={styles.headerTitle}>Confirm Payment</Text>
       </View>
 
-      {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />}
+      {isLoading ? (
+        <CheckoutSkeleton />
+      ) : (
+        <>
+          {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />}
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Order Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>BIF {parseFloat(subtotal).toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Medicine Service Fee</Text>
-            <Text style={styles.summaryValue}>BIF {parseFloat(serviceFee).toFixed(2)}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
-            <Text style={styles.totalValue}>BIF {parseFloat(total).toFixed(2)}</Text>
-          </View>
-        </View>
+          <ScrollView contentContainerStyle={styles.content}>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryTitle}>Order Summary</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>BIF {parseFloat(subtotal).toFixed(2)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Medicine Service Fee</Text>
+                <Text style={styles.summaryValue}>BIF {parseFloat(serviceFee).toFixed(2)}</Text>
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Amount</Text>
+                <Text style={styles.totalValue}>BIF {parseFloat(total).toFixed(2)}</Text>
+              </View>
+            </View>
 
-        <View style={styles.paymentMethodCard}>
-          <Wallet size={24} color="#4CAF50" />
-          <Text style={styles.paymentMethodText}>Paying with Gahungu Wallet</Text>
-        </View>
+            <View style={styles.paymentMethodCard}>
+              <Wallet size={24} color="#4CAF50" />
+              <Text style={styles.paymentMethodText}>Paying with Gahungu Wallet</Text>
+            </View>
 
-        <TouchableOpacity
-          style={[styles.confirmButton, isLoading && styles.disabledButton]}
-          onPress={handleInitiatePayment}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.confirmButtonText}>Confirm & Pay</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={handleInitiatePayment}
+            >
+              <Text style={styles.confirmButtonText}>Confirm & Pay</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </>
+      )}
 
       <Modal
         visible={isPinModalVisible}
@@ -314,6 +360,7 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, fontFamily: 'Roboto-Medium', fontSize: 18, color: 'black', top: -15, textAlign: 'center' },
   content: { padding: 16 },
   summaryCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 2 },
+  skeletonLine: { backgroundColor: '#e0e0e0', borderRadius: 4 },
   summaryTitle: { fontSize: 18, fontFamily: 'Roboto-Bold', marginBottom: 12 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryLabel: { fontSize: 16, fontFamily: 'Roboto-Regular', color: '#616161' },

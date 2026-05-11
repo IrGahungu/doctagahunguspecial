@@ -1,11 +1,41 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, SafeAreaView, Animated } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import * as Progress from 'react-native-progress'; // Need to install this: `npx expo install react-native-progress`
 import { API_BASE_URL } from "@/config";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const WalletSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.monetizationGoalCard}>
+      <View style={[styles.skeletonLine, { width: 150, height: 20, marginBottom: 10 }]} />
+      <View style={[styles.skeletonLine, { width: 100, height: 16 }]} />
+    </View>
+    <View style={styles.progressBarContainer}>
+      <View style={[styles.skeletonLine, { width: '100%', height: 15, borderRadius: 15, marginBottom: 15 }]} />
+      <View style={[styles.skeletonLine, { width: 120, height: 18, marginBottom: 10 }]} />
+      <View style={[styles.skeletonLine, { width: '80%', height: 14, marginBottom: 10 }]} />
+      <View style={[styles.skeletonLine, { width: '100%', height: 40, marginTop: 10 }]} />
+    </View>
+  </SkeletonPulse>
+);
 
 export default function WalletDetailsScreen() {
   const router = useRouter();
@@ -120,12 +150,15 @@ export default function WalletDetailsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.monetizationGoalCard}>
-          <Text style={styles.progressTitle}>Monetization Goal</Text>
-          <Text style={styles.summaryItem}>Threshold: {monetizationGoal.toLocaleString()} EP</Text>
-        </View>
+        {loading ? (
+          <WalletSkeleton />
+        ) : (
+          <>
+            <View style={styles.monetizationGoalCard}>
+              <Text style={styles.progressTitle}>Monetization Goal</Text>
+              <Text style={styles.summaryItem}>Threshold: {monetizationGoal.toLocaleString()} EP</Text>
+            </View>
 
-        {loading && <ActivityIndicator size="small" color="#4CAF50" style={{ marginBottom: 10 }} />}
         <View style={styles.progressBarContainer}>
           <Progress.Bar 
             progress={displayProgress} 
@@ -150,6 +183,8 @@ export default function WalletDetailsScreen() {
             Note: After reaching {monetizationGoal.toLocaleString()} EP, you will be able to turn your points into money and withdraw it.
           </Text>
         </View>
+          </>
+        )}
 
         {/* Daily Summary Card */}
         <View style={styles.summaryCard}>
@@ -279,5 +314,9 @@ const styles = StyleSheet.create({
     marginTop: 15,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });

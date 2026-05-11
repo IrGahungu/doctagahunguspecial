@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextStyle, Image, ActivityIndicator, RefreshControl } from "react-native";
+import React, { useEffect, useState, useCallback, useRef } from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextStyle, Image, ActivityIndicator, RefreshControl, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -38,6 +38,59 @@ type Order = {
   service_fee: number;
   pharmacy?: Pharmacy;
 };
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const OrderDetailSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.scrollContainer}>
+      <View style={styles.card}>
+        <View style={[styles.skeletonLine, { width: '40%', height: 20, marginBottom: 15 }]} />
+        {[1, 2, 3, 4, 5].map((_, i) => (
+          <View key={i} style={[styles.detailRow, { marginBottom: 12 }]}>
+            <View style={[styles.skeletonLine, { width: '30%', height: 16 }]} />
+            <View style={[styles.skeletonLine, { width: '40%', height: 16 }]} />
+          </View>
+        ))}
+      </View>
+      <View style={styles.card}>
+        <View style={[styles.skeletonLine, { width: '30%', height: 20, marginBottom: 15 }]} />
+        {[1, 2].map((_, i) => (
+          <View key={i} style={styles.itemRow}>
+            <View style={[styles.skeletonLine, { width: 50, height: 50, borderRadius: 8, marginRight: 12 }]} />
+            <View style={{ flex: 1 }}>
+              <View style={[styles.skeletonLine, { width: '70%', height: 16, marginBottom: 8 }]} />
+              <View style={[styles.skeletonLine, { width: '40%', height: 12 }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  </SkeletonPulse>
+);
 
 export default function OrderDetailsScreen() {
   const router = useRouter();
@@ -296,10 +349,16 @@ const getStatusStyle = (status: OrderStatus): TextStyle => {
   }
 };
 
-if (loading) {
+if (loading || (error && !order)) {
   return (
-    <SafeAreaView style={[styles.container, styles.centered]}>
-      <ActivityIndicator size="large" color="#4CAF50" />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={24} color="#212121" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Order Details</Text>
+      </View>
+      <OrderDetailSkeleton />
     </SafeAreaView>
   );
 }
@@ -509,5 +568,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });

@@ -45,12 +45,63 @@ const getCurrency = (country: string | null): string => {
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
 const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const ProductDetailSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.scrollContent}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.detailsContainer}>
+        <View style={[styles.skeletonLine, { width: '70%', height: 28, marginBottom: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 60, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '40%', height: 24, marginBottom: 15 }]} />
+        {[1, 2].map((_, i) => (
+          <View key={i} style={[styles.pharmacyCard, { marginBottom: 12, borderStyle: 'dashed' }]}>
+            <View style={[styles.pharmacyHeader, { backgroundColor: '#f0f0f0' }]}>
+              <View style={[styles.skeletonLine, { width: 40, height: 40, borderRadius: 20, marginRight: 12 }]} />
+              <View style={[styles.skeletonLine, { width: '50%', height: 20 }]} />
+            </View>
+            <View style={styles.pharmacyDetails}>
+              <View style={[styles.skeletonLine, { width: '100%', height: 40, marginBottom: 8 }]} />
+              <View style={[styles.skeletonLine, { width: '100%', height: 40 }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  </SkeletonPulse>
+);
+
 export default function ProductDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
   const showToast = useToastStore(state => state.showToast);
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
@@ -149,6 +200,7 @@ export default function ProductDetailScreen() {
       if (stockError) {
         console.error('Error fetching product details:', stockError.message);
         setProduct(null);
+        setError('Failed to load product details.');
       } else if (stockData) {
         // 2. Fetch all stocks with the same name to list all pharmacies
         const userCountry = await SecureStore.getItemAsync("user_country");
@@ -225,6 +277,7 @@ export default function ProductDetailScreen() {
         if (currentPharmacy) {
           setSelectedPharmacyId(currentPharmacy.id);
         }
+        setError(null);
       }
       setLoading(false);
     };
@@ -311,11 +364,19 @@ export default function ProductDetailScreen() {
     }
   };
 
-  if (loading) {
+  if (loading || (error && !product)) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Loading...</Text>
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#212121" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Product Details</Text>
+          <View style={styles.headerIconContainer}>
+            <Icon name="shopping-cart" size={28} color="gray" />
+          </View>
+        </View>
+        <ProductDetailSkeleton />
       </View>
     );
   }
@@ -323,7 +384,7 @@ export default function ProductDetailScreen() {
   if (!product) {
     return (
       <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 50 }}>Product not found.</Text>
+        <Text style={{ textAlign: 'center', marginTop: 50, color: 'red' }}>{error || 'Product not found.'}</Text>
       </View>
     );
   }
@@ -912,5 +973,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#616161',
     fontFamily: 'Roboto-Medium',
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 250,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });

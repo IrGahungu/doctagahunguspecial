@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -21,6 +22,40 @@ import { supabase } from '@/lib/supabase';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const LoginFeeSkeleton = () => (
+  <SkeletonPulse>
+    <View style={{ alignItems: 'center', marginBottom: 40 }}>
+      <View style={[styles.skeletonLine, { width: 60, height: 60, borderRadius: 30, marginBottom: 16 }]} />
+      <View style={[styles.skeletonLine, { width: '60%', height: 24, marginBottom: 8 }]} />
+      <View style={[styles.skeletonLine, { width: '80%', height: 16 }]} />
+    </View>
+    <View style={[styles.card, { height: 180, justifyContent: 'center' }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+        <View style={[styles.skeletonLine, { width: '30%', height: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '30%', height: 20 }]} />
+      </View>
+      <View style={styles.divider} />
+      <View style={[styles.skeletonLine, { width: '100%', height: 60, borderRadius: 12 }]} />
+    </View>
+    <View style={[styles.skeletonLine, { width: '100%', height: 60, borderRadius: 30, marginTop: 40 }]} />
+  </SkeletonPulse>
+);
 
 const LOGIN_FEE_MAP: { [country: string]: number } = {
   Burundi: 1000,
@@ -281,9 +316,9 @@ export default function LoginPaymentFeeScreen() {
 
   if (fetchingData) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <LoginFeeSkeleton />
+      </SafeAreaView>
     );
   }
 
@@ -542,4 +577,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   warningText: { flex: 1, fontSize: 13, color: '#E65100', fontWeight: 'bold' },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+  },
 });

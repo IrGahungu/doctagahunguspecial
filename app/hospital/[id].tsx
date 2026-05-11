@@ -50,12 +50,61 @@ const getCurrencyForCountry = (country: string | null) => {
 
 const HOSPITAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/hospital-images/";
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const HospitalDetailSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.scrollContent}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.detailsContainer}>
+        <View style={[styles.skeletonLine, { width: '70%', height: 24, marginBottom: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 60, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '90%', height: 60, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '80%', height: 100, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '60%', height: 20, marginBottom: 12 }]} />
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          <View style={[styles.skeletonLine, { width: '30%', height: 30, borderRadius: 15 }]} />
+          <View style={[styles.skeletonLine, { width: '30%', height: 30, borderRadius: 15 }]} />
+        </View>
+        <View style={[styles.skeletonLine, { width: '100%', height: 150, borderRadius: 12, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '50%', height: 20, marginBottom: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 80, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 45, borderRadius: 8 }]} />
+      </View>
+    </View>
+  </SkeletonPulse>
+);
+
 export default function HospitalDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [hospital, setHospital] = useState<Hospital | null>(null);
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
+  const [error, setError] = useState<string | null>(null);
   const showToast = useToastStore((state) => state.showToast);
   const [showCallCarButton, setShowCallCarButton] = useState(true);
 
@@ -108,6 +157,7 @@ export default function HospitalDetailScreen() {
       if (error) {
         console.error('Error fetching hospital details:', error.message);
         setHospital(null);
+        setError('Failed to load hospital details.');
       } else if (data) {
         setHospital(data);
       }
@@ -129,10 +179,17 @@ export default function HospitalDetailScreen() {
     };
   }, [id, navigation]);
 
-  if (loading) {
+  if (loading || (error && !hospital)) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#212121" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Hospital Details</Text>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+        <HospitalDetailSkeleton />
       </View>
     );
   }
@@ -504,6 +561,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     fontFamily: 'Roboto-Regular'
+  },
+  skeletonImage: {
+    width: '95%',
+    alignSelf: 'center',
+    height: 250,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginVertical: 16,
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
   detailsContainer: {
     backgroundColor: 'white',

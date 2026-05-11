@@ -57,6 +57,54 @@ type Pharmacy = {
 
 const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const PharmacyDetailSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.scrollContent}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.detailsContainer}>
+        <View style={[styles.skeletonLine, { width: '70%', height: 24, marginBottom: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '40%', height: 20, marginBottom: 10 }]} />
+        <View style={[styles.skeletonLine, { width: '90%', height: 60, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '40%', height: 20, marginBottom: 10 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 120, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '60%', height: 20, marginBottom: 10 }]} />
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 15 }}>
+          <View style={[styles.skeletonLine, { width: '30%', height: 24, borderRadius: 12 }]} />
+          <View style={[styles.skeletonLine, { width: '30%', height: 24, borderRadius: 12 }]} />
+        </View>
+        <View style={[styles.skeletonLine, { width: '50%', height: 20, marginBottom: 10 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 80, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 45, borderRadius: 8 }]} />
+      </View>
+    </View>
+  </SkeletonPulse>
+);
+
 export default function PharmacyDetailScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams();
@@ -233,10 +281,17 @@ export default function PharmacyDetailScreen() {
     Linking.openURL(url);
   };
 
-  if (loading) {
+  if (loading || (error && !pharmacy)) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#212121" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Pharmacy Details</Text>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+        <PharmacyDetailSkeleton />
       </View>
     );
   }
@@ -464,6 +519,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     fontFamily: 'Roboto-Regular',
+  },
+  skeletonImage: {
+    width: '95%',
+    alignSelf: 'center',
+    height: 250,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginVertical: 16,
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
   detailsContainer: {
     backgroundColor: 'white',

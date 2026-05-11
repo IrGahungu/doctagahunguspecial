@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -44,6 +44,7 @@ export default function BusCheckoutScreen() {
   const fadeScale = useRef(new Animated.Value(0)).current;
   const [engagementPoints, setEngagementPoints] = useState<number>(0);
   const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
 
   const safeTotal = parseFloat(Array.isArray(total) ? total[0] : (total || '0'));
@@ -53,6 +54,58 @@ export default function BusCheckoutScreen() {
   const safeCompany = Array.isArray(company) ? company[0] : company;
   const safeFrom = Array.isArray(from) ? from[0] : from;
   const safeTo = Array.isArray(to) ? to[0] : to;
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const BusCheckoutSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.content}>
+      <View style={[styles.ticketCard, { height: 200 }]}>
+        <View style={[styles.skeletonLine, { width: '50%', height: 20, marginBottom: 20 }]} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
+          <View style={[styles.skeletonLine, { width: '30%', height: 16 }]} />
+          <View style={[styles.skeletonLine, { width: '30%', height: 16 }]} />
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+          <View style={[styles.skeletonLine, { width: '40%', height: 14 }]} />
+          <View style={[styles.skeletonLine, { width: '40%', height: 14 }]} />
+        </View>
+      </View>
+
+      <View style={[styles.summaryCard, { height: 180 }]}>
+        <View style={[styles.skeletonLine, { width: '60%', height: 18, marginBottom: 15 }]} />
+        <View style={[styles.skeletonLine, { width: '80%', height: 14, marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { width: '70%', height: 14, marginBottom: 8 }]} />
+        <View style={[styles.skeletonLine, { width: '90%', height: 18, marginTop: 10 }]} />
+      </View>
+
+      <View style={[styles.skeletonLine, { width: '100%', height: 55, borderRadius: 15, marginTop: 20 }]} />
+    </View>
+  </SkeletonPulse>
+);
 
   // Fetch user's engagement points on component mount
   useEffect(() => {
@@ -68,6 +121,7 @@ export default function BusCheckoutScreen() {
         if (res.ok && data.engagement_points !== undefined) {
           setEngagementPoints(data.engagement_points);
           setUserId(data.id); // Also set userId here
+          setError(null); // Clear any previous errors
         }
 
         // Fetch the dynamic threshold from backend
@@ -77,9 +131,11 @@ export default function BusCheckoutScreen() {
         const configData = await configRes.json();
         if (configRes.ok && configData.min_ep_required) {
           setMinEpRequired(configData.min_ep_required);
+          setError(null); // Clear any previous errors
         }
       } catch (error) {
         console.error('Error fetching engagement points:', error);
+        setError('Failed to load eligibility details.');
       }
     };
     fetchUserEngagementPoints();
@@ -132,6 +188,7 @@ export default function BusCheckoutScreen() {
           type: 'error',
           text1: 'Authentication Error',
           text2: 'Please log in to book.',
+          visibilityTime: 3000,
         });
         router.replace('/auth');
         return;
@@ -147,6 +204,7 @@ export default function BusCheckoutScreen() {
         Toast.show({
           type: 'error',
           text1: 'Wallet Error',
+          visibilityTime: 3000,
           text2: walletData.error || 'Failed to fetch balance.',
         });
         return;
@@ -156,6 +214,7 @@ export default function BusCheckoutScreen() {
         Toast.show({
           type: 'error',
           text1: 'Insufficient Balance',
+          visibilityTime: 3000,
           text2: 'Please add funds to your wallet.',
         });
         return;
@@ -169,6 +228,7 @@ export default function BusCheckoutScreen() {
       Toast.show({
         type: 'error',
         text1: 'Error',
+        visibilityTime: 3000,
         text2: 'Failed to verify wallet balance.',
       });
     } finally {
@@ -280,6 +340,10 @@ export default function BusCheckoutScreen() {
         <Text style={styles.headerTitle}>Confirm Booking</Text>
       </View>
 
+      {(isLoading || isCheckingEligibility || error) ? (
+        <BusCheckoutSkeleton />
+      ) : (
+        <>
       {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />}
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -378,6 +442,8 @@ export default function BusCheckoutScreen() {
           {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payButtonText}>Confirm & Pay</Text>}
         </TouchableOpacity>
       </ScrollView>
+      </>
+      )}
 
       <Modal visible={isPinModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -435,6 +501,7 @@ const styles = StyleSheet.create({
   seatLabel: { color: '#757575', fontSize: 14 },
   seatValue: { fontFamily: 'Roboto-Bold', color: '#4CAF50' },
   summaryCard: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2 },
+  skeletonLine: { backgroundColor: '#e0e0e0', borderRadius: 4 },
   summaryTitle: { fontSize: 16, fontFamily: 'Roboto-Bold', marginBottom: 12 },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryLabel: { fontSize: 14, color: '#757575' },

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Animated } from 'react-native';
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProductGrid from '@/components/ProductGrid';
@@ -12,6 +12,31 @@ const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 16 padding on each side, 16 gap
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
 
 // Skeleton component for a single product card
 const SkeletonProductCard: React.FC = () => (
@@ -26,14 +51,16 @@ const SkeletonProductCard: React.FC = () => (
 
 // Skeleton component for the grid
 const ProductGridSkeleton = () => (
-  <View style={styles.skeletonContainer}>
-    <SkeletonProductCard />
-    <SkeletonProductCard />
-    <SkeletonProductCard />
-    <SkeletonProductCard />
-    <SkeletonProductCard />
-    <SkeletonProductCard />
-  </View>
+  <SkeletonPulse>
+    <View style={styles.skeletonContainer}>
+      <SkeletonProductCard />
+      <SkeletonProductCard />
+      <SkeletonProductCard />
+      <SkeletonProductCard />
+      <SkeletonProductCard />
+      <SkeletonProductCard />
+    </View>
+  </SkeletonPulse>
 );
 
 export default function CategoryDetailScreen() {
@@ -98,12 +125,9 @@ export default function CategoryDetailScreen() {
   }, [id, country]);
 
   const renderContent = () => {
-    if (loading) {
+    // Show skeleton if loading or if network fails (error exists but no data)
+    if (loading || (error && products.length === 0)) {
       return <ProductGridSkeleton />;
-    }
-
-    if (error) {
-      return <View style={styles.centerContent}><Text style={styles.errorText}>{error}</Text></View>;
     }
 
     if (products.length === 0) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Keyboard, Dimensions, Image, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Keyboard, Dimensions, Image, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Search, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -29,6 +29,67 @@ type RecentSearchItem = {
 
 const RECENT_SEARCH_LIMIT = 10; // Limit the number of recent searches
 const RECENT_SEARCH_KEY = 'recent_searches';
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const SearchSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.skeletonContainer}>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <View key={i} style={styles.skeletonItem}>
+          <View style={styles.skeletonImage} />
+          <View style={styles.skeletonTextContainer}>
+            <View style={styles.skeletonLine} />
+            <View style={[styles.skeletonLine, { width: '60%', marginTop: 8 }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  </SkeletonPulse>
+);
+
+const RecentSearchesSkeleton = () => (
+  <View style={styles.recentSearchesContainer}>
+    <View style={styles.recentSearchesHeader}>
+      <View style={[styles.skeletonLine, { width: 120, height: 18, marginBottom: 10 }]} />
+    </View>
+    <SkeletonPulse>
+      <View style={styles.recentSearchesGrid}>
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <View key={i} style={[styles.recentSearchChip, { borderColor: '#f5f5f5' }]}>
+            <View style={[styles.recentSearchImage, { backgroundColor: '#e0e0e0' }]} />
+            <View style={styles.skeletonTextContainer}>
+              <View style={[styles.skeletonLine, { width: '100%', height: 12 }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </SkeletonPulse>
+  </View>
+);
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -97,16 +158,16 @@ export default function SearchScreen() {
 
   // Initial setup: fetch country, load recent searches, and focus input
   useEffect(() => {
-    const fetchCountry = async () => {
+    const init = async () => {
+      setIsInitialLoad(true);
       const stored = await SecureStore.getItemAsync('user_country');
       setCountry(stored ? stored.trim() : null);
+      await loadRecentSearches();
+      setIsInitialLoad(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
     };
-    fetchCountry();
-    // Focus input on mount
-    loadRecentSearches();
-    setTimeout(() => inputRef.current?.focus(), 100);
-    setIsInitialLoad(false);
-  }, []);
+    init();
+  }, [loadRecentSearches]);
 
   // Suggestions Logic
   useEffect(() => {
@@ -302,10 +363,7 @@ export default function SearchScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Gahungu ariko arabikuronderera...</Text>
-        </View>
+        <SearchSkeleton />
       ) : searchError ? (
         <View style={styles.center}>
           <Icon name="wifi-off" size={60} color="#BDBDBD" />
@@ -328,7 +386,10 @@ export default function SearchScreen() {
           keyboardDismissMode="on-drag"
           onScrollBeginDrag={() => Keyboard.dismiss()}
           ListHeaderComponent={
-            (query.length === 0 && recentSearches.length > 0 && !isFetchingSuggestions && !isInitialLoad) ? (
+            query.length === 0 && !isFetchingSuggestions ? (
+              isInitialLoad ? (
+                <RecentSearchesSkeleton />
+              ) : recentSearches.length > 0 ? (
               <View style={styles.recentSearchesContainer}>
                 <View style={styles.recentSearchesHeader}>
                   <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
@@ -359,7 +420,7 @@ export default function SearchScreen() {
                   })}
                 </View>
               </View>
-            ) : null
+            ) : null) : null
           }
           data={suggestions}
           keyExtractor={(item) => `${item.type}-${item.name}`}
@@ -564,5 +625,32 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#616161',
+  },
+  skeletonContainer: {
+    padding: 16,
+  },
+  skeletonItem: {
+    flexDirection: 'row',
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  skeletonImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+    marginRight: 12,
+  },
+  skeletonTextContainer: {
+    flex: 1,
+  },
+  skeletonLine: {
+    height: 16,
+    width: '80%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });

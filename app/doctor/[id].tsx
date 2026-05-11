@@ -46,6 +46,50 @@ const getCurrency = (country: string | null): string => {
 
 const DOCTOR_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/doctor-images/";
 
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const DoctorDetailSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.scrollContent}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.detailsContainer}>
+        <View style={[styles.skeletonLine, { width: '60%', height: 24, marginBottom: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '40%', height: 18, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 60, marginBottom: 20 }]} />
+        <View style={[styles.skeletonLine, { width: '30%', height: 20, marginBottom: 12 }]} />
+        <View style={[styles.skeletonLine, { width: '100%', height: 250, borderRadius: 12, marginBottom: 20 }]} />
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={[styles.skeletonLine, { flex: 1, height: 45, borderRadius: 8 }]} />
+          <View style={[styles.skeletonLine, { flex: 1, height: 45, borderRadius: 8 }]} />
+        </View>
+      </View>
+    </View>
+  </SkeletonPulse>
+);
+
 type Availability = {
   date: string;
   times: string[];
@@ -74,6 +118,7 @@ export default function DoctorDetailScreen() {
   const { id } = params;
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const showToast = useToastStore((state) => state.showToast);
 
@@ -183,14 +228,15 @@ export default function DoctorDetailScreen() {
         if (typeof field === 'string') return field.replace(/[{}"]/g, '').split(',').map(s => s.trim()).filter(Boolean);
         return [];
       };
-      const { data: rawData, error } = await supabase
+      const { data: rawData, error: dbError } = await supabase
         .from('doctor_applications')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (error) {
-        console.error('Error fetching doctor:', error.message);
+      if (dbError) {
+        console.error('Error fetching doctor:', dbError.message);
+        setError('Failed to load doctor details.');
         setDoctor(null);
       } else {
         console.log('Fetched doctor data:', rawData);
@@ -203,6 +249,7 @@ export default function DoctorDetailScreen() {
           consultation_fee_offline: Number(rawData.consultation_fee_offline || 0),
         };
         setDoctor(data as Doctor);
+        setError(null);
       }
       setLoading(false);
     };
@@ -429,10 +476,17 @@ export default function DoctorDetailScreen() {
     return result;
   }, [selectedDate, selectedAvailability, doctor]);
 
-  if (loading) {
+  if (loading || (error && !doctor)) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Icon name="arrow-back" size={24} color="#212121" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Doctor Profile</Text>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+        <DoctorDetailSkeleton />
       </View>
     );
   }
@@ -840,6 +894,18 @@ backButton: {
     fontSize: 16,
     color: '#666',
     fontFamily: 'Roboto-Regular',
+  },
+  skeletonImage: {
+    width: '95%',
+    alignSelf: 'center',
+    height: 250,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginVertical: 16,
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
   detailsContainer: {
     backgroundColor: 'white',

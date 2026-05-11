@@ -1,5 +1,5 @@
-import React, { useState, useMemo, Fragment, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, Fragment, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -9,6 +9,55 @@ import { supabase } from '@/lib/supabase';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const BusSeatSelectionSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.legendContainer}>
+      <View style={[styles.skeletonLine, { width: '25%', height: 16 }]} />
+      <View style={[styles.skeletonLine, { width: '25%', height: 16 }]} />
+      <View style={[styles.skeletonLine, { width: '25%', height: 16 }]} />
+    </View>
+    <View style={[styles.busIllustration, { height: 400, justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={styles.driverSection}>
+        <View style={[styles.skeletonLine, { width: 30, height: 30, borderRadius: 15 }]} />
+      </View>
+      <View style={styles.gridContainer}>
+        {[...Array(12)].map((_, i) => (
+          <View key={i} style={[styles.skeletonLine, { width: (SCREEN_WIDTH - 120) / 3, height: 45, borderRadius: 8 }]} />
+        ))}
+      </View>
+    </View>
+    <View style={styles.footer}>
+      <View style={[styles.skeletonLine, { width: '40%', height: 20 }]} />
+      <View style={[styles.skeletonLine, { width: '40%', height: 45, borderRadius: 12 }]} />
+    </View>
+  </SkeletonPulse>
+);
 
 export default function BusSeatSelectionScreen() {
   const router = useRouter();
@@ -72,7 +121,7 @@ export default function BusSeatSelectionScreen() {
   }, [id, travelDate]);
 
   // Real-time listener for reservations on this bus and date
-  useRealtimeRefresh('bus_reservations', fetchReservedSeats, `bus_id=eq.${id}&travel_date=eq.${travelDate}`);
+  useRealtimeRefresh('bus_reservations', fetchReservedSeats, id && travelDate ? `bus_id=eq.${id}&travel_date=eq.${travelDate}` : undefined);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -167,10 +216,8 @@ export default function BusSeatSelectionScreen() {
         <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatVIP]} /><Text style={styles.legendLabel}>VIP</Text></View>
       </View>
 
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-        </View>
+      {loading ? ( // Render skeleton if loading
+        <BusSeatSelectionSkeleton />
       ) : (
       <ScrollView contentContainerStyle={styles.seatScroll} showsVerticalScrollIndicator={false}>
         <View style={styles.busIllustration}>
@@ -306,5 +353,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
   },
   disabledBtn: { backgroundColor: '#ccc' },
-  confirmBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  confirmBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  skeletonLine: { backgroundColor: '#e0e0e0', borderRadius: 4 },
 });

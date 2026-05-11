@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Keyboard, Dimensions, Image } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, FlatList, Keyboard, Dimensions, Image, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Search, X, ChevronRight, Pill } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -27,6 +27,44 @@ const getCurrency = (country: string | null): string => {
 const BANNER_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/banner-images/";
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
 const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
+
+const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
+  return <Animated.View style={{ opacity: pulseAnim }}>{children}</Animated.View>;
+};
+
+const PrescriptionSkeleton = () => (
+  <SkeletonPulse>
+    <View style={styles.resultsList}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={[styles.medicineCard, { height: 160 }]}>
+          <View style={styles.medicineHeader}>
+            <View style={[styles.skeletonLine, { width: 60, height: 60, borderRadius: 8, marginRight: 12 }]} />
+            <View style={{ flex: 1 }}>
+              <View style={[styles.skeletonLine, { width: '70%', height: 18, marginBottom: 8 }]} />
+              <View style={[styles.skeletonLine, { width: '40%', height: 16 }]} />
+            </View>
+          </View>
+          <View style={[styles.skeletonLine, { width: '100%', height: 1, marginVertical: 10 }]} />
+          <View style={[styles.skeletonLine, { width: '30%', height: 14, marginBottom: 8 }]} />
+          <View style={[styles.skeletonLine, { width: '60%', height: 20, borderRadius: 4 }]} />
+        </View>
+      ))}
+    </View>
+  </SkeletonPulse>
+);
 
 type MedicinePharmacy = {
   id: string;
@@ -256,7 +294,9 @@ export default function PrescriptionsScreen() {
         </TouchableOpacity>
       </View>
 
-      {searchResults.length > 0 ? (
+      {isLoading ? (
+        <PrescriptionSkeleton />
+      ) : searchResults.length > 0 ? (
         <FlatList
           data={searchResults}
           keyExtractor={(item, index) => `${item.id}-${index}`}
@@ -480,5 +520,9 @@ const styles = StyleSheet.create({
     color: '#888',
     marginTop: 8,
     textAlign: 'center',
+  },
+  skeletonLine: {
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
 });
