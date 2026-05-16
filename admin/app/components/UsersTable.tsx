@@ -290,7 +290,7 @@ export default function UsersTable() {
                       <span>{visibleQuestions.has(u.id) ? (u.secret_question || "—") : "********"}</span>
                       <button 
                         onClick={() => toggleQuestionVisibility(u.id)}
-                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 focus:outline-none"
+                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 focus:outline-none cursor-pointer"
                         title={visibleQuestions.has(u.id) ? "Hide question" : "Show question"}
                       >
                         {visibleQuestions.has(u.id) ? (
@@ -311,7 +311,7 @@ export default function UsersTable() {
                       <span>{visibleAnswers.has(u.id) ? (u.secret_answer || "—") : "********"}</span>
                       <button 
                         onClick={() => toggleAnswerVisibility(u.id)}
-                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 focus:outline-none"
+                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 focus:outline-none cursor-pointer"
                         title={visibleAnswers.has(u.id) ? "Hide answer" : "Show answer"}
                       >
                         {visibleAnswers.has(u.id) ? (
@@ -332,7 +332,7 @@ export default function UsersTable() {
                       <span className="font-mono">{visiblePasswords.has(u.id) ? (u.password || "—") : "********"}</span>
                       <button 
                         onClick={() => togglePasswordVisibility(u.id)}
-                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 focus:outline-none"
+                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 focus:outline-none cursor-pointer"
                         title={visiblePasswords.has(u.id) ? "Hide password" : "Show password"}
                       >
                         {visiblePasswords.has(u.id) ? (
@@ -369,7 +369,7 @@ export default function UsersTable() {
                     <button
                       onClick={() => handleToggleVerified(u.id, u.is_verified)}
                       disabled={isSubmitting || editingUserId === u.id}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
                         u.is_verified ? "bg-green-500" : "bg-gray-300"
                       }`}
                     >
@@ -398,13 +398,13 @@ export default function UsersTable() {
                     <div className="flex flex-col gap-2">
                       {editingUserId === u.id ? (
                         <>
-                          <button onClick={() => handleUpdate(u.id)} disabled={isSubmitting} className="btn-save">Save</button>
-                          <button onClick={handleCancelClick} disabled={isSubmitting} className="btn-cancel">Cancel</button>
+                          <button onClick={() => handleUpdate(u.id)} disabled={isSubmitting} className="btn-save cursor-pointer">Save</button>
+                          <button onClick={handleCancelClick} disabled={isSubmitting} className="btn-cancel cursor-pointer">Cancel</button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => handleEditClick(u)} disabled={isSubmitting} className="btn-edit">Edit</button>
-                          <button onClick={() => handleDelete(u.id)} disabled={isSubmitting} className="btn-delete">
+                          <button onClick={() => handleEditClick(u)} disabled={isSubmitting} className="btn-edit cursor-pointer">Edit</button>
+                          <button onClick={() => handleDelete(u.id)} disabled={isSubmitting} className="btn-delete cursor-pointer">
                             Delete
                           </button>
                         </>

@@ -54,8 +54,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingUpdates, setIsEditingUpdates] = useState(false);
-  const [dashboardStats, setDashboardStats] = useState({ totalViews: 0 });
+  const [dashboardStats, setDashboardStats] = useState({ totalViews: 0, totalRevenue: 0 });
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [profileForm, setProfileForm] = useState({
       name: "",
@@ -158,6 +159,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       toast.error("You need to be approved first");
       return;
     }
+    if (activeTab === tab) {
+      setRefreshKey((prev) => prev + 1);
+    }
     setActiveTab(tab);
     if (tab === "status") setShowStatus(true);
   };
@@ -168,7 +172,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       fetch(`/api/insurance/apply?id=${app.id}`)
         .then((res) => res.json())
         .then((data) => {
-          setDashboardStats({ totalViews: data.views || 0 });
+          setDashboardStats({ 
+            totalViews: data.views || 0,
+            totalRevenue: 0 // Placeholder until implemented in your backend
+          });
         })
         .catch((err) => console.error("Failed to load dashboard stats", err))
         .finally(() => setIsDashboardLoading(false));
@@ -265,7 +272,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           .catch((err) => console.error("Failed to load profile", err))
           .finally(() => setIsProfileLoading(false));
       }
-  }, [activeTab, app.id]);
+  }, [activeTab, app.id, refreshKey]);
 
   async function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -484,7 +491,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("dashboard")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'dashboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -499,7 +506,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("updates")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'updates' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -513,8 +520,23 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <div className="relative">
           <button
+            onClick={() => handleNavClick("purchases")}
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'purchases' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+                <span className="hidden md:block">Purchases</span>
+              </>
+          </button>
+          {activeTab === "purchases" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-teal-600 rounded-full"></div>}
+        </div>
+
+        <div className="relative">
+          <button
             onClick={() => handleNavClick("profile")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'profile' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -529,7 +551,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("settings")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'settings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -545,7 +567,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("status")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'status' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -559,7 +581,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition"
+          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -589,6 +611,23 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
                         <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
                         <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Revenue</h4>
+                        <div className="text-4xl font-bold text-green-600">
+                          {dashboardStats.totalRevenue.toLocaleString()} <span className="text-base text-gray-400">BIF</span>
+                        </div>
+                        <button
+                          onClick={() => toast.success("The team is implementing it for soon")}
+                          disabled={dashboardStats.totalRevenue === 0}
+                          className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                            dashboardStats.totalRevenue > 0
+                              ? "bg-green-500 text-white hover:bg-green-600"
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          Withdraw
+                        </button>
                       </div>
                     </div>
                     <div className="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -632,7 +671,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           router.push(`/apply/insurance?id=${app.id}`);
                         }}
                         disabled={isNavigating}
-                        className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
+                        className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 cursor-pointer"
                       >
                         {isNavigating ? (
                           <>
@@ -737,7 +776,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <button
                       onClick={() => setIsEditingUpdates(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -757,7 +796,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 relative group">
                             <button
                               onClick={() => removePlan(index)}
-                              className="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"
+                              className="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                               title="Remove Plan"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -836,7 +875,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🏥 Partner Hospitals</label>
-                        <button onClick={addHospital} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Hospital</button>
+                        <button onClick={addHospital} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ Add Hospital</button>
                       </div>
                       <div className="space-y-2">
                         {hospitalsList.map((hospital, index) => (
@@ -849,7 +888,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               className="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                               placeholder="Hospital Name"
                             />
-                            <button onClick={() => removeHospital(index)} className="text-red-500 hover:text-red-700 p-1">
+                            <button onClick={() => removeHospital(index)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                             </button>
                           </div>
@@ -860,7 +899,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">💊 Partner Pharmacies</label>
-                        <button onClick={addPharmacy} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Pharmacy</button>
+                        <button onClick={addPharmacy} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ Add Pharmacy</button>
                       </div>
                       <div className="space-y-2">
                         {pharmaciesList.map((pharmacy, index) => (
@@ -873,7 +912,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               className="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                               placeholder="Pharmacy Name"
                             />
-                            <button onClick={() => removePharmacy(index)} className="text-red-500 hover:text-red-700 p-1">
+                            <button onClick={() => removePharmacy(index)} className="text-red-500 hover:text-red-700 p-1 cursor-pointer">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                             </button>
                           </div>
@@ -885,12 +924,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🏢 Office Locations</label>
-                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Location</button>
+                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ Add Location</button>
                       </div>
                       <div className="space-y-4">
                         {officeLocations.map((loc, index) => (
                           <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 relative">
-                            <button onClick={() => removeLocation(index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500">
+                            <button onClick={() => removeLocation(index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500 cursor-pointer">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                             </button>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
@@ -957,7 +996,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   if (!query) return toast.error("Please enter an address or city to search.");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
-                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -966,7 +1005,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handlePasteCoordinates(index)}
-                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -975,7 +1014,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handleUseCurrentLocation(index)}
-                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -1049,7 +1088,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingUpdates(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
                         Cancel
@@ -1057,7 +1096,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveUpdates}
                         disabled={isSavingProfile}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2 cursor-pointer"
                       >
                         {isSavingProfile ? (
                           <>
@@ -1118,7 +1157,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <button
                       onClick={() => setIsEditingProfile(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1140,12 +1179,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         )}
                       </div>
                       <div>
-                        <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-100 transition text-sm font-medium">
+                        <label className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-100 transition text-sm font-medium cursor-pointer">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                           </svg>
                           Change Photo
-                          <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" />
+                          <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden cursor-pointer" />
                         </label>
                       </div>
                     </div>
@@ -1211,7 +1250,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingProfile(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
                         Cancel
@@ -1219,7 +1258,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveProfile}
                         disabled={isSavingProfile}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2 cursor-pointer"
                       >
                         {isSavingProfile ? (
                           <>
@@ -1256,7 +1295,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </div>
                           <button
                             onClick={() => setIsEditingPassword(true)}
-                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium"
+                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium cursor-pointer"
                           >
                             Update Password
                           </button>
@@ -1276,7 +1315,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 type="button"
                                 onClick={() => setShowOldPassword(!showOldPassword)}
-                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
                               >
                                 {showOldPassword ? (
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -1299,7 +1338,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 type="button"
                                 onClick={() => setShowNewPassword(!showNewPassword)}
-                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
                               >
                                 {showNewPassword ? (
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -1322,7 +1361,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 type="button"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
                               >
                                 {showConfirmPassword ? (
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -1338,7 +1377,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 setIsEditingPassword(false);
                                 setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
                               }}
-                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition cursor-pointer"
                               disabled={isSavingPassword}
                             >
                               Cancel
@@ -1346,7 +1385,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <button
                               onClick={handlePasswordUpdate}
                               disabled={isSavingPassword || !passwordForm.newPassword || !passwordForm.oldPassword}
-                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2 cursor-pointer"
                             >
                               {isSavingPassword ? "Updating..." : "Save Password"}
                             </button>
@@ -1367,14 +1406,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowLogoutConfirm(false)}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400 cursor-pointer"
                     >
                       {isLoggingOut ? (
                         <>

@@ -69,7 +69,7 @@ export default function BusesTable() {
         </div>
         <button 
           onClick={() => { setEditingBus(null); setModalOpen(true); }}
-          className="bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors"
+          className="bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors cursor-pointer"
         >
           + Add Bus Schedule
         </button>
@@ -112,8 +112,8 @@ export default function BusesTable() {
                 </td>
                 <td className="p-4 font-bold text-green-600">BIF {bus.price.toLocaleString()}</td>
                 <td className="p-4 text-center space-x-3">
-                  <button onClick={() => openEdit(bus)} className="btn-edit">Edit</button>
-                  <button onClick={() => handleDelete(bus.id)} className="btn-delete">Delete</button>
+                  <button onClick={() => openEdit(bus)} className="btn-edit cursor-pointer">Edit</button>
+                  <button onClick={() => handleDelete(bus.id)} className="btn-delete cursor-pointer">Delete</button>
                 </td>
               </tr>
             ))}

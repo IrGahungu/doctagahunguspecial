@@ -58,9 +58,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [isEditingUpdates, setIsEditingUpdates] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({ totalViews: 0 });
   const [recentActivities, setRecentActivities] = useState<{ id: string; title: string; date: string; icon: any }[]>([]);
+  const [totalRevenue, setTotalRevenue] = useState(0); // Add state for total revenue
+  const [totalBookings, setTotalBookings] = useState(0); // Add state for total bookings
   const [chartData, setChartData] = useState<{ date: string; views: number }[]>([]);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [sidebarImageError, setSidebarImageError] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [profileForm, setProfileForm] = useState({
     name: "",
@@ -166,6 +169,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       toast.error("You have to get approved first");
       return;
     }
+    if (activeTab === tab) {
+      setRefreshKey((prev) => prev + 1);
+    }
     setActiveTab(tab);
     if (tab === "status") setShowStatus(true);
   };
@@ -186,7 +192,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         fetch(`/api/hospital/views?hospital_id=${app.id}`).then((res) => res.json().catch(() => ({})))
       ])
         .then(([data, viewsData]) => {
+          // Placeholder for revenue and bookings. In a real app, you'd fetch this data.
+          const calculatedRevenue = 0; // Example: fetch from a new API endpoint or calculate from bookings
+          const calculatedBookings = 0; // Example: fetch from a new API endpoint
+
           setDashboardStats({ totalViews: data.views || 0 });
+          setTotalRevenue(calculatedRevenue);
 
           const activities = [
             {
@@ -335,7 +346,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         .catch((err) => console.error("Failed to load profile", err))
         .finally(() => setIsProfileLoading(false));
     }
-  }, [activeTab, app]);
+  }, [activeTab, app, refreshKey]);
 
   async function handleProfileImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -556,7 +567,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("dashboard")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'dashboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             <>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -571,7 +582,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("updates")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'updates' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             <>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -585,8 +596,23 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <div className="relative">
           <button
+            onClick={() => handleNavClick("bookings")}
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="hidden md:block">Bookings</span>
+            </>
+          </button>
+          {activeTab === "bookings" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-green-600 rounded-full"></div>}
+        </div>
+
+        <div className="relative">
+          <button
             onClick={() => handleNavClick("profile")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'profile' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             <>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -601,7 +627,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("settings")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'settings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -617,7 +643,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("status")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'status' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             <>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -631,7 +657,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition"
+          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -656,11 +682,34 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 {isDashboardLoading ? (
                   <div className="text-center py-10">Loading stats...</div>
                 ) : (
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-8"> {/* Changed to space-y-8 for vertical spacing */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
                       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
                         <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
                         <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
+                      </div>
+                      {/* Total Revenue Card */}
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Revenue</h4>
+                        <div className="text-4xl font-bold text-green-600">
+                          {totalRevenue.toLocaleString()} <span className="text-base text-gray-400">BIF</span>
+                        </div>
+                        <button
+                          onClick={() => toast.success("The team is implementing it for soon")}
+                          disabled={totalRevenue === 0}
+                          className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                            totalRevenue > 0
+                              ? "bg-green-500 text-white hover:bg-green-600"
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                        >
+                          Withdraw
+                        </button>
+                      </div>
+                      {/* Placeholder for Total Bookings */}
+                      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Bookings</h4>
+                        <div className="text-4xl font-bold text-blue-600">{totalBookings}</div>
                       </div>
                     </div>
 
@@ -1208,7 +1257,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingUpdates(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
                         Cancel
@@ -1216,7 +1265,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveUpdates}
                         disabled={isSavingProfile}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2 cursor-pointer"
                       >
                         {isSavingProfile ? (
                           <>
@@ -1535,14 +1584,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowLogoutConfirm(false)}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400 cursor-pointer"
                     >
                       {isLoggingOut ? (
                         <>

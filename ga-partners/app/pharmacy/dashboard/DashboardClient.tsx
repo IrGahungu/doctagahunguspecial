@@ -142,6 +142,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [chartData, setChartData] = useState<{ date: string; revenue: number; orders: number; views: number }[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
@@ -222,6 +223,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     if (tab !== "status" && app.status !== "approved") {
       toast.error("You need to be approved first");
       return;
+    }
+    if (activeTab === tab) {
+      setRefreshKey((prev) => prev + 1);
     }
     setActiveTab(tab);
     if (tab === "status") setShowStatus(true);
@@ -357,7 +361,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         })
         .finally(() => setIsDashboardLoading(false));
     }
-  }, [activeTab, app.id]);
+  }, [activeTab, app.id, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "profile" && app.id) {
@@ -412,7 +416,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         .catch((err) => console.error("Failed to load profile", err))
         .finally(() => setIsProfileLoading(false));
     }
-  }, [activeTab, app.id]);
+  }, [activeTab, app.id, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "availability" && app.id) {
@@ -437,13 +441,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         .catch((err) => console.error("Failed to load data", err))
         .finally(() => setIsStockLoading(false));
     }
-  }, [activeTab, app.id]);
+  }, [activeTab, app.id, refreshKey]);
 
   useEffect(() => {
     if (activeTab === "bookings" && app.id) {
       fetchOrders();
     }
-  }, [activeTab, app.id]);
+  }, [activeTab, app.id, refreshKey]);
 
   async function handleStatusUpdate(orderId: string, newStatus: string) {
     console.log(`Updating order ${orderId} to ${newStatus}`);
@@ -895,7 +899,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("dashboard")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'dashboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -910,7 +914,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("availability")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'availability' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -925,7 +929,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("bookings")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -943,7 +947,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("profile")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'profile' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -958,7 +962,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("settings")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'settings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -974,7 +978,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("status")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'status' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -988,7 +992,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition"
+          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -1027,6 +1031,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="text-2xl font-bold text-center text-green-600">
                         {dashboardStats.totalRevenue.toLocaleString()} <span className="text-xs text-gray-400">BIF</span>
                       </div>
+                      <button
+                        onClick={() => toast.success("The team is implementing it for soon")}
+                        disabled={dashboardStats.totalRevenue === 0}
+                        className={`mt-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                          dashboardStats.totalRevenue > 0
+                            ? "bg-green-500 text-white hover:bg-green-600"
+                            : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        }`}
+                      >
+                        Withdraw
+                      </button>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
                       <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Pending Orders</h4>
@@ -1168,7 +1183,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           setTimeout(() => setIsNavigating(false), 3000);
                         }}
                         disabled={isNavigating}
-                        className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
+                        className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 cursor-pointer"
                       >
                         {isNavigating ? (
                           <>
@@ -1285,7 +1300,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     {editingStockId && (
                       <button
                         onClick={handleCancelEdit}
-                        className="bg-gray-500 text-white rounded px-6 py-2 hover:bg-gray-600 transition"
+                        className="bg-gray-500 text-white rounded px-6 py-2 hover:bg-gray-600 transition cursor-pointer"
                       >
                         Cancel
                       </button>
@@ -1293,7 +1308,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <button
                       onClick={handleSaveStock}
                       disabled={isAddingStock}
-                      className="bg-indigo-600 text-white rounded px-6 py-2 hover:bg-indigo-700 disabled:bg-indigo-400 transition"
+                      className="bg-indigo-600 text-white rounded px-6 py-2 hover:bg-indigo-700 disabled:bg-indigo-400 transition cursor-pointer"
                     >
                       {isAddingStock ? "Saving..." : editingStockId ? "Update Item" : "Add Item"}
                     </button>
@@ -1362,13 +1377,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <td className="p-3 text-right">
                                 <button
                                   onClick={() => handleEditStock(item)}
-                                  className="text-blue-600 hover:text-blue-800 text-sm font-medium mr-3"
+                                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold mr-2 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => handleDeleteStock(item.id)}
-                                  className="text-red-500 hover:text-red-700 text-sm font-medium"
+                                  className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
                                   Delete
                                 </button>
@@ -1519,7 +1534,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                     <div className="mt-3 pt-3 border-t border-gray-200 flex justify-end">
                                       <button
                                         onClick={() => handlePrintOrder(order)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded hover:bg-gray-700 transition"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded hover:bg-gray-700 transition cursor-pointer"
                                       >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -1658,7 +1673,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <button
                       onClick={() => setIsEditingProfile(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1844,7 +1859,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             )}
                             <button
                               onClick={() => removeOpeningHour(i)}
-                              className="ml-auto text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition"
+                              className="ml-auto bg-red-50 text-red-500 hover:bg-red-100 p-2 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                               title="Remove"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1853,7 +1868,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </button>
                           </div>
                         ))}
-                        <button onClick={addOpeningHour} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2">
+                        <button onClick={addOpeningHour} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2 cursor-pointer">
                           + Add Another Day
                         </button>
                       </div>
@@ -1910,7 +1925,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   if (!query) return alert("Please enter an address or city to search.");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
-                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1920,7 +1935,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 type="button"
                                 onClick={() => handleCurrentLocation(index)}
-                                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md transition flex items-center gap-1"
+                                className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md transition flex items-center gap-1 cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -1930,7 +1945,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handlePasteCoordinates(index)}
-                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1970,7 +1985,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             />
                             <button
                               onClick={() => removeInsurance(index)}
-                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition"
+                              className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1978,7 +1993,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </button>
                           </div>
                         ))}
-                        <button onClick={addInsurance} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2">
+                        <button onClick={addInsurance} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2 cursor-pointer">
                           + Add Insurance
                         </button>
                       </div>
@@ -1987,7 +2002,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingProfile(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
                         Cancel
@@ -1995,7 +2010,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveProfile}
                         disabled={isSavingProfile}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2 cursor-pointer"
                       >
                         {isSavingProfile ? (
                           <>
@@ -2032,7 +2047,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </div>
                           <button
                             onClick={() => setIsEditingPassword(true)}
-                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium"
+                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium cursor-pointer"
                           >
                             Update Password
                           </button>
@@ -2114,7 +2129,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 setIsEditingPassword(false);
                                 setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
                               }}
-                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition cursor-pointer"
                               disabled={isSavingPassword}
                             >
                               Cancel
@@ -2122,7 +2137,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <button
                               onClick={handlePasswordUpdate}
                               disabled={isSavingPassword || !passwordForm.newPassword || !passwordForm.oldPassword}
-                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2 cursor-pointer"
                             >
                               {isSavingPassword ? "Updating..." : "Save Password"}
                             </button>
@@ -2144,14 +2159,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowLogoutConfirm(false)}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400 cursor-pointer"
                     >
                       {isLoggingOut ? (
                         <>
@@ -2179,7 +2194,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         setShowDeleteStockConfirm(false);
                         setStockToDeleteId(null);
                       }}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                       disabled={isDeletingStock}
                     >
                       Cancel
@@ -2187,7 +2202,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <button
                       onClick={confirmDeleteStock}
                       disabled={isDeletingStock}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400 cursor-pointer"
                     >
                       {isDeletingStock ? "Deleting..." : "Delete"}
                     </button>

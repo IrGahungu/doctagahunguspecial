@@ -122,6 +122,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const endInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const breakEndInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
@@ -405,7 +406,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       }
     };
     loadData();
-  }, [activeTab, app.id, app.status]);
+  }, [activeTab, app.id, app.status, refreshKey]);
 
   // Helper functions for the availability form
   function addLocation() { setLocations([...Locations, { type: "Main Location", city: "", address: "", phone: "", latitude: "", longitude: "" }]); }
@@ -831,6 +832,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       return;
     }
 
+    if (activeTab === tab) {
+      setRefreshKey((prev) => prev + 1);
+    }
+
     setActiveTab(tab);
     setLoadingTab(tab);
 
@@ -877,7 +882,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("dashboard")}
             disabled={loadingTab === "dashboard"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'dashboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             {loadingTab === "dashboard" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -900,7 +905,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("availability")}
             disabled={loadingTab === "availability"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'availability' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             {loadingTab === "availability" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -923,7 +928,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("schedule")}
             disabled={loadingTab === "schedule"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-teal-600 text-white rounded-2xl hover:bg-teal-700 transition disabled:bg-teal-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'schedule' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             {loadingTab === "schedule" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -946,7 +951,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("bookings")}
             disabled={loadingTab === "bookings"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             {loadingTab === "bookings" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -974,7 +979,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("profile")}
             disabled={loadingTab === "profile"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'profile' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             {loadingTab === "profile" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -997,7 +1002,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <button
             onClick={() => handleNavClick("settings")}
             disabled={loadingTab === "settings"}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'settings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             {loadingTab === "settings" ? (
               <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1020,7 +1025,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("status")}
-            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition"
+            className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'status' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
             disabled={loadingTab === "status"}
           >
             {loadingTab === "status" ? (
@@ -1042,7 +1047,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
-          className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition"
+            className="relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -1081,9 +1086,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="text-lg font-bold text-center text-green-600">{dashboardStats.totalRevenue.toLocaleString()} BIF</div>
                         <button
-                          onClick={() => alert("Withdrawal feature coming soon!")}
+                          onClick={() => toast.success("The team is implementing it for soon")}
                           disabled={dashboardStats.totalRevenue === 0}
-                          className="px-2 py-0.5 text-[10px] font-medium text-white bg-green-600 rounded hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          className="px-2 py-0.5 text-[10px] font-medium text-white bg-green-600 rounded hover:bg-green-700 transition cursor-pointer disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-black"
                         >
                           Withdraw
                         </button>
@@ -1197,7 +1202,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           router.push(`/apply/doctor?id=${app.id}`);
                         }}
                         disabled={isNavigating}
-                        className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400"
+                        className="mt-4 inline-flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                       >
                         {isNavigating ? (
                           <>
@@ -1274,7 +1279,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <button
                       onClick={() => setIsEditingProfile(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1399,7 +1404,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingProfile(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                         disabled={isSavingProfile}
                       >
                         Cancel
@@ -1407,7 +1412,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveProfile}
                         disabled={isSavingProfile}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                       >
                         {isSavingProfile ? (
                           <>
@@ -1444,7 +1449,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </div>
                           <button
                             onClick={() => setIsEditingPassword(true)}
-                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium"
+                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                           >
                             Update Password
                           </button>
@@ -1526,7 +1531,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 setIsEditingPassword(false);
                                 setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
                               }}
-                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                               disabled={isSavingPassword}
                             >
                               Cancel
@@ -1534,7 +1539,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <button
                               onClick={handlePasswordUpdate}
                               disabled={isSavingPassword || !passwordForm.newPassword || !passwordForm.oldPassword}
-                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               {isSavingPassword ? "Updating..." : "Save Password"}
                             </button>
@@ -1603,7 +1608,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <button
                                   onClick={() => handleBookingAction(booking.id, 'confirmed')}
                                   disabled={updatingBookingId === booking.id}
-                                  className="text-green-600 hover:text-green-800 font-medium text-xs border border-green-200 bg-green-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                                  className="text-green-600 hover:text-green-800 font-medium text-xs border border-green-200 bg-green-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
                                   {updatingBookingId === booking.id && (
                                     <svg className="animate-spin h-3 w-3 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1618,7 +1623,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <button
                                   onClick={() => handleBookingAction(booking.id, 'completed')}
                                   disabled={updatingBookingId === booking.id}
-                                  className="text-blue-600 hover:text-blue-800 font-medium text-xs border border-blue-200 bg-blue-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                                  className="text-blue-600 hover:text-blue-800 font-medium text-xs border border-blue-200 bg-blue-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
                                   {updatingBookingId === booking.id && (
                                     <svg className="animate-spin h-3 w-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1633,7 +1638,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <button
                                   onClick={() => handleBookingAction(booking.id, 'cancelled')}
                                   disabled={updatingBookingId === booking.id}
-                                  className="text-red-600 hover:text-red-800 font-medium text-xs border border-red-200 bg-red-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50"
+                                  className="text-red-600 hover:text-red-800 font-medium text-xs border border-red-200 bg-red-50 px-2 py-1 rounded flex items-center gap-1 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
                                   {updatingBookingId === booking.id && (
                                     <svg className="animate-spin h-3 w-3 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1709,7 +1714,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
                     <button
                       onClick={() => setIsEditingAvailability(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1723,12 +1728,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block font-semibold text-gray-700">Locations</label>
-                        <button onClick={addLocation} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">+ Add Location</button>
+                        <button onClick={addLocation} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">+ Add Location</button>
                       </div>
                       <div className="space-y-4">
                         {Locations.map((loc, index) => (
                           <div key={index} className="relative">
-                            <button onClick={() => removeLocation(index)} className="absolute -top-2 -right-2 z-10 p-1 bg-white text-gray-400 hover:text-red-500 rounded-full border border-gray-200 shadow-sm transition-colors">
+                            <button onClick={() => removeLocation(index)} className="absolute -top-2 -right-2 z-10 p-1 bg-white text-gray-400 hover:text-red-500 rounded-full border border-gray-200 shadow-sm transition-colors cursor-pointer">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                             </button>
                             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -1788,7 +1793,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   if (!query) return alert("Please enter an address or city to search.");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
-                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1797,7 +1802,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handlePasteCoordinates(index)}
-                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1806,7 +1811,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handleUseCurrentLocation(index)}
-                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -1837,13 +1842,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="font-semibold text-gray-700">Availability Slots</label>
-                        <button onClick={handleAddAvailability} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Slot</button>
+                        <button onClick={handleAddAvailability} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Add Slot</button>
                       </div>
                       {availabilityForm.availability.map((slot, idx) => (
                         <div key={idx} className="border border-gray-200 rounded p-3 mb-3 bg-gray-50">
                           <div className="flex justify-between items-start mb-2">
                             <h5 className="text-xs font-bold text-gray-500 uppercase">Slot {idx + 1}</h5>
-                            <button onClick={() => handleRemoveAvailability(idx)} className="text-red-600 text-xs hover:underline">Remove</button>
+                            <button onClick={() => handleRemoveAvailability(idx)} className="text-red-600 text-xs hover:underline cursor-pointer">Remove</button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
@@ -1911,7 +1916,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-4 flex gap-3">
                       <button
                         onClick={() => setIsEditingAvailability(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                         disabled={isSavingAvailability}
                       >
                         Cancel
@@ -1919,7 +1924,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveAvailability}
                         disabled={isSavingAvailability}
-                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-400 transition flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                       >
                         {isSavingAvailability ? (
                           <>
@@ -1952,7 +1957,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <p className="text-gray-500 mb-6">You haven't set up your working schedule yet.</p>
                         <button
                           onClick={() => setIsEditingSchedule(true)}
-                          className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium"
+                          className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                         >
                           Create Schedule
                         </button>
@@ -1989,7 +1994,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <div className="flex justify-end pt-4 border-t border-gray-100">
                           <button
                             onClick={() => setIsEditingSchedule(true)}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 font-medium"
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                               <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -2007,11 +2012,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex gap-2">
                         <button
                           onClick={handleApplyToAllDays}
-                          className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                            className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                         >
                           Apply to All Days
                         </button>
-                        <button onClick={handleAddScheduleRow} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">+ Add Day</button>
+                        <button onClick={handleAddScheduleRow} className="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">+ Add Day</button>
                       </div>
                     </div>
 
@@ -2089,7 +2094,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 }}
                               />
                             </div>
-                            <button onClick={() => handleRemoveScheduleRow(idx)} className="text-red-600 p-2 hover:bg-red-50 rounded">
+                            <button onClick={() => handleRemoveScheduleRow(idx)} className="text-red-600 p-2 hover:bg-red-50 rounded cursor-pointer">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                               </svg>
@@ -2102,7 +2107,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-4 flex gap-3">
                       <button
                         onClick={() => setIsEditingSchedule(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                         disabled={isSavingSchedule}
                       >
                         Cancel
@@ -2110,7 +2115,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveSchedule}
                         disabled={isSavingSchedule}
-                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-400 transition flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                       >
                         {isSavingSchedule ? (
                           <>
@@ -2136,14 +2141,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowLogoutConfirm(false)}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleLogout}
                       disabled={isLoggingOut}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400 cursor-pointer"
                     >
                       {isLoggingOut ? (
                         <>
@@ -2174,7 +2179,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setConfirmationModal({ isOpen: false, bookingId: null, action: null })}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                       disabled={!!updatingBookingId}
                     >
                       No, Go Back
@@ -2186,7 +2191,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         }
                       }}
                       disabled={!!updatingBookingId}
-                      className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 ${
+                      className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${
                         confirmationModal.action === "confirmed" ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
                       }`}
                     >
@@ -2213,13 +2218,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowDeleteLocationConfirm(false)}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={confirmDeleteLocation}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                     >
                       Delete
                     </button>

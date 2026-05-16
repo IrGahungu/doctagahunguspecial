@@ -105,8 +105,8 @@ export default function CategoryModal({
         <div className="p-6 border-t shrink-0">
           {formError && <p className="text-red-500 text-sm mb-4">{formError}</p>}
           <div className="flex justify-end space-x-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded disabled:opacity-50" disabled={isSubmitting}>Cancel</button>
-            <button type="submit" form="category-form" className="px-4 py-2 bg-green-600 text-white rounded disabled:bg-gray-400" disabled={isSubmitting}>
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded disabled:opacity-50 cursor-pointer" disabled={isSubmitting}>Cancel</button>
+            <button type="submit" form="category-form" className="px-4 py-2 bg-green-600 text-white rounded disabled:bg-gray-400 cursor-pointer" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : "Save"}
             </button>
           </div>

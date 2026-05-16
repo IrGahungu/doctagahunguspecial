@@ -261,7 +261,7 @@ export default function BusBookingsTable() {
             <button 
               onClick={() => handleBulkStatusUpdate('confirmed')}
               disabled={updatingId === 'bulk'}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition-all animate-in fade-in zoom-in"
+              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition-all animate-in fade-in zoom-in cursor-pointer"
             >
               {updatingId === 'bulk' ? <Spinner /> : `Confirm ${selectedIds.size} Tickets`}
             </button>
@@ -342,7 +342,7 @@ export default function BusBookingsTable() {
                   {b.status === 'confirmed' ? (
                     <button 
                       onClick={() => handleDownloadTicket(b)}
-                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold text-[10px] uppercase border border-blue-200 px-2 py-1 rounded bg-blue-50"
+                      className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold text-[10px] uppercase border border-blue-200 px-2 py-1 rounded bg-blue-50 cursor-pointer"
                     >
                       Print
                     </button>

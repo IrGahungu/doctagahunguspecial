@@ -607,8 +607,8 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                         content: app.location || app.locations || app.doctor_users?.location || app.hospital_users?.locations || app.insurance_users?.location || app.insurance_users?.locations || "",
                         extra: app.country || app.doctor_users?.country || app.pharmacy_users?.country || app.hospital_users?.country || app.insurance_users?.country || app.origin_country
                       })}
-                      className="px-3 py-1 bg-blue-100 text-blue-600 text-xs rounded hover:bg-blue-200"
-                    >
+                      className="px-3 py-1 bg-blue-100 text-blue-600 text-xs rounded hover:bg-blue-200 cursor-pointer"
+                      >
                       View
                     </button>
                   )}
@@ -632,7 +632,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                           }
                         });
                       }}
-                      className="px-3 py-1 bg-purple-100 text-purple-600 text-xs rounded hover:bg-purple-200"
+                      className="px-3 py-1 bg-purple-100 text-purple-600 text-xs rounded hover:bg-purple-200 cursor-pointer"
                     >
                       View Details
                     </button>
@@ -658,7 +658,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                           }
                         });
                       }}
-                      className="px-3 py-1 bg-green-100 text-green-600 text-xs rounded hover:bg-green-200"
+                      className="px-3 py-1 bg-green-100 text-green-600 text-xs rounded hover:bg-green-200 cursor-pointer"
                     >
                       View Details
                     </button>
@@ -684,7 +684,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                           }
                         });
                       }}
-                      className="px-3 py-1 bg-teal-100 text-teal-600 text-xs rounded hover:bg-teal-200"
+                      className="px-3 py-1 bg-teal-100 text-teal-600 text-xs rounded hover:bg-teal-200 cursor-pointer"
                     >
                       View Details
                     </button>
@@ -694,7 +694,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                   {(app.availability || app.doctor_users?.availability) && (
                     <button
                       onClick={() => setViewModal({ isOpen: true, title: "Availability Details", content: app.doctor_users?.availability || "" })}
-                      className="px-3 py-1 bg-blue-100 text-blue-600 text-xs rounded hover:bg-blue-200"
+                      className="px-3 py-1 bg-blue-100 text-blue-600 text-xs rounded hover:bg-blue-200 cursor-pointer"
                     >
                       View
                     </button>
@@ -703,7 +703,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                 <td className="p-2">
                   <button 
                     onClick={() => setDocsModal({ isOpen: true, doctor: app.doctor_users || app.pharmacy_users || app.hospital_users || app.insurance_users || app as any })}
-                    className="px-3 py-1 bg-indigo-100 text-indigo-600 text-xs rounded hover:bg-indigo-200 font-semibold"
+                    className="px-3 py-1 bg-indigo-100 text-indigo-600 text-xs rounded hover:bg-indigo-200 font-semibold cursor-pointer"
                   >
                     View Credentials
                   </button>
@@ -733,7 +733,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                     {app.status === 'rejected' && app.rejection_reason && (
                       <button 
                         onClick={() => setViewModal({ isOpen: true, title: "Rejection Reason", content: app.rejection_reason || "" })}
-                        className="text-[10px] text-red-600 underline hover:text-red-800 mb-1"
+                        className="text-[10px] text-red-600 underline hover:text-red-800 mb-1 cursor-pointer"
                       >
                         Show Reason
                       </button>
@@ -744,7 +744,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                       <button
                         onClick={() => handleApprove(app.id)}
                         disabled={updatingId === app.id}
-                          className="btn-approve w-full"
+                        className="btn-approve w-full cursor-pointer"
                         >
                           <div className="flex justify-center">{updatingId === app.id ? <Spinner /> : 'Approve'}</div>
                         </button>
@@ -753,7 +753,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                       <button
                         onClick={() => handleReject(app.id)}
                         disabled={updatingId === app.id}
-                          className="btn-reject w-full"
+                        className="btn-reject w-full cursor-pointer"
                         >
                           <div className="flex justify-center">{updatingId === app.id ? <Spinner /> : 'Reject'}</div>
                         </button>
@@ -778,10 +778,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
             <h3 className="text-lg font-bold mb-2">Confirm Approval</h3>
             <p className="text-gray-600 mb-6">Are you sure you want to approve this doctor's application? They will gain access to the platform immediately.</p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setIsApproveModalOpen(false)} className="btn-cancel">
+              <button onClick={() => setIsApproveModalOpen(false)} className="btn-cancel cursor-pointer">
                 Cancel
               </button>
-              <button onClick={submitApproval} className="btn-approve" disabled={updatingId === applicationToApprove}>
+              <button onClick={submitApproval} className="btn-approve cursor-pointer" disabled={updatingId === applicationToApprove}>
                 {updatingId === applicationToApprove ? 'Processing...' : 'Yes, Approve'}
               </button>
             </div>
@@ -800,10 +800,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                     placeholder="Explain why the application is being rejected..."
                 />
                 <div className="flex justify-end gap-4 mt-4">
-                    <button onClick={() => setIsRejectModalOpen(false)} className="btn-cancel">
+                    <button onClick={() => setIsRejectModalOpen(false)} className="btn-cancel cursor-pointer">
                         Cancel
                     </button>
-                    <button onClick={submitRejection} className="btn-reject" disabled={updatingId === applicationToReject}>
+                    <button onClick={submitRejection} className="btn-reject cursor-pointer" disabled={updatingId === applicationToReject}>
                         {updatingId === applicationToReject ? 'Submitting...' : 'Submit Rejection'}
                     </button>
                 </div>
@@ -816,7 +816,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
               <h3 className="font-bold text-lg text-gray-800">{type === "doctor" ? "Doctor Credentials" : type === "pharmacy" ? "Pharmacy Credentials" : type === "hospital" ? "Hospital Credentials" : "Insurance Credentials"}: {(docsModal.doctor as any)?.name || (docsModal.doctor as any)?.fullname || "N/A"}</h3>
-              <button onClick={() => setDocsModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+              <button onClick={() => setDocsModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl cursor-pointer">&times;</button>
             </div>
             
             <div className="p-4 border-b bg-indigo-50/50 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -853,7 +853,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
                         href={getImageUrl(doc.src, currentBucket)} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                        className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold cursor-pointer"
                       >
                         View Full Size
                       </a>
@@ -877,7 +877,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
               {renderFormattedModalContent()}
             </div>
             <div className="flex justify-end mt-4">
-              <button onClick={() => setViewModal(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm">Close</button>
+              <button onClick={() => setViewModal(null)} className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm cursor-pointer">Close</button>
             </div>
           </div>
         </div>

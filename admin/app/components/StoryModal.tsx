@@ -253,7 +253,7 @@ export default function StoryModal({
           <h2 className="text-xl font-bold">
             {editingStory ? "Edit Story" : "Add Story"}
           </h2>
-          <button onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-600 cursor-pointer">
             &times;
           </button>
         </div>
@@ -345,7 +345,7 @@ export default function StoryModal({
                       <button
                         type="button"
                         onClick={() => handleRemoveMedia(i)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition-colors"
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow-md hover:bg-red-600 transition-colors cursor-pointer"
                         title="Remove"
                       >
                         &times;
@@ -436,7 +436,7 @@ export default function StoryModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-50 cursor-pointer"
           >
             Cancel
           </button>
@@ -448,7 +448,7 @@ export default function StoryModal({
               avatarStatus === "uploading" ||
               mediaStatus === "uploading"
             }
-            className="bg-blue-600 text-white px-6 py-2 rounded font-semibold disabled:opacity-50"
+            className="bg-blue-600 text-white px-6 py-2 rounded font-semibold disabled:opacity-50 cursor-pointer"
           >
             {saving ? "Saving..." : editingStory ? "Update Story" : "Save Story"}
           </button>

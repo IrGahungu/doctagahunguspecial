@@ -14,8 +14,8 @@ import BannerModal from "@/app/components/BannerModal";
 import DealModal from "@/app/components/DealModal";
 import DoctorModal from "@/app/components/DoctorModal";
 import MedicineModal from "@/app/components/MedicineModal";
-import StoryModal from "../../components/StoryModal";
-import PostModal from "../../components/PostModal";
+import StoryModal from "@/app/components/StoryModal";
+import PostModal from "@/app/components/PostModal";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
@@ -187,6 +187,23 @@ type ButtonSettings = {
   show_my_bus_tickets_button: boolean; // New
 };
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_AUTH_SERVER_URL || "http://localhost:3001";
+
+type ApprovedEntity = {
+  id: string;
+  name: string;
+  revenue: number;
+  image?: string;
+};
+
+type OverallStats = {
+  doctors: ApprovedEntity[];
+  hospitals: ApprovedEntity[];
+  insurances: ApprovedEntity[];
+  pharmacies: ApprovedEntity[];
+  admin: { serviceFees: number; loginFees: number; busFees: number; total: number };
+};
+
 type EpRewards = {
   ep_story_view: string;
   ep_post_view: string;
@@ -203,6 +220,10 @@ const Spinner = ({ className = "h-5 w-5" }: { className?: string }) => (
   </svg>
 );
 
+const DOCTOR_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/doctor-images/";
+const HOSPITAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/hospital-images/";
+const INSURANCE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/insurance-images/";
+const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
 const BANNER_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/banner-images/";
 const DEAL_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/deal-images/";
 
@@ -229,6 +250,13 @@ export default function AdminDashboard() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activeView, setActiveView] = useState<string | null>(null);
   const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
+  const [overallStats, setOverallStats] = useState<OverallStats>({
+    doctors: [],
+    hospitals: [],
+    insurances: [],
+    pharmacies: [],
+    admin: { serviceFees: 0, loginFees: 0, busFees: 0, total: 0 }
+  });
   const [epRewards, setEpRewards] = useState({
     ep_story_view: "500",
     ep_post_view: "300",
@@ -627,6 +655,19 @@ export default function AdminDashboard() {
       (Array.isArray(data) ? data : []).map(mapPost)
     );
 
+  const fetchOverallStats = async () => {
+    try {
+      const res = await fetch("/api/admin/stats/overall");
+      if (res.ok) {
+        const result = await res.json();
+        console.log("DEBUG Frontend: Received Overall Stats:", result);
+        setOverallStats(result.data || result);
+      }
+    } catch (error) {
+      console.error("Error fetching overall stats:", error);
+    }
+  };
+
   /** ----------------------
    * Navigation & Refresh Logic
    -----------------------*/
@@ -653,7 +694,8 @@ export default function AdminDashboard() {
       else if (view === "ep-threshold") refreshTasks.push(fetchEpThreshold());
       else if (view === "engagement-points") refreshTasks.push(fetchEpRewards());
       else if (view === "manage-buttons") refreshTasks.push(fetchEpRewards()); // Fetch all EP settings, including button visibility
-
+      else if (view === "overall-view") refreshTasks.push(fetchOverallStats());
+      
       if (refreshTasks.length > 0) {
         await Promise.all(refreshTasks);
       } else {
@@ -712,6 +754,7 @@ export default function AdminDashboard() {
       fetchServiceFees();
       fetchEpThreshold();
       fetchEpRewards(); // Fetch initial EP rewards and button visibility
+      fetchOverallStats();
     }
   }, [isSupabaseConnected]);
 
@@ -1362,92 +1405,104 @@ export default function AdminDashboard() {
         </div>
         <nav className="flex-1 p-4 space-y-2">
           <button
+            onClick={() => handleNavClick("overall-view")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-gray-800 text-white rounded-lg transition-all cursor-pointer ${activeView === 'overall-view' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Overall View
+          </button>
+          <button
             onClick={() => handleNavClick("users")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-blue-500 text-white rounded-lg transition-all ${activeView === 'users' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-blue-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'users' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Users
           </button>
           <button
             onClick={() => handleNavClick("orders")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-gray-500 text-white rounded-lg transition-all ${activeView === 'orders' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-gray-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'orders' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Orders
           </button>
           <button
             onClick={() => handleNavClick("applications", "doctor")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-pink-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'doctor' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-pink-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'applications' && applicationType === 'doctor' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Doctor Applications
           </button>
           <button
             onClick={() => handleNavClick("applications", "pharmacy")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-purple-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'pharmacy' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-purple-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'applications' && applicationType === 'pharmacy' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Pharma Applications
           </button>
           <button
             onClick={() => handleNavClick("applications", "hospital")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-green-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'hospital' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-green-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'applications' && applicationType === 'hospital' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Hospitals Applications
           </button>
           <button
             onClick={() => handleNavClick("applications", "insurance")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-teal-500 text-white rounded-lg transition-all ${activeView === 'applications' && applicationType === 'insurance' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-teal-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'applications' && applicationType === 'insurance' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Insu Applications
           </button>
           <button
             onClick={() => handleNavClick("doctor-bookings")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-fuchsia-500 text-white rounded-lg transition-all ${activeView === 'doctor-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-fuchsia-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'doctor-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Doctor Bookings
           </button>
           <button
             onClick={() => handleNavClick("hospital-bookings")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-emerald-500 text-white rounded-lg transition-all ${activeView === 'hospital-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-emerald-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'hospital-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Hospital Bookings
           </button>
           <button
             onClick={() => handleNavClick("bus")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-slate-600 text-white rounded-lg transition-all ${activeView === 'bus' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-slate-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'bus' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Bus
           </button>
           <button
             onClick={() => handleNavClick("bus-bookings")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-zinc-600 text-white rounded-lg transition-all ${activeView === 'bus-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-zinc-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'bus-bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Bus Bookings
           </button>
           <button
+            onClick={() => handleNavClick("withdrawals")}
+            className={`w-full text-left p-3 text-xs font-semibold bg-orange-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'withdrawals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+          >
+            Manage Withdrawals
+          </button>
+          <button
             onClick={() => handleNavClick("service-fees")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-cyan-600 text-white rounded-lg transition-all ${activeView === 'service-fees' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-cyan-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'service-fees' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Service Fees
           </button>
           <button
             onClick={() => handleNavClick("ep-threshold")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-violet-600 text-white rounded-lg transition-all ${activeView === 'ep-threshold' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-violet-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'ep-threshold' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage EP Threshold
           </button>
           <button
             onClick={() => handleNavClick("engagement-points")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-emerald-600 text-white rounded-lg transition-all ${activeView === 'engagement-points' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-emerald-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'engagement-points' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage EP Rewards
           </button>
           <button
             onClick={() => handleNavClick("manage-buttons")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-blue-800 text-white rounded-lg transition-all ${activeView === 'manage-buttons' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-blue-800 text-white rounded-lg transition-all cursor-pointer ${activeView === 'manage-buttons' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Buttons
           </button>
           <button
             onClick={() => handleNavClick("stock")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all ${activeView === "stock"
+            className={`w-full text-left p-3 text-xs font-semibold bg-indigo-500 text-white rounded-lg transition-all cursor-pointer ${activeView === "stock"
               ? "ring-2 ring-offset-2 ring-black"
               : ""
               }`}
@@ -1456,50 +1511,50 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => handleNavClick("categories")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-yellow-500 text-white rounded-lg transition-all ${activeView === 'categories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-yellow-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'categories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Categories
           </button>
           <button
             onClick={() => handleNavClick("reviews")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-yellow-600 text-white rounded-lg transition-all ${activeView === 'reviews' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-yellow-600 text-white rounded-lg transition-all cursor-pointer ${activeView === 'reviews' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Reviews
           </button>
           <button
             onClick={() => handleNavClick("banners")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-red-500 text-white rounded-lg transition-all ${activeView === 'banners' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-red-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'banners' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Banners
           </button>
           <button
             onClick={() => handleNavClick("deals")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-orange-500 text-white rounded-lg transition-all ${activeView === 'deals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-orange-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'deals' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Deals
           </button>
           <button
             onClick={() => handleNavClick("stories")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-rose-500 text-white rounded-lg transition-all ${activeView === 'stories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-rose-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'stories' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Stories
           </button>
           <button
             onClick={() => handleNavClick("posts")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-sky-500 text-white rounded-lg transition-all ${activeView === 'posts' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-sky-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'posts' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Manage Posts
           </button>
           <button
             onClick={() => handleNavClick("leaderboard")}
-            className={`w-full text-left p-3 text-xs font-semibold bg-amber-500 text-white rounded-lg transition-all ${activeView === 'leaderboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
+            className={`w-full text-left p-3 text-xs font-semibold bg-amber-500 text-white rounded-lg transition-all cursor-pointer ${activeView === 'leaderboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
             Engagement Leaderboard
           </button>
         </nav>
 
         <div className="p-4 border-t">
-          <button onClick={handleSignOut} disabled={isSigningOut} className="w-full p-3 text-center bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors text-xs font-semibold flex items-center justify-center gap-2">
+          <button onClick={handleSignOut} disabled={isSigningOut} className="w-full p-3 text-center bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer">
             {isSigningOut ? <Spinner /> : (
               <>
                 <span>Sign Out</span>
@@ -1523,6 +1578,183 @@ export default function AdminDashboard() {
         {activeView === null && (
           <div className="text-center p-10 bg-white rounded-lg shadow">
             <h2 className="text-2xl font-bold">Welcome back MSC. IT. ENG. JEAN KEVIN GAHUNGU</h2>
+          </div>
+        )}
+
+        {activeView === "withdrawals" && (
+          <div className="bg-white rounded-lg shadow p-10 text-center animate-in fade-in duration-500">
+            <div className="text-6xl mb-4">🏦</div>
+            <h2 className="text-2xl font-bold text-gray-800">Withdrawals Management</h2>
+            <p className="text-gray-500 mt-2">This feature is currently under development.</p>
+            <div className="mt-6 inline-block px-4 py-2 bg-orange-100 text-orange-700 rounded-full font-bold text-sm">Coming Soon</div>
+          </div>
+        )}
+
+        {activeView === "overall-view" && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center">
+              <h2 className="text-3xl font-bold text-gray-800">Platform Performance Overview</h2>
+              <button onClick={fetchOverallStats} className="bg-white border px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Refresh Stats</button>
+            </div>
+
+            {/* Partner Stats */}
+            {/* Individual Partner Cards */}
+            {([
+              { type: 'doctors', label: 'Approved Doctors', icon: '🩺', color: 'bg-pink-500', prefix: DOCTOR_URL_PREFIX },
+              { type: 'hospitals', label: 'Approved Hospitals', icon: '🏥', color: 'bg-green-500', prefix: HOSPITAL_URL_PREFIX },
+              { type: 'insurances', label: 'Approved Insurances', icon: '🛡️', color: 'bg-teal-500', prefix: INSURANCE_URL_PREFIX },
+              { type: 'pharmacies', label: 'Approved Pharmacies', icon: '💊', color: 'bg-purple-500', prefix: PHARMACY_URL_PREFIX },
+            ] as const).map((category) => {
+              // Type guard to ensure we are accessing array properties of overallStats
+              const entityType = category.type as keyof Omit<OverallStats, 'admin'>;
+              const entities = overallStats[entityType];
+
+              return (
+              <div key={category.type} className="mb-8">
+                <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wider mb-4">{category.label}</h3>
+                {entities.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {entities.map((partner) => (
+                      <div key={partner.id} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 transition-transform hover:scale-[1.02]">
+                        <div className="flex items-center mb-4">
+                          {partner.image ? (
+                            <img
+                              src={partner.image.startsWith('http') ? partner.image : `${category.prefix}${partner.image}`}
+                              alt={partner.name}
+                              className="w-12 h-12 rounded-full object-cover mr-4 border-2 border-gray-200"
+                            />
+                          ) : (
+                            <div className={`p-3 rounded-full ${category.color} text-white text-xl mr-4 shadow-lg`}>
+                              {category.icon}
+                            </div>
+                          )}
+                          <h4 className="text-lg font-bold text-gray-800 flex-1">{partner.name}</h4>
+                        </div>
+                        <div className="pt-4 border-t border-gray-50">
+                          <p className="text-xs font-bold text-gray-400 uppercase mb-1">Total Earned</p>
+                          <p className="text-xl font-bold text-green-600">
+                            {partner.revenue.toLocaleString()} <span className="text-xs font-normal text-gray-400">BIF</span>
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 bg-gray-50 rounded-xl text-center text-gray-500">
+                    No {category.label.toLowerCase()} found.
+                  </div>
+                )}
+              </div>
+            )})}
+            
+            {/* Admin Revenue Stats */}
+            <div>
+              <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wider mb-4">Admin Revenue</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl lg:col-span-2">
+                  <div className="flex justify-between items-center mb-6">
+                    <div>
+                      <p className="text-indigo-100 font-bold uppercase tracking-widest text-xs">
+                        Total Admin Earnings
+                      </p>
+                      <h4 className="text-4xl font-black mt-1">
+                        {overallStats.admin.total.toLocaleString()}{" "}
+                        <span className="text-lg font-normal opacity-70">BIF</span>
+                      </h4>
+                    </div>
+                    <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-md">
+                      <span className="text-4xl">💰</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-8 border-t border-white/20 pt-6">
+                    <div>
+                      <p className="text-indigo-100 text-xs font-bold uppercase">Service Fees</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {overallStats.admin.serviceFees.toLocaleString()}{" "}
+                        <span className="text-sm opacity-70">BIF</span>
+                      </p>
+                      <p className="text-[10px] text-indigo-200 mt-1">From orders & bookings</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-100 text-xs font-bold uppercase">Login/Access Fees</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {overallStats.admin.loginFees.toLocaleString()}{" "}
+                        <span className="text-sm opacity-70">BIF</span>
+                      </p>
+                      <p className="text-[10px] text-indigo-200 mt-1">From view access deductions</p>
+                    </div>
+                    <div>
+                      <p className="text-indigo-100 text-xs font-bold uppercase">Bus Fees</p>
+                      <p className="text-2xl font-bold mt-1">
+                        {overallStats.admin.busFees.toLocaleString()}{" "}
+                        <span className="text-sm opacity-70">BIF</span>
+                      </p>
+                      <p className="text-[10px] text-indigo-200 mt-1">From JK BUS tickets</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm flex flex-col justify-center">
+                  <h4 className="text-gray-400 font-bold uppercase text-xs tracking-widest mb-4">Revenue Split</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-semibold text-gray-600">Service Fees</span>
+                        {overallStats.admin.total > 0 && (
+                          <span className="font-bold text-indigo-600">
+                            {Math.round(
+                              (overallStats.admin.serviceFees /
+                                overallStats.admin.total) *
+                                100
+                            )}
+                            %
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-indigo-500 h-full" style={{ width: `${overallStats.admin.total > 0 ? (overallStats.admin.serviceFees / overallStats.admin.total) * 100 : 0}%` }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-semibold text-gray-600">Access Fees</span>
+                        {overallStats.admin.total > 0 && (
+                          <span className="font-bold text-blue-400">
+                            {Math.round(
+                              (overallStats.admin.loginFees /
+                                overallStats.admin.total) *
+                                100
+                            )}
+                            %
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-blue-400 h-full" style={{ width: `${overallStats.admin.total > 0 ? (overallStats.admin.loginFees / overallStats.admin.total) * 100 : 0}%` }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-semibold text-gray-600">Bus Fees</span>
+                        {overallStats.admin.total > 0 && (
+                          <span className="font-bold text-slate-500">
+                            {Math.round(
+                              (overallStats.admin.busFees /
+                                overallStats.admin.total) *
+                                100
+                            )}
+                            %
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-slate-500 h-full" style={{ width: `${overallStats.admin.total > 0 ? (overallStats.admin.busFees / overallStats.admin.total) * 100 : 0}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -1582,7 +1814,7 @@ export default function AdminDashboard() {
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold">Manage Service Fees</h2>
                   <div className="flex gap-2">
-                    <button onClick={() => setFeeModalOpen(true)} className="text-sm bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition-colors shadow-sm font-semibold">+ Add New Fee</button>
+                    <button onClick={() => setFeeModalOpen(true)} className="text-sm bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 transition-colors shadow-sm font-semibold cursor-pointer">+ Add New Fee</button>
                     <button onClick={fetchServiceFees} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors">Refresh</button>
                   </div>
                 </div>
@@ -1619,15 +1851,15 @@ export default function AdminDashboard() {
                             <td className="p-3">
                               {editingFeeId === rowId ? (
                                 <div className="flex gap-2">
-                                  <button onClick={() => handleUpdateServiceFee(fee.id)} className="btn-save">
+                                  <button onClick={() => handleUpdateServiceFee(fee.id)} className="btn-save cursor-pointer">
                                     {loadingId === fee.id ? "Saving..." : "Save"}
                                   </button>
-                                  <button onClick={() => setEditingFeeId(null)} className="btn-cancel">Cancel</button>
+                                  <button onClick={() => setEditingFeeId(null)} className="btn-cancel cursor-pointer">Cancel</button>
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => { setEditingFeeId(rowId); setTempFeeValue(fee.fee.toString()); }}
-                                  className="btn-edit"
+                                  className="btn-edit cursor-pointer"
                                 >
                                   Edit Fee
                                 </button>
@@ -1644,7 +1876,7 @@ export default function AdminDashboard() {
 
             {/* Add Fee Modal Overlay */}
             {feeModalOpen && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] backdrop-blur-sm">
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 backdrop-blur-sm">
                 <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md animate-in fade-in zoom-in duration-200">
                   <h3 className="text-xl font-bold mb-4">Add New Service Fee</h3>
                   <div className="space-y-4">
@@ -1671,8 +1903,8 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 mt-8">
-                    <button onClick={() => setFeeModalOpen(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                    <button onClick={handleCreateServiceFee} className="px-6 py-2 bg-cyan-600 text-white rounded-lg font-bold hover:bg-cyan-700 shadow-md">Create Fee</button>
+                    <button onClick={() => setFeeModalOpen(false)} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg cursor-pointer">Cancel</button>
+                    <button onClick={handleCreateServiceFee} className="px-6 py-2 bg-cyan-600 text-white rounded-lg font-bold hover:bg-cyan-700 shadow-md cursor-pointer">Create Fee</button>
                   </div>
                 </div>
               </div>
@@ -1709,7 +1941,7 @@ export default function AdminDashboard() {
                       />
                       <button
                         onClick={() => handleUpdateSettingValue('min_ep_required', newThresholdInput)}
-                        className="btn-save min-w-[140px]"
+                        className="btn-save min-w-[140px] cursor-pointer"
                       >Save</button>
                     </div>
                   </div>
@@ -1727,7 +1959,7 @@ export default function AdminDashboard() {
                       />
                       <button
                         onClick={() => handleUpdateEpReward('monetization_goal', epRewards.monetization_goal)}
-                        className="btn-save min-w-[140px]"
+                        className="btn-save min-w-[140px] cursor-pointer"
                       >Save</button>
                     </div>
                     <p className="text-xs text-gray-400 mt-3 italic">This goal appears on the user's account progress bar.</p>
@@ -1741,7 +1973,7 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-lg shadow p-8 max-w-2xl mx-auto border border-gray-100">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-800">Manage Engagement Point Rewards</h2>
-                  <button onClick={fetchEpRewards} className="text-sm text-emerald-600 font-bold hover:underline">Refresh Values</button>
+                  <button onClick={fetchEpRewards} className="text-sm text-emerald-600 font-bold hover:underline cursor-pointer">Refresh Values</button>
                 </div>
                 <div className="grid grid-cols-1 gap-6">
                   {[
@@ -1773,7 +2005,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => handleUpdateEpReward(item.key, epRewards[item.key as keyof typeof epRewards])}
                           disabled={isRefreshing}
-                          className="btn-save min-w-[120px]"
+                          className="btn-save min-w-[120px] cursor-pointer"
                         >
                           {isRefreshing ? <Spinner /> : "Update"}
                         </button>
@@ -1798,7 +2030,7 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => handleUpdateEpReward('story_duration', epRewards.story_duration)}
                         disabled={isRefreshing}
-                        className="btn-save min-w-[120px]"
+                        className="btn-save min-w-[120px] cursor-pointer"
                       >
                         {isRefreshing ? <Spinner /> : "Update"}
                       </button>
@@ -1840,7 +2072,7 @@ export default function AdminDashboard() {
                           onChange={(e) => handleUpdateEpReward(btn.key, e.target.checked)}
                           disabled={isRefreshing}
                         />
-                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-4 peer-focus:ring-blue-300 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
                     </div>
                   ))}
@@ -2007,7 +2239,7 @@ export default function AdminDashboard() {
                   <h2 className="text-2xl font-bold">Categories</h2>
                   <button
                     onClick={openAddCategoryModal}
-                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-700"
+                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-700 cursor-pointer"
                   >
                     + Add Category
                   </button>
@@ -2037,14 +2269,14 @@ export default function AdminDashboard() {
                           <td className="p-2 space-x-2">
                             <button
                               onClick={() => openEditCategoryModal(cat)}
-                              className="btn-edit"
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handleCategoryDelete(cat.id)}
                               disabled={loadingId === cat.id}
-                              className="btn-delete"
+                              className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               {loadingId === cat.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
@@ -2079,7 +2311,7 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-bold">Manage Reviews</h2>
-                  <button onClick={fetchReviews} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors">Refresh</button>
+                  <button onClick={fetchReviews} className="text-sm bg-gray-100 px-3 py-1 rounded hover:bg-gray-200 transition-colors cursor-pointer">Refresh</button>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -2123,13 +2355,13 @@ export default function AdminDashboard() {
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => handleSaveReply(review.id)}
-                                    className="btn-save"
+                                    className="btn-save cursor-pointer"
                                   >
                                     Save
                                   </button>
                                   <button
                                     onClick={() => setReplyingToId(null)}
-                                    className="btn-cancel"
+                                    className="btn-cancel cursor-pointer"
                                   >
                                     Cancel
                                   </button>
@@ -2144,14 +2376,14 @@ export default function AdminDashboard() {
                             <div className="flex flex-col gap-1">
                               <button
                                 onClick={() => { setReplyingToId(review.id); setAdminReplyText(review.admin_reply || ""); }}
-                                className="btn-edit"
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                               >
                                 {review.admin_reply ? "Edit Reply" : "Reply"}
                               </button>
                               <button
                                 onClick={() => handleReviewDelete(review.id)}
                                 disabled={loadingId === review.id}
-                                className="btn-delete flex items-center gap-1"
+                              className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex items-center gap-1"
                               >
                                 {loadingId === review.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                               </button>
@@ -2246,14 +2478,14 @@ export default function AdminDashboard() {
                           <td className="p-2 space-x-2">
                             <button
                               onClick={() => openEditPharmacyModal(phar)}
-                              className="btn-edit"
+                              className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               Edit
                             </button>
                             <button
                               onClick={() => handlePharmacyDelete(phar.id)}
                               disabled={loadingId === phar.id}
-                              className="btn-delete"
+                              className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                             >
                               {loadingId === phar.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
@@ -2350,8 +2582,8 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditHospitalModal(hosp)} className="btn-edit">Edit</button>
-                            <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="btn-delete">
+                            <button onClick={() => openEditHospitalModal(hosp)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handleHospitalDelete(hosp.id)} disabled={loadingId === hosp.id} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">
                               {loadingId === hosp.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2421,8 +2653,8 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditInsuranceModal(ins)} className="btn-edit">Edit</button>
-                            <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="btn-delete">
+                            <button onClick={() => openEditInsuranceModal(ins)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handleInsuranceDelete(ins.id)} disabled={loadingId === ins.id} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">
                               {loadingId === ins.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2455,7 +2687,7 @@ export default function AdminDashboard() {
                   <h2 className="text-2xl font-bold">Banners</h2>
                   <button
                     onClick={openAddBannerModal}
-                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700"
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 cursor-pointer"
                   >
                     + Add Banner
                   </button>
@@ -2482,8 +2714,8 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-2">{banner.link}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditBannerModal(banner)} className="btn-edit">Edit</button>
-                            <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="btn-delete">
+                            <button onClick={() => openEditBannerModal(banner)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handleBannerDelete(banner.id)} disabled={loadingId === banner.id} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">
                               {loadingId === banner.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2516,7 +2748,7 @@ export default function AdminDashboard() {
                   <h2 className="text-2xl font-bold">Deals of the Day</h2>
                   <button
                     onClick={openAddDealModal}
-                    className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-700"
+                    className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-700 cursor-pointer"
                   >
                     + Add Deal
                   </button>
@@ -2547,8 +2779,8 @@ export default function AdminDashboard() {
                           <td className="p-2">{deal.discount}</td>
                           <td className="p-2">{deal.tagline}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditDealModal(deal)} className="btn-edit">Edit</button>
-                            <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="btn-delete">
+                            <button onClick={() => openEditDealModal(deal)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">
                               {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2618,8 +2850,8 @@ export default function AdminDashboard() {
                           <td className="p-2">{doc.booking_type}</td>
                           <td className="p-2">{doc.availability && doc.availability.length > 0 ? 'Yes' : 'No'}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => openEditDoctorModal(doc)} className="btn-edit">Edit</button>
-                            <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="btn-delete">
+                            <button onClick={() => openEditDoctorModal(doc)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handleDoctorDelete(doc.id)} disabled={loadingId === doc.id} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">
                               {loadingId === doc.id ? <Spinner className="h-4 w-4" /> : "Delete"}
                             </button>
                           </td>
@@ -2650,7 +2882,7 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-bold">Manage Stories</h2>
-                  <button onClick={openAddStoryModal} className="px-4 py-2 bg-rose-500 text-white rounded hover:bg-rose-700">+ Add Story</button>
+                  <button onClick={openAddStoryModal} className="px-4 py-2 bg-rose-500 text-white rounded hover:bg-rose-700 cursor-pointer">+ Add Story</button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm border">
@@ -2672,7 +2904,7 @@ export default function AdminDashboard() {
                             <div className="flex flex-col gap-1">
                               <button
                                 onClick={() => toggleStoryVisibility(story, "show_tag")}
-                                className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+                                className="flex items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
                               >
                                 <span className={`text-xs font-bold uppercase ${story.show_tag === false ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{story.tag}</span>
                                 {story.show_tag === false && <span className="text-[9px] bg-red-100 text-red-600 px-1 rounded">Hidden</span>}
@@ -2680,7 +2912,7 @@ export default function AdminDashboard() {
                               {story.website && (
                                 <button
                                   onClick={() => toggleStoryVisibility(story, "show_website")}
-                                  className="flex items-center gap-1 hover:opacity-70 transition-opacity"
+                                  className="flex items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
                                 >
                                   <span className={`text-[10px] ${story.show_website === false ? 'text-gray-400' : 'text-blue-600'}`}>Website Link</span>
                                   <span className={`text-[9px] px-1 rounded ${story.show_website === false ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{story.show_website === false ? 'Hidden' : 'Visible'}</span>
@@ -2696,7 +2928,7 @@ export default function AdminDashboard() {
                                   <button
                                     key={i}
                                     onClick={() => setPreviewMedia(url)}
-                                    className="hover:opacity-80 transition-opacity"
+                                    className="hover:opacity-80 transition-opacity cursor-pointer"
                                   >
                                     {isVideo ? (
                                       <video
@@ -2715,9 +2947,9 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => viewStats('story', story.id, story.name)} className="text-green-600 hover:underline">Stats</button>
-                            <button onClick={() => openEditStoryModal(story)} className="btn-edit">Edit</button>
-                            <button onClick={() => handleStoryDelete(story.id)} className="btn-delete">Delete</button>
+                            <button onClick={() => viewStats('story', story.id, story.name)} className="text-green-600 hover:underline cursor-pointer">Stats</button>
+                            <button onClick={() => openEditStoryModal(story)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handleStoryDelete(story.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Delete</button>
                           </td>
                         </tr>
                       ))}
@@ -2745,7 +2977,7 @@ export default function AdminDashboard() {
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-bold">Manage Posts</h2>
-                  <button onClick={openAddPostModal} className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-700">+ Add Post</button>
+                  <button onClick={openAddPostModal} className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-700 cursor-pointer">+ Add Post</button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm border">
@@ -2770,7 +3002,7 @@ export default function AdminDashboard() {
                                   <button
                                     key={i}
                                     onClick={() => setPreviewMedia(url)}
-                                    className="hover:opacity-80 transition-opacity"
+                                    className="hover:opacity-80 transition-opacity cursor-pointer"
                                   >
                                     {isVideo ? (
                                       <video
@@ -2795,7 +3027,7 @@ export default function AdminDashboard() {
                                 <button
                                   onClick={() => togglePostVisibility(post, "show_website")}
                                   title="Toggle Website visibility"
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_website === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform cursor-pointer ${post.show_website === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   WEB
                                 </button>
@@ -2804,7 +3036,7 @@ export default function AdminDashboard() {
                                 <button
                                   onClick={() => togglePostVisibility(post, "show_whatsapp")}
                                   title="Toggle WhatsApp visibility"
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_whatsapp === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform cursor-pointer ${post.show_whatsapp === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   WA
                                 </button>
@@ -2813,7 +3045,7 @@ export default function AdminDashboard() {
                                 <button
                                   onClick={() => togglePostVisibility(post, "show_instagram")}
                                   title="Toggle Instagram visibility"
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_instagram === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform cursor-pointer ${post.show_instagram === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   IG
                                 </button>
@@ -2822,7 +3054,7 @@ export default function AdminDashboard() {
                                 <button
                                   onClick={() => togglePostVisibility(post, "show_twitter")}
                                   title="Toggle X visibility"
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform ${post.show_twitter === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border font-medium hover:scale-105 transition-transform cursor-pointer ${post.show_twitter === false ? 'bg-red-50 text-red-500 border-red-200 line-through' : 'bg-green-50 text-green-600 border-green-200'}`}
                                 >
                                   X
                                 </button>
@@ -2835,10 +3067,10 @@ export default function AdminDashboard() {
                           <td className="p-2 truncate max-w-xs">{post.caption}</td>
                           <td className="p-2">{post.likes}</td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => viewStats('post-likes', post.id, post.title)} className="text-green-600 hover:underline">Likes</button>
-                            <button onClick={() => viewStats('post-views', post.id, post.title)} className="text-purple-600 hover:underline">Views</button>
-                            <button onClick={() => openEditPostModal(post)} className="btn-edit">Edit</button>
-                            <button onClick={() => handlePostDelete(post.id)} className="btn-delete">Delete</button>
+                            <button onClick={() => viewStats('post-likes', post.id, post.title)} className="text-green-600 hover:underline cursor-pointer">Likes</button>
+                            <button onClick={() => viewStats('post-views', post.id, post.title)} className="text-purple-600 hover:underline cursor-pointer">Views</button>
+                            <button onClick={() => openEditPostModal(post)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
+                            <button onClick={() => handlePostDelete(post.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Delete</button>
                           </td>
                         </tr>
                       ))}
