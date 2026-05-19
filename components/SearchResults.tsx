@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router'; // Changed from useNavigation
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const currencyMap: { [country: string]: string } = {
   Burundi: 'FBU',
@@ -111,6 +112,8 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
   console.log('SearchResults received results:', JSON.stringify(results, null, 2));
   const router = useRouter(); // Using Expo Router instead of React Navigation
   const [country, setCountry] = React.useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   // Helper to format array-like strings from DB for display
   const formatArrayString = (input: string | string[] | object | undefined): string => {
@@ -265,18 +268,18 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Searching for "{query}"...</Text>
+        <ActivityIndicator size="large" color="#4CAF50" /> {/* No translation needed for icon */}
+        <Text style={styles.loadingText}>{t["searching for"]} "{query}"...</Text>
       </View>
     );
   }
 
   if (allResults.length === 0 && query) {
     return (
-      <View style={styles.noResults}>
+      <View style={styles.noResults}> {/* No translation needed for icon */}
         <Icon name="search-off" size={40} color="#ccc" />
-        <Text style={styles.noResultsText}>No results found for "{query}"</Text>
-        <Text style={styles.noResultsSubText}>Try different keywords</Text>
+        <Text style={styles.noResultsText}>{t["no results found for"]} "{query}"</Text>
+        <Text style={styles.noResultsSubText}>{t["try different keywords"]}</Text>
       </View>
     );
   }
@@ -287,7 +290,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
         onPress={() => handleItemPress(item)}
         activeOpacity={0.7}
       >
-        {item.image ? (
+        {item.image ? ( // No translation needed for icon
           typeof item.image === 'string' ? (
             <Image source={{ uri: item.image }} style={styles.itemImage} />
           ) : (
@@ -295,7 +298,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
           )
         ) : (
           <View style={[styles.itemImage, styles.itemImagePlaceholder]}>
-            <Icon name={
+            <Icon name={ // No translation needed for icon
               item.type === 'medicine' ? 'medication' :
                 item.type === 'pharmacy' ? 'local-pharmacy' :
                   item.type === 'hospital' ? 'local-hospital' : 'person'
@@ -312,7 +315,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
             </Text>
           )}
           {item.type === 'medicine' && item.pharmacies && item.pharmacies.length > 0 && (
-            <Text style={styles.itemSubtext}>
+            <Text style={styles.itemSubtext}> {/* No translation needed for icon */}
               Available in {item.pharmacies.length} pharmac{item.pharmacies.length > 1 ? 'ies' : 'y'}
             </Text>
           )}
@@ -322,12 +325,12 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
           {item.type === 'hospital' && (
             <View style={{ marginTop: 4 }}>
               {item.available_blood_types && (
-                <Text style={styles.itemSubtext} numberOfLines={1}>
+                <Text style={styles.itemSubtext} numberOfLines={1}> {/* No translation needed for icon */}
                   <Icon name="bloodtype" size={12} color="#f44336" /> {formatArrayString(item.available_blood_types)}
                 </Text>
               )}
               {item.medical_equipment && (
-                <Text style={styles.itemSubtext} numberOfLines={1}>
+                <Text style={styles.itemSubtext} numberOfLines={1}> {/* No translation needed for icon */}
                   <Icon name="medical-services" size={12} color="#4caf50" /> {formatArrayString(item.medical_equipment)}
                 </Text>
               )}
@@ -354,9 +357,9 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
       keyboardDismissMode="on-drag"
       onScrollBeginDrag={() => Keyboard.dismiss()}
       style={styles.container}
-      ListHeaderComponent={
+      ListHeaderComponent={ // No translation needed for icon
         <View style={styles.header}>
-          <Text style={styles.title}>Results for "{query}"</Text>
+          <Text style={styles.title}>{t["results for"]} "{query}"</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Icon name="close" size={24} color="#333" />
           </TouchableOpacity>

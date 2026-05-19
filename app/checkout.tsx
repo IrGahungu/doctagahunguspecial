@@ -18,6 +18,7 @@ import { useCartStore } from '@/stores/cartStore';
 import Toast from 'react-native-toast-message';
 import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
@@ -77,6 +78,8 @@ export default function CheckoutScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPinModalVisible, setIsPinModalVisible] = useState(false);
   const [pin, setPin] = useState('');
+  const language = useLanguageStore((state) => state.language);
+  const t = translations[language];
   const [showConfetti, setShowConfetti] = useState(false);
 
   const handleInitiatePayment = async () => {
@@ -262,42 +265,42 @@ export default function CheckoutScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Payment</Text>
+        <Text style={styles.headerTitle}>{t["confirm payment"]}</Text>
       </View>
 
       {isLoading ? (
         <CheckoutSkeleton />
       ) : (
         <>
-          {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />}
+          {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />} {/* No translation needed for icon */}
 
           <ScrollView contentContainerStyle={styles.content}>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Order Summary</Text>
+              <Text style={styles.summaryTitle}>{t["order summary"]}</Text>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryLabel}>{t.subtotal}</Text>
                 <Text style={styles.summaryValue}>BIF {parseFloat(subtotal).toFixed(2)}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Medicine Service Fee</Text>
+                <Text style={styles.summaryLabel}>{t["medicine service fee"]}</Text>
                 <Text style={styles.summaryValue}>BIF {parseFloat(serviceFee).toFixed(2)}</Text>
               </View>
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total Amount</Text>
+                <Text style={styles.totalLabel}>{t["total amount"]}</Text>
                 <Text style={styles.totalValue}>BIF {parseFloat(total).toFixed(2)}</Text>
               </View>
             </View>
 
             <View style={styles.paymentMethodCard}>
-              <Wallet size={24} color="#4CAF50" />
-              <Text style={styles.paymentMethodText}>Paying with Gahungu Wallet</Text>
+              <Wallet size={24} color="#4CAF50" /> {/* No translation needed for icon */}
+              <Text style={styles.paymentMethodText}>{t["paying with gahungu wallet"]}</Text>
             </View>
 
             <TouchableOpacity
               style={styles.confirmButton}
               onPress={handleInitiatePayment}
             >
-              <Text style={styles.confirmButtonText}>Confirm & Pay</Text>
+              <Text style={styles.confirmButtonText}>{t["confirm and pay"]}</Text>
             </TouchableOpacity>
           </ScrollView>
         </>
@@ -310,8 +313,8 @@ export default function CheckoutScreen() {
         onRequestClose={() => setIsPinModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Enter Wallet PIN</Text>
+          <View style={styles.modalContent}> {/* No translation needed for icon */}
+            <Text style={styles.modalTitle}>{t["enter wallet pin"]}</Text>
             <Text style={styles.modalSubtitle}>Please enter your 4-digit PIN to confirm payment.</Text>
             
             <TextInput
@@ -330,15 +333,15 @@ export default function CheckoutScreen() {
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => setIsPinModalVisible(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+              > {/* No translation needed for icon */}
+                <Text style={styles.cancelButtonText}>{t.cancel}</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={[styles.modalButton, styles.verifyButton]} 
                 onPress={handleVerifyAndPay}
                 disabled={isLoading}
-              >
+              > {/* No translation needed for icon */}
                 {isLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (

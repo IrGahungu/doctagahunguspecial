@@ -6,6 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import { supabase } from '@/lib/supabase';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 type OrderStatus = "Pending" | "Accepted" | "Cancelled" | "Packed" | "On the way" | "Delivered";
 
@@ -66,6 +67,8 @@ export default function OrdersScreen() {
   const [hasError, setHasError] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setHasError(false);
@@ -142,10 +145,10 @@ export default function OrdersScreen() {
   const renderOrderItem = ({ item }: { item: Order }) => (
     <TouchableOpacity style={styles.orderItem} onPress={() => router.push(`/order/${item.id}` as any)}>
       <View style={styles.orderInfo}>
-        <Text style={styles.orderId}>Order #{String(item.id || '').substring(0, 8)}</Text>
-        <Text style={styles.orderDate}>Placed on: {new Date(item.created_at).toLocaleDateString()}</Text>
-        <Text style={styles.orderTotal}>Total: BIF {Number(item.total_amount || 0).toFixed(2)}</Text>
-      </View>
+        <Text style={styles.orderId}>{t["order hash"]}{String(item.id || '').substring(0, 8)}</Text>
+        <Text style={styles.orderDate}>{t["placed on"]} {new Date(item.created_at).toLocaleDateString()}</Text>
+        <Text style={styles.orderTotal}>{t.total} BIF {Number(item.total_amount || 0).toFixed(2)}</Text>
+      </View> {/* No translation needed for icon */}
       <View style={styles.statusContainer}>
         <Text style={styles.checkStatusText}>Check your order status</Text>
         <ChevronRight size={22} color="#757575" />
@@ -159,19 +162,19 @@ export default function OrdersScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Orders</Text>
+        <Text style={styles.headerTitle}>{t["my orders"]}</Text>
       </View>
       {loading ? (
         <OrderSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load orders. Please check your connection.</Text>
+          <Text style={styles.errorText}>{t["failed to load orders"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchOrders}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
+        <FlatList // No translation needed for icon
           data={orders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
@@ -179,9 +182,9 @@ export default function OrdersScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>You have no orders yet.</Text>
-              <TouchableOpacity onPress={() => router.push('/')}>
-                <Text style={styles.browseButton}>Start Shopping</Text>
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/')}> {/* No translation needed for icon */}
+                <Text style={styles.browseButton}>{t["start shopping"]}</Text>
+              </TouchableOpacity> {/* No translation needed for icon */}
             </View>
           }
           onRefresh={fetchOrders}

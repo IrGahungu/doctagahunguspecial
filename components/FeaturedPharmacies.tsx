@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 interface Props {
   title: string;
@@ -60,6 +61,8 @@ const SkeletonCard = () => (
 const PharmacyItem = ({ item, baseUrl }: { item: SimplePharmacy; baseUrl: string }) => {
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   return (
     <Pressable
@@ -104,8 +107,8 @@ const PharmacyItem = ({ item, baseUrl }: { item: SimplePharmacy; baseUrl: string
       </View>
       <View style={styles.details}>
         <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>See Details</Text>
+        <View style={styles.detailsButton}> {/* No translation needed for icon */}
+          <Text style={styles.detailsButtonText}>{t["see details"]}</Text>
         </View>
       </View>
     </Pressable>
@@ -116,6 +119,8 @@ export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: P
   const [items, setItems] = useState<SimplePharmacy[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -184,7 +189,7 @@ export default function FeaturedPharmacies({ title, onViewAll, baseUrl = "" }: P
     return (
       <View style={styles.section}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.noDataText}>No Pharmacies available, Coming soon</Text>
+        <Text style={styles.noDataText}>{t["no pharmacies available"]}</Text>
       </View>
     );
   }

@@ -5,6 +5,10 @@ import { useRouter } from "expo-router";
 import { API_BASE_URL } from "@/config";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
+import { useAuthStore } from "@/stores/authStore";
+import { useCartStore } from "@/stores/cartStore";
+import { useLanguageStore, translations } from '@/stores/languageStore';
+import Toast from "react-native-toast-message";
 
 const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
@@ -49,6 +53,8 @@ export default function UpdateProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   // ✅ Fetch current profile data
   const fetchProfile = useCallback(async () => {
@@ -85,54 +91,90 @@ export default function UpdateProfileScreen() {
   // ✅ Update profile
   const handleUpdate = async () => {
     if (!fullname.trim()) {
-      Alert.alert("Validation Error", "Full name is required.");
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Full name is required.',
+      });
       return;
     }
 
     if (!whatsappNumber.trim() || !whatsappNumber.startsWith("+") || whatsappNumber.length < 10) {
-      Alert.alert("Validation Error", "Please enter a valid WhatsApp number starting with '+' followed by your country code (e.g., +25777990118).");
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: "Enter a valid WhatsApp number starting with '+'.",
+      });
       return;
     }
 
-    setLoading(true);
-    try {
-      const token = await SecureStore.getItemAsync("token");
-      if (!token) {
-        Alert.alert("Error", "Not logged in");
-        return;
-      }
+    Alert.alert(
+      "Confirm Update",
+      "Updating your profile information will log you out automatically. Do you wish to continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Update",
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const token = await SecureStore.getItemAsync("token");
+              if (!token) {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Error',
+                  text2: 'Not logged in',
+                });
+                return;
+              }
 
-      const res = await fetch(`${API_BASE_URL}/update-profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+              const res = await fetch(`${API_BASE_URL}/update-profile`, {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  fullname,
+                  whatsapp_number: whatsappNumber,
+                }),
+              });
+
+              if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || "Failed to update profile");
+              }
+
+              Alert.alert(
+                "✅ Success",
+                "Profile updated successfully! For security reasons, you will now be logged out. Please log in again with your updated credentials.",
+                [
+                  {
+                    text: "OK",
+                    onPress: async () => {
+                      // Perform Logout and redirect
+                      useAuthStore.getState().setUserId(null);
+                      useCartStore.getState().clearItems();
+                      await SecureStore.deleteItemAsync("token");
+                      router.replace("/auth");
+                    },
+                  },
+                ],
+                { cancelable: false }
+              );
+            } catch (err: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Update Failed',
+                text2: err.message || "Could not update profile.",
+              });
+            } finally {
+              setLoading(false);
+            }
+          },
         },
-        body: JSON.stringify({
-          fullname,
-          whatsapp_number: whatsappNumber,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to update profile");
-      }
-
-      const data = await res.json();
-
-      Alert.alert(
-        "✅ Success",
-        `Profile updated! Your number is now ${data.is_verified ? "verified" : "not verified"
-        }.`
-      );
-
-      router.back();
-    } catch (err: any) {
-      Alert.alert("❌ Error", err.message || "Could not update profile.");
-    } finally {
-      setLoading(false);
-    }
+      ]
+    );
   };
 
   return (
@@ -141,39 +183,39 @@ export default function UpdateProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButtonHeader}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
       </View>
 
       {isFetching ? (
         <ProfileSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load profile information.</Text>
+          <Text style={styles.errorText}>{t["failed to load profile"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchProfile}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
       <View style={styles.content}>
-      <Text style={styles.title}>Update Profile</Text>
+      <Text style={styles.title}>{t["update profile"]}</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Full Name"
+        placeholder={t["full name"]}
         value={fullname}
         onChangeText={setFullname}
       />
-
+ {/* No translation needed for icon */}
       <TextInput
         style={styles.input}
-        placeholder="WhatsApp Number (e.g., +257...)"
+        placeholder={t["whatsapp number"]}
         value={whatsappNumber}
         onChangeText={setWhatsappNumber}
         keyboardType="phone-pad"
       />
 
       <TouchableOpacity style={styles.button} onPress={handleUpdate} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? "Updating..." : "Save Changes"}</Text>
+        <Text style={styles.buttonText}>{loading ? t.updating : t["save changes"]}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>

@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Header from '@/components/Header';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2; // 16 padding on each side, 16 gap
@@ -71,6 +72,8 @@ export default function CategoriesScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   // Fetch categories from Supabase
   const fetchCategories = async () => {
@@ -129,7 +132,7 @@ export default function CategoriesScreen() {
   return (
     <View style={styles.container}>
       <Header />
-      <Text style={styles.pageTitle}>All Categories</Text>
+      <Text style={styles.pageTitle}>{t["all categories"]}</Text>
       {loading ? (
         <CategoryGridSkeleton />
       ) : (

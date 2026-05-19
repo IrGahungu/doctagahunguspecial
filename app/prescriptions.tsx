@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import Icon from 'react-native-vector-icons/MaterialIcons'; // For medicine/pharmacy icons
 import Carousel from '@/components/Carousel';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const { width } = Dimensions.get('window');
 
@@ -91,6 +92,8 @@ export default function PrescriptionsScreen() {
   const [searchResults, setSearchResults] = useState<MedicineResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -218,7 +221,7 @@ export default function PrescriptionsScreen() {
       </View>
 
       {item.pharmacies.length > 0 && (
-        <View style={styles.pharmaciesSection}>
+        <View style={styles.pharmaciesSection}> {/* No translation needed for icon */}
           <Text style={styles.sectionSubTitle}>Available at:</Text>
           {item.pharmacies.map((pharmacy) => (
             <TouchableOpacity
@@ -252,7 +255,7 @@ export default function PrescriptionsScreen() {
       )}
 
       {item.insurances.length > 0 && (
-        <View style={styles.insurancesSection}>
+        <View style={styles.insurancesSection}> {/* No translation needed for icon */}
           <Text style={styles.sectionSubTitle}>Covered by:</Text>
           <View style={styles.insuranceTags}>
             {item.insurances.map((insurance, index) => (
@@ -272,7 +275,7 @@ export default function PrescriptionsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Prescriptions</Text>
+        <Text style={styles.headerTitle}>{t["my prescriptions"]}</Text>
       </View>
 
       <Carousel baseUrl={BANNER_URL_PREFIX} />
@@ -299,8 +302,8 @@ export default function PrescriptionsScreen() {
       ) : searchResults.length > 0 ? (
         <FlatList
           data={searchResults}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
-          renderItem={renderMedicineResult}
+          keyExtractor={(item, index) => `${item.id}-${index}`} // No translation needed for icon
+          renderItem={renderMedicineResult} // No translation needed for icon
           contentContainerStyle={styles.resultsList}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
@@ -309,8 +312,8 @@ export default function PrescriptionsScreen() {
         !isLoading && searchText.trim() !== '' && (
           <View style={styles.noResults}>
             <Icon name="search-off" size={40} color="#ccc" />
-            <Text style={styles.noResultsText}>No results found for your prescriptions.</Text>
-            <Text style={styles.noResultsSubText}>Try different spellings or fewer items.</Text>
+            <Text style={styles.noResultsText}>{t["no prescriptions found"]}</Text>
+            <Text style={styles.noResultsSubText}>{t["try different spellings"]}</Text>
           </View>
         )
       )}

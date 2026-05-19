@@ -5,12 +5,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { API_BASE_URL } from "@/config"; // ✅ Import backend base URL
 import * as SecureStore from "expo-secure-store";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
-const menuItems = [
-  { name: 'Doctors', icon: 'doctor', backgroundColor: '#FFF9C4', route: '/doctors' },
-  { name: 'Pharmacies', icon: 'hospital-building', backgroundColor: '#C8E6C9', route: '/pharmacies' },
-  { name: 'Hospitals', icon: 'hospital-box', backgroundColor: '#B3E5FC', route: '/hospitals' },
-  { name: 'Insurances', icon: 'shield-plus', backgroundColor: '#E0E0E0', route: '/insurances' },
+const getMenuItems = (t: any) => [
+  { name: t.doctors, icon: 'doctor', backgroundColor: '#FFF9C4', route: '/doctors' },
+  { name: t.pharmacies, icon: 'hospital-building', backgroundColor: '#C8E6C9', route: '/pharmacies' },
+  { name: t.hospitals, icon: 'hospital-box', backgroundColor: '#B3E5FC', route: '/hospitals' },
+  { name: t.insurances, icon: 'shield-plus', backgroundColor: '#E0E0E0', route: '/insurances' },
 ];
 
 const currencyMap: { [country: string]: string } = {
@@ -137,6 +138,8 @@ const Firework = ({ startX, delay, color }: { startX: number, delay: number, col
 };
 
 export default function Header() {
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [fullname, setFullname] = useState<string>("");
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -150,7 +153,7 @@ export default function Header() {
   useEffect(() => {
     const blink = Animated.loop(
       Animated.sequence([
-        Animated.timing(blinkAnim, {
+        Animated.timing(blinkAnim, { //
           toValue: 0.3,
           duration: 800,
           useNativeDriver: true,
@@ -315,15 +318,15 @@ export default function Header() {
           <View style={styles.leftInfoContainer}>
             {isLoggedIn ? (
               <Text style={styles.welcomeText}>
-                Murahawe ikaze kwa Dr. Gahungu: {' '}
+                {t["murahawe ikaze kwa Dr. Gahungu:"]} {' '}
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#4CAF50" />
                 ) : (
                   fullname
                 )}
               </Text>
-            ) : (
-              <Text style={styles.welcomeText}>Murahawe ikaze kwa Dr. Gahungu</Text>
+            ) : ( //
+              <Text style={styles.welcomeText}>{t["murahawe ikaze kwa Dr. Gahungu:"]}</Text>
             )}
 
             <View style={[styles.networkTester, { borderColor: networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336' }]}>
@@ -371,7 +374,7 @@ export default function Header() {
         )}
       </View>
       <View style={styles.container}>
-        {menuItems.map((item, index) => (
+        {getMenuItems(t).map((item, index) => (
           <TouchableOpacity
             key={index}
             style={[styles.menuItem, { backgroundColor: item.backgroundColor }]}

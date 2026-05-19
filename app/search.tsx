@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import SearchResults from '@/components/SearchResults';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
 const PHARMACY_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/pharmacy-images/";
@@ -103,6 +104,8 @@ export default function SearchScreen() {
   const [results, setResults] = useState<any>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const getImageSourceForType = (type: string, imagePath?: string | null) => {
@@ -342,8 +345,8 @@ export default function SearchScreen() {
           <TextInput
             ref={inputRef}
             style={styles.searchPlaceholder}
-            placeholderTextColor="#757575"
-            placeholder="Search medicines, doctors, pharmacies..."
+            placeholderTextColor="#757575" // No translation needed for icon
+            placeholder={t.searchPlaceholder}
             value={query}
             onChangeText={(text) => {
                 setQuery(text);
@@ -365,8 +368,8 @@ export default function SearchScreen() {
       {isLoading ? (
         <SearchSkeleton />
       ) : searchError ? (
-        <View style={styles.center}>
-          <Icon name="wifi-off" size={60} color="#BDBDBD" />
+        <View style={styles.center}> {/* No translation needed for icon */}
+          <Icon name="wifi-off" size={60} color="#BDBDBD" /> {/* No translation needed for icon */}
           <Text style={styles.errorText}>{searchError}</Text>
           <Text style={styles.emptyText}>Please check your internet connection and try again.</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => performFinalSearch(query)}>
@@ -389,8 +392,8 @@ export default function SearchScreen() {
             query.length === 0 && !isFetchingSuggestions ? (
               isInitialLoad ? (
                 <RecentSearchesSkeleton />
-              ) : recentSearches.length > 0 ? (
-              <View style={styles.recentSearchesContainer}>
+              ) : recentSearches.length > 0 ? ( // No translation needed for icon
+              <View style={styles.recentSearchesContainer}> {/* No translation needed for icon */}
                 <View style={styles.recentSearchesHeader}>
                   <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
                   <TouchableOpacity onPress={clearRecentSearches} style={styles.clearAllButton}>
@@ -454,8 +457,8 @@ export default function SearchScreen() {
           ListEmptyComponent={
             query.length < 2 ? ( // If query is less than 2 characters
                 (recentSearches.length === 0 && !isInitialLoad) ? ( // And no recent searches or not initial load
-                  <View style={styles.center}>
-                    <Icon name="search" size={60} color="#BDBDBD" />
+                  <View style={styles.center}> {/* No translation needed for icon */}
+                    <Icon name="search" size={60} color="#BDBDBD" /> {/* No translation needed for icon */}
                     <Text style={styles.emptyText}>Type at least 2 characters to see suggestions</Text>
                 </View>
                 ) : null // Otherwise, render nothing (null)

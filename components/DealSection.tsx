@@ -12,6 +12,7 @@ import { DealOfTheDay } from '@/types';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { translations, useLanguageStore } from '@/stores/languageStore';
 
 const DealSkeleton = () => {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
@@ -121,6 +122,8 @@ const DealSection: React.FC<DealSectionProps> = ({
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -172,7 +175,7 @@ const DealSection: React.FC<DealSectionProps> = ({
     return (
       <View style={styles.container}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.noDataText}>No Deals available, Coming soon</Text>
+        <Text style={styles.noDataText}>{t["no deals available"]}</Text>
       </View>
     );
   }

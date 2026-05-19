@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from '@/components/Toast';
 import { useToastStore } from '@/stores/toastStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/lib/supabase';
 
@@ -34,6 +35,8 @@ export default function PaymentScreen() {
   }>();
   const showToast = useToastStore((state) => state.showToast);
   const insets = useSafeAreaInsets();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [serviceFee, setServiceFee] = useState<number>(0);
   const [loadingFee, setLoadingFee] = useState(true);
 
@@ -92,38 +95,38 @@ export default function PaymentScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payment</Text>
+        <Text style={styles.headerTitle}>{t.payment}</Text>
         {/* Placeholder for right icon to balance layout */}
         <View style={styles.headerRightPlaceholder} />
       </View>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={false} // No translation needed for icon
       >
         <View style={styles.detailsContainer}>
-          <Text style={styles.sectionTitle}>Booking Details</Text>
+          <Text style={styles.sectionTitle}>{t["booking details"]}</Text>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Doctor</Text>
+            <Text style={styles.detailLabel}>{t.doctor}</Text>
             <Text style={styles.detailValue}>{doctorName}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date</Text>
+            <Text style={styles.detailLabel}>{t.date}</Text>
             <Text style={styles.detailValue}>{date}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Time</Text>
+            <Text style={styles.detailLabel}>{t.time}</Text>
             <Text style={styles.detailValue}>{time}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Type</Text>
-            <Text style={styles.detailValue}>{type === 'online' ? 'Online' : 'In-Office'}</Text>
+            <Text style={styles.detailLabel}>{t.type}</Text>
+            <Text style={styles.detailValue}>{type === 'online' ? t.online : t["in-office"]}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Consultation Fee(To be Fixed by Doctors)</Text>
+          <View style={styles.detailRow}> {/* No translation needed for icon */}
+            <Text style={styles.detailLabel}>{t["consultation fee"]}</Text>
             <Text style={styles.detailValue}>BIF {parsedConsultationFee.toLocaleString()}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Doctor Service Fee</Text>
+          <View style={styles.detailRow}> {/* No translation needed for icon */}
+            <Text style={styles.detailLabel}>{t["doctor service fee"]}</Text>
             {loadingFee ? (
               <SkeletonPulse>
                 <View style={[styles.skeletonLine, { width: 80, height: 16 }]} />
@@ -133,29 +136,29 @@ export default function PaymentScreen() {
             )}
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalLabel}>{t["total amount"]}</Text>
             <Text style={styles.totalValue}>BIF {totalAmount.toLocaleString()}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <Text style={styles.sectionTitle}>{t["payment method"]}</Text>
           <View style={styles.buttonsContainer}>
             <Pressable
               style={({ pressed }) => [
                 styles.button,
                 pressed && styles.pressedButton,
               ]}
-              onPress={() => handlePayment('Gahungu Wallet')}
+              onPress={() => handlePayment('Gahungu Wallet')} // No translation needed for icon
             >
-              <Text style={styles.buttonText}>Pay with Gahungu Wallet</Text>
+              <Text style={styles.buttonText}>{t["pay with gahungu wallet"]}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [
                 styles.button,
                 pressed && styles.pressedButton,
               ]}
-              onPress={() => handlePayment('Gahungu Card')}
+              onPress={() => handlePayment('Gahungu Card')} // No translation needed for icon
             >
-              <Text style={styles.buttonText}>Pay with Gahungu Card</Text>
+              <Text style={styles.buttonText}>{t["pay with gahungu card"]}</Text>
             </Pressable>
           </View>
         </View>

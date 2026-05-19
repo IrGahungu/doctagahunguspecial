@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFrameworkReady } from "@/hooks/useFrameworkReady";
 import { useFonts } from "expo-font";
@@ -9,12 +9,18 @@ import {
   Roboto_700Bold_Italic,
 } from "@expo-google-fonts/roboto";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
+import { useEffect } from "react";
 import Toast from "react-native-toast-message";
+import * as SecureStore from "expo-secure-store";
+import { useLanguageStore } from "@/stores/languageStore";
 
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function RootLayout() {
   useFrameworkReady();
+  const segments = useSegments();
+  const router = useRouter();
+  const loadLanguage = useLanguageStore(state => state.loadLanguage);
 
   const [fontsLoaded] = useFonts({
     "Roboto-Regular": Roboto_400Regular,
@@ -24,6 +30,36 @@ export default function RootLayout() {
     "Roboto-Italic": Roboto_400Regular,
     "Roboto-Medium-Italic": Roboto_500Medium,
   });
+
+  useEffect(() => {
+    loadLanguage();
+  }, []);
+
+  useEffect(() => {
+    const checkAccessFee = async () => {
+      const token = await SecureStore.getItemAsync('token');
+      const userId = await SecureStore.getItemAsync('userId');
+      
+      // Only perform check if user is logged in
+      if (!token || !userId) return;
+
+      // 🛑 Avoid redirect loop: check if we are already in auth or payment screens
+      const inAuthGroup = segments[0] === 'auth' || segments[0] === 'login-payment-fee';
+      if (inAuthGroup) return;
+
+      const lastPayment = await SecureStore.getItemAsync(`last_login_payment_${userId}`);
+      const now = Date.now();
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+
+      if (!lastPayment || (now - parseInt(lastPayment, 10)) > twentyFourHours) {
+        router.replace('/login-payment-fee');
+      }
+    };
+
+    if (fontsLoaded) {
+      checkAccessFee();
+    }
+  }, [segments, fontsLoaded]);
 
   if (!fontsLoaded) {
     return (

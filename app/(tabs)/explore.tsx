@@ -6,6 +6,7 @@ import { Video, ResizeMode } from 'expo-av';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { API_BASE_URL } from '@/config';
 import { supabase } from '@/lib/supabase';
 
@@ -70,6 +71,8 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
   onLike: () => void,
   onNextImage: (index: number) => void 
 }) => {
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [lastTap, setLastTap] = useState<number | null>(null);
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [likes, setLikes] = useState(item.likes);
@@ -202,10 +205,10 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
       <View style={styles.postHeader}>
         <View style={styles.postHeaderLeft}>
           <Image source={{ uri: item.avatar }} style={styles.postAvatar} />
-          <Text style={styles.postUsername}>{item.title}</Text>
+          <Text style={styles.postUsername}>{item.title}</Text> {/* No translation needed for icon */}
         </View>
-        {!!item.tag && <Text style={styles.postTag}>{item.tag}</Text>}
-      </View>
+        {!!item.tag && <Text style={styles.postTag}>{item.tag}</Text>} {/* No translation needed for icon */}
+      </View> {/* No translation needed for icon */}
 
       <View style={styles.postDescriptionContainer}>
         <Text style={styles.captionText}>{item.caption}</Text>
@@ -213,27 +216,27 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
 
       <View style={styles.postLinksContainer}>
         {item.website && item.show_website !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.website, "their website")}>
-            <Globe size={14} color="#4CAF50" />
-            <Text style={styles.postLinkText}>Link to the website</Text>
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.website, "their website")}> {/* No translation needed for icon */}
+            <Globe size={14} color="#4CAF50" /> {/* No translation needed for icon */}
+            <Text style={styles.postLinkText}>{t["link to website"]}</Text>
           </TouchableOpacity>
         )}
         {item.whatsapp && item.show_whatsapp !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(`whatsapp://send?phone=${item.whatsapp}`, "WhatsApp")}>
-            <MessageCircle size={14} color="#25D366" />
-            <Text style={styles.postLinkText}>Click here to Whatsapp</Text>
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(`whatsapp://send?phone=${item.whatsapp}`, "WhatsApp")}> {/* No translation needed for icon */}
+            <MessageCircle size={14} color="#25D366" /> {/* No translation needed for icon */}
+            <Text style={styles.postLinkText}>{t["click to whatsapp"]}</Text>
           </TouchableOpacity>
         )}
         {item.instagram && item.show_instagram !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.instagram, "Instagram")}>
-            <Instagram size={14} color="#E1306C" />
-            <Text style={styles.postLinkText}>Follow them on Instagram</Text>
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.instagram, "Instagram")}> {/* No translation needed for icon */}
+            <Instagram size={14} color="#E1306C" /> {/* No translation needed for icon */}
+            <Text style={styles.postLinkText}>{t["follow on instagram"]}</Text>
           </TouchableOpacity>
         )}
         {item.twitter && item.show_twitter !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.twitter, "X")}>
-            <Twitter size={14} color="#000" />
-            <Text style={styles.postLinkText}>Follow them on X</Text>
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.twitter, "X")}> {/* No translation needed for icon */}
+            <Twitter size={14} color="#000" /> {/* No translation needed for icon */}
+            <Text style={styles.postLinkText}>{t["follow on x"]}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -252,8 +255,8 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
             />
           ) : (
             <Image source={{ uri: item.images[currentImageIndex] }} style={styles.postImage} resizeMode="cover" />
-          )}
-          
+          )} {/* No translation needed for icon */}
+
           {item.images.length > 1 ? (
             <>
               <TouchableOpacity style={styles.nextImageButton} onPress={handleNextImage}>
@@ -268,8 +271,8 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
                 ))}
               </View>
             </>
-          ) : null}
-          
+          ) : null} {/* No translation needed for icon */}
+
           {/* Multi-heart burst animation */}
           <View style={styles.heartOverlay}>
             {heartAnimations.map((anim, i) => {
@@ -294,16 +297,16 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
 
       <View style={styles.postActions}>
         <View style={styles.postActionsLeft}>
-          <TouchableOpacity style={styles.actionIcon} onPress={toggleLike}>
-            <Heart size={24} color={isLiked ? "#E1306C" : "#333"} fill={isLiked ? "#E1306C" : "transparent"} />
+          <TouchableOpacity style={styles.actionIcon} onPress={toggleLike}> {/* No translation needed for icon */}
+            <Heart size={24} color={isLiked ? "#E1306C" : "#333"} fill={isLiked ? "#E1306C" : "transparent"} /> {/* No translation needed for icon */}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIcon} onPress={handleShare}>
-            <Send size={24} color="#333" />
+          <TouchableOpacity style={styles.actionIcon} onPress={handleShare}> {/* No translation needed for icon */}
+            <Send size={24} color="#333" /> {/* No translation needed for icon */}
           </TouchableOpacity>
         </View>
-        <TouchableOpacity>
-          <Bookmark size={24} color="#333" />
-        </TouchableOpacity>
+        <TouchableOpacity> {/* No translation needed for icon */}
+          <Bookmark size={24} color="#333" /> {/* No translation needed for icon */}
+        </TouchableOpacity> {/* No translation needed for icon */}
       </View>
 
       <View style={styles.postFooter}>
@@ -353,6 +356,8 @@ export default function ExploreScreen() {
   const pulseScale = useRef(new Animated.Value(1)).current;
   const rewardAnim = useRef(new Animated.Value(0)).current;
   const rewardPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const walletGraffitiAnimations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
 
   // Effect to load/save daily stats and reset if new day
@@ -797,7 +802,7 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Explore</Text>
+        <Text style={styles.headerTitle}>{t.explore}</Text>
         <TouchableOpacity 
           style={styles.walletContainer} 
           onPress={() => router.push({
@@ -953,8 +958,8 @@ export default function ExploreScreen() {
                   <ActivityIndicator size="large" color="#fff" />
                 </View>
               )}
-              <Animated.View 
-                style={[
+              <Animated.View // No translation needed for icon
+                style={[ // No translation needed for icon
                   styles.graffitiEffect, 
                   { 
                     transform: [{ scale: graffitiScale }], 
@@ -963,8 +968,8 @@ export default function ExploreScreen() {
                 ]} 
               />
               {!!selectedStory.tag && selectedStory.show_tag !== false && (
-                <Text style={styles.storyTag}>{selectedStory.tag.toUpperCase()}</Text>
-              )}
+                <Text style={styles.storyTag}>{selectedStory.tag.toUpperCase()}</Text> 
+              )} 
               <Text style={styles.imageCounter}>
                 {currentImageIndex + 1} / {selectedStory.images.length}
               </Text>

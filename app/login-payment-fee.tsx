@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore';
+import { translations, useLanguageStore } from '@/stores/languageStore';
 
 const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
@@ -83,18 +84,22 @@ export default function LoginPaymentFeeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [fee, setFee] = useState<number>(1000);
   const [isDefaultPin, setIsDefaultPin] = useState<boolean>(false);
+  const [hasError, setHasError] = useState(false);
   
   // New states for privacy and PIN
   const [isBalanceVisible, setIsBalanceVisible] = useState(false);
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinPurpose, setPinPurpose] = useState<'reveal' | 'pay' | null>(null);
   const [pin, setPin] = useState('');
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [supportModalVisible, setSupportModalVisible] = useState(false);
 
   const currency = currencyMap[country] || 'USD';
 
   const fetchData = useCallback(async () => {
     try {
+      setHasError(false);
       const token = await SecureStore.getItemAsync('token');
       const storedCountry = await SecureStore.getItemAsync('user_country');
       if (storedCountry) setCountry(storedCountry);
@@ -115,21 +120,60 @@ export default function LoginPaymentFeeScreen() {
         
         if (!feeError && feeData) {
           setFee(Number(feeData.fee));
+          await SecureStore.setItemAsync('cached_access_fee', feeData.fee.toString());
         }
       }
 
       const res = await fetch(`${API_BASE_URL}/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
 
       if (res.ok) {
+        const data = await res.json();
         setWalletBalance(Number(data.wallet_balance));
         setUserId(data.id);
         setIsDefaultPin(data.is_default_pin);
+
+        // ✅ Check if the access fee was already paid within the last 24 hours
+        const lastPayment = await SecureStore.getItemAsync(`last_login_payment_${data.id}`);
+        if (lastPayment) {
+          const timeElapsed = Date.now() - parseInt(lastPayment, 10);
+          const twentyFourHours = 24 * 60 * 60 * 1000;
+          if (timeElapsed < twentyFourHours) {
+            router.replace('/(tabs)');
+            return;
+          }
+        }
+
+        // Cache for offline/bad network use
+        await SecureStore.setItemAsync(`cached_balance_${data.id}`, data.wallet_balance.toString());
+        await SecureStore.setItemAsync('userId', data.id);
+      } else {
+        throw new Error("Failed to fetch profile");
       }
     } catch (err) {
       console.error('Error fetching data:', err);
+      setHasError(true);
+      // Try to load cached data for bad network
+      const cachedFee = await SecureStore.getItemAsync('cached_access_fee');
+      if (cachedFee) setFee(Number(cachedFee));
+      
+      const storedUserId = await SecureStore.getItemAsync('userId');
+      if (storedUserId) {
+        setUserId(storedUserId);
+        const cachedBal = await SecureStore.getItemAsync(`cached_balance_${storedUserId}`);
+        if (cachedBal) setWalletBalance(Number(cachedBal));
+
+        // ✅ Check payment validity when network is unavailable
+        const lastPayment = await SecureStore.getItemAsync(`last_login_payment_${storedUserId}`);
+        if (lastPayment) {
+          const timeElapsed = Date.now() - parseInt(lastPayment, 10);
+          if (timeElapsed < 24 * 60 * 60 * 1000) {
+            router.replace('/(tabs)');
+            return;
+          }
+        }
+      }
     } finally {
       setFetchingData(false);
     }
@@ -171,7 +215,11 @@ export default function LoginPaymentFeeScreen() {
 
   const handlePinSubmit = async () => {
     if (pin.length !== 4) {
-      Alert.alert('Error', 'Please enter a 4-digit PIN');
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter a 4-digit PIN',
+      });
       return;
     }
     
@@ -197,26 +245,57 @@ export default function LoginPaymentFeeScreen() {
           await executePayment();
         }
       } else {
-        const data = await res.json();
-        Alert.alert('Error', data.error || 'Incorrect PIN');
-        setPin('');
+        try {
+          const data = await res.json();
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: data.error || 'Incorrect PIN',
+          });
+          setPin('');
+        } catch (e) {
+          // Network issue during verify - trust user for payment entry
+          if (pinPurpose === 'pay') {
+            setPinModalVisible(false);
+            await executePayment();
+          } else {
+            Toast.show({
+              type: 'info',
+              text1: 'Connection Weak',
+              text2: 'Cannot verify PIN right now.',
+            });
+            setPin('');
+          }
+        }
       }
     } catch (err) {
-      Alert.alert('Error', 'Connection failed');
+      if (pinPurpose === 'pay') {
+        setPinModalVisible(false);
+        await executePayment();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Connection failed',
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const executePayment = async () => {
+    const newLocalBalance = walletBalance - fee;
     if (walletBalance < fee) {
-      Alert.alert(
-        'Insufficient Balance',
-        `You need ${fee} ${currency} to enter. Your current balance is ${walletBalance} ${currency}. Please contact support to top up.`
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Insufficient Balance',
+        text2: `You need ${fee} ${currency} to enter.`,
+      });
       return;
     }
 
+    setLoading(true);
     try {
       const token = await SecureStore.getItemAsync('token');
       const res = await fetch(`${API_BASE_URL}/wallet/deduct`, {
@@ -231,16 +310,14 @@ export default function LoginPaymentFeeScreen() {
         }),
       });
 
-      const data = await res.json();
-
       if (res.ok) {
-        /*
         // Store payment timestamp for 24-hour validity
         if (userId) {
           await SecureStore.setItemAsync(`last_login_payment_${userId}`, Date.now().toString());
+          await SecureStore.setItemAsync(`cached_balance_${userId}`, newLocalBalance.toString());
         }
-        */
 
+        setWalletBalance(newLocalBalance);
         Toast.show({
           type: 'success',
           text1: 'Payment Successful',
@@ -248,11 +325,21 @@ export default function LoginPaymentFeeScreen() {
         });
         router.replace('/(tabs)');
       } else {
-        Alert.alert('Payment Failed', data.error || 'Something went wrong');
+        const data = await res.json();
+        Toast.show({
+          type: 'error',
+          text1: 'Payment Failed',
+          text2: data.error || 'Something went wrong',
+        });
       }
     } catch (err) {
-      Alert.alert('Error', 'Could not connect to server');
+      Toast.show({
+        type: 'error',
+        text1: 'Internet Required',
+        text2: 'Please connect to the internet to validate access.',
+      });
     } finally {
+      setLoading(false);
       setPin('');
       setPinPurpose(null);
     }
@@ -278,10 +365,11 @@ export default function LoginPaymentFeeScreen() {
     }
 
     if (walletBalance < fee) {
-      Alert.alert(
-        'Insufficient Balance',
-        `You need ${fee} ${currency} to enter. Your current balance is ${walletBalance} ${currency}. Please contact support to top up.`
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Insufficient Balance',
+        text2: `You need ${fee} ${currency} to enter.`,
+      });
       return;
     }
     setPinPurpose('pay');
@@ -325,10 +413,10 @@ export default function LoginPaymentFeeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <ShieldCheck size={48} color="#4CAF50" />
-        <Text style={styles.title}>Secure Access Fee</Text>
+        <ShieldCheck size={48} color="#4CAF50" /> {/* No translation needed for icon */}
+        <Text style={styles.title}>{t["secure access fee"]}</Text>
         <Text style={styles.subtitle}>
-          To ensure the best service, a small login access fee is required to continue.
+          {t["access fee message"]}
         </Text>
       </View>
 
@@ -342,8 +430,8 @@ export default function LoginPaymentFeeScreen() {
 
         <View style={styles.walletInfo}>
           <View style={styles.walletRow}>
-            <View style={styles.walletHeader}>
-              <Wallet size={20} color="#212121" />
+            <View style={styles.walletHeader}> {/* No translation needed for icon */}
+              <Wallet size={20} color="#212121" /> {/* No translation needed for icon */}
               <Text style={styles.walletTitle}>Gahungu Wallet</Text>
             </View>
             
@@ -358,6 +446,7 @@ export default function LoginPaymentFeeScreen() {
               }}
               style={styles.eyeButton}
             >
+              {/* No translation needed for icon */}
               {isBalanceVisible ? <EyeOff size={20} color="#4CAF50" /> : <Eye size={20} color="#757575" />}
             </TouchableOpacity>
           </View>
@@ -374,8 +463,8 @@ export default function LoginPaymentFeeScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoText}>
             {isDefaultPin 
-              ? 'Notice: Your default wallet PIN is 1616. Please change it to continue.'
-              : 'This fee supports the maintenance of Dr. Gahungu\'s pharmacy network and 24/7 availability.'}
+              ? t["default pin notice"]
+              : t["fee support message"]}
           </Text>
         </View>
       </View>
@@ -396,7 +485,7 @@ export default function LoginPaymentFeeScreen() {
           <ActivityIndicator color="#fff" />
         ) : (
           <>
-            <Text style={styles.payButtonText}>{isDefaultPin ? 'Change PIN to Continue' : 'Pay & Enter App'}</Text>
+            <Text style={styles.payButtonText}>{isDefaultPin ? t["change pin to continue"] : t["pay and enter app"]}</Text>
             <ArrowRight size={20} color="#fff" />
           </>
         )}
@@ -407,16 +496,16 @@ export default function LoginPaymentFeeScreen() {
         onPress={handleLogout}
       >
         <LogOut size={20} color="#d32f2f" />
-        <Text style={styles.logoutText}>Logout</Text>
+        <Text style={styles.logoutText}>{t.logout}</Text>
       </TouchableOpacity>
 
-      {walletBalance < fee && (
-        <TouchableOpacity 
-          style={styles.addMoneyButton} 
-          onPress={() => Toast.show({ type: 'info', text1: 'Redirecting...', text2: 'Please use the main wallet to add funds.' })}
+      {hasError && (
+        <TouchableOpacity
+          style={styles.retryButton} 
+          onPress={() => { setFetchingData(true); fetchData(); }}
         >
-          <PlusCircle size={20} color="#2196F3" />
-          <Text style={styles.addMoneyText}>Add Money to Wallet</Text>
+          <PlusCircle size={20} color="#F44336" />
+          <Text style={styles.retryText}>Retry Connection</Text>
         </TouchableOpacity>
       )}
 
@@ -431,9 +520,9 @@ export default function LoginPaymentFeeScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.modalContent}
           >
-            <Text style={styles.modalTitle}>Wallet Security</Text>
+            <Text style={styles.modalTitle}>{t["wallet security"]}</Text>
             <Text style={styles.modalSubtitle}>
-              {pinPurpose === 'pay' ? 'Enter PIN to authorize payment' : 'Enter PIN to show balance'}
+              {pinPurpose === 'pay' ? t["enter pin to pay"] : t["enter pin to show balance"]}
             </Text>
             
             <TextInput
@@ -449,15 +538,15 @@ export default function LoginPaymentFeeScreen() {
             />
 
             <TouchableOpacity 
-              onPress={() => { setPinModalVisible(false); setSupportModalVisible(true); }} 
+              onPress={() => { setPinModalVisible(false); setSupportModalVisible(true); }}
               style={styles.forgotPinContainer}
             >
-              <Text style={styles.forgotPinText}>Forgot PIN?</Text>
+              <Text style={styles.forgotPinText}>{t["forgot pin"]}</Text>
             </TouchableOpacity>
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={handleCloseModal}>
-                <Text>Cancel</Text>
+                <Text>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalVerify} onPress={handlePinSubmit} disabled={loading}>
                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalVerifyText}>Verify</Text>}
@@ -475,17 +564,17 @@ export default function LoginPaymentFeeScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Contact Admin</Text>
+            <Text style={styles.modalTitle}>{t["contact admin"]}</Text>
             <Text style={styles.modalSubtitle}>
-              Would you like to open WhatsApp to contact the admin at +25777990118?
+              {t["contact admin whatsapp"]}
             </Text>
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setSupportModalVisible(false)}>
-                <Text>No</Text>
+                <Text>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalVerify} onPress={() => { handleWhatsAppContact(); setSupportModalVisible(false); }}>
-                <Text style={styles.modalVerifyText}>Yes</Text>
+                <Text style={styles.modalVerifyText}>{t.verify}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -538,14 +627,14 @@ const styles = StyleSheet.create({
   },
   disabledButton: { backgroundColor: '#A5D6A7' },
   payButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  addMoneyButton: {
+  retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 20,
     gap: 8,
   },
-  addMoneyText: { color: '#2196F3', fontSize: 16, fontWeight: '600' },
+  retryText: { color: '#F44336', fontSize: 16, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 25 },
   modalContent: { backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%', alignItems: 'center' },
   modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 8 },

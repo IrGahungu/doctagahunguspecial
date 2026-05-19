@@ -14,7 +14,7 @@ import FeaturedInsurances from '@/components/FeaturedInsurances';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-
+import { useLanguageStore, translations } from '@/stores/languageStore';
 //
 // =======================
 // TYPES
@@ -100,6 +100,8 @@ export default function MainScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [contentKey, setContentKey] = useState(0);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   //
   // Fetch selected country
@@ -149,14 +151,14 @@ const onRefresh = useCallback(() => {
 //
 const renderMainContent = () => (
   <View key={contentKey}>
-    <Carousel baseUrl={BANNER_URL_PREFIX} />
-    <CategorySlider/>
-    <DealSection title="Deals of the Day" baseUrl={DEAL_URL_PREFIX} />
-    <ProductGrid title="Recommended for You" baseUrl={MEDICINE_URL_PREFIX} />
-    <FeaturedPharmacies title="Featured Pharmacies" baseUrl={PHARMACY_URL_PREFIX} />
-    <FeaturedHospitals baseUrl={HOSPITAL_URL_PREFIX} />
-    <FeaturedDoctors title="Featured Doctors" baseUrl={DOCTOR_URL_PREFIX} />
-    <FeaturedInsurances baseUrl={INSURANCE_URL_PREFIX} />
+    <Carousel baseUrl={BANNER_URL_PREFIX} /> {/* No title prop */}
+    <CategorySlider/> {/* No title prop */}
+    <DealSection title={t["deals of the day"]} baseUrl={DEAL_URL_PREFIX} />
+    <ProductGrid title={t["recommended for you"]} baseUrl={MEDICINE_URL_PREFIX} />
+    <FeaturedPharmacies title={t["featured pharmacies"]} baseUrl={PHARMACY_URL_PREFIX} />
+    <FeaturedHospitals title={t["featured hospitals"]} baseUrl={HOSPITAL_URL_PREFIX} />
+    <FeaturedDoctors title={t["featured doctors"]} baseUrl={DOCTOR_URL_PREFIX} />
+    <FeaturedInsurances title={t["featured insurances"]} baseUrl={INSURANCE_URL_PREFIX} /> {/* Title is inside component */}
     <View style={{ height: 20 }} />
   </View>
 );
@@ -175,8 +177,8 @@ return (
         onPress={() => router.push('/search')}
       >
         <View style={styles.searchBar}>
-          <Icon name="search" size={20} color="#2874F0" />
-          <Text style={styles.searchPlaceholder}>Ronderera hano na Gahungu Search...</Text>
+          <Icon name="search" size={20} color="#2874F0" /> {/* No translation needed for icon */}
+          <Text style={styles.searchPlaceholder}>{t.searchPlaceholderText}</Text>
         </View>
       </TouchableOpacity>
 

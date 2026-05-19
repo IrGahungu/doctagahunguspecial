@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import * as Progress from 'react-native-progress'; // Need to install this: `npx expo install react-native-progress`
 import { API_BASE_URL } from "@/config";
 import { supabase } from "@/lib/supabase";
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { useAuthStore } from "@/stores/authStore";
 
 const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
@@ -51,6 +52,8 @@ export default function WalletDetailsScreen() {
   const [displayProgress, setDisplayProgress] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const progressPercentage = Math.min(engagementPoints / monetizationGoal, 1);
   const pointsToReachGoal = monetizationGoal - engagementPoints;
@@ -144,7 +147,7 @@ export default function WalletDetailsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Engagement Points</Text>
+        <Text style={styles.headerTitle}>{t["my engagement points"]}</Text>
         {/* Placeholder for alignment */}
         <View style={{ width: 40 }} />
       </View>
@@ -153,8 +156,8 @@ export default function WalletDetailsScreen() {
         {loading ? (
           <WalletSkeleton />
         ) : (
-          <>
-            <View style={styles.monetizationGoalCard}>
+          <> {/* No translation needed for icon */}
+            <View style={styles.monetizationGoalCard}> {/* No translation needed for icon */}
               <Text style={styles.progressTitle}>Monetization Goal</Text>
               <Text style={styles.summaryItem}>Threshold: {monetizationGoal.toLocaleString()} EP</Text>
             </View>
@@ -172,22 +175,22 @@ export default function WalletDetailsScreen() {
             animationType="timing"
           />
           <Text style={styles.progressText}>
-            {engagementPoints.toLocaleString()} / {monetizationGoal.toLocaleString()} EP
+            {engagementPoints.toLocaleString()} / {monetizationGoal.toLocaleString()} {t.ep}
           </Text>
           <Text style={styles.motivationText}>
             {pointsToReachGoal > 0
-              ? `Just ${pointsToReachGoal.toLocaleString()} EP to reach your goal! Keep it up! 💪`
-              : `Congratulations! You've reached your monetization goal! 🎉`}
+              ? `Just ${pointsToReachGoal.toLocaleString()} ${t["points to reach goal"]}`
+              : t["goal reached"]}
           </Text>
           <Text style={styles.monetizationInfo}>
-            Note: After reaching {monetizationGoal.toLocaleString()} EP, you will be able to turn your points into money and withdraw it.
+            Note: After reaching {monetizationGoal.toLocaleString()} {t.ep}, you will be able to turn your points into money and withdraw it.
           </Text>
         </View>
           </>
         )}
 
         {/* Daily Summary Card */}
-        <View style={styles.summaryCard}>
+        <View style={styles.summaryCard}> {/* No translation needed for icon */}
           <Text style={styles.summaryCardTitle}>Daily Summary</Text>
           <Text style={styles.summaryItem}>• Posts Liked Today: {postsLikedToday}</Text>
           <Text style={styles.summaryItem}>• Stories Viewed Today: {storiesViewedToday}</Text>

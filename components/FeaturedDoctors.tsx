@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 type Doctor = {
   id: string;
@@ -74,6 +75,8 @@ const SkeletonCard = () => {
 const DoctorItem = ({ doctor, baseUrl }: { doctor: Doctor; baseUrl: string }) => {
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   return (
     <Pressable
@@ -110,7 +113,7 @@ const DoctorItem = ({ doctor, baseUrl }: { doctor: Doctor; baseUrl: string }) =>
         <Text style={styles.name}>{doctor.name}</Text>
         {doctor.specialty && <Text style={styles.specialty}>{doctor.specialty}</Text>}
         <View style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>See Details</Text>
+          <Text style={styles.detailsButtonText}>{t["see details"]}</Text>
         </View>
       </View>
     </Pressable>
@@ -121,6 +124,8 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -171,7 +176,7 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
     return (
       <View style={styles.section}>
         <View style={styles.header}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>{title}</Text> {/* Title is a prop, already translated */}
         </View>
         <View style={styles.row}>
           <SkeletonCard />
@@ -184,15 +189,15 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
   if (!loading && doctors.length === 0) {
     return (
       <View style={styles.section}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.noDataText}>No Doctors available, Coming soon</Text>
+        <Text style={styles.title}>{title}</Text> {/* Title is a prop, already translated */}
+        <Text style={styles.noDataText}>{t["no doctors available"]}</Text>
       </View>
     );
   }
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.title}>{title}</Text> {/* Title is a prop, already translated */}
         {onViewAll && (
           <Pressable onPress={onViewAll}>
             <Text style={styles.viewAll}>View All</Text>

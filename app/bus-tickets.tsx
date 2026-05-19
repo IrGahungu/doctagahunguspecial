@@ -9,6 +9,7 @@ import { API_BASE_URL } from '@/config';
 import QRCode from 'react-native-qrcode-svg';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 type BusTicket = {
@@ -76,6 +77,8 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
   const viewRef = useRef<View>(null);
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
   const isConfirmed = item.status === 'confirmed';
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const handleDownload = async () => {
     try {
@@ -109,10 +112,10 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
       )}
       <View style={styles.cardHeader}>
         <View style={styles.companyInfo}>
-          <Bus size={20} color="#4CAF50" />
+          <Bus size={20} color="#4CAF50" /> {/* No translation needed for icon */}
           <Text style={styles.companyName}>{item.buses.company}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}> {/* No translation needed for icon */}
           {isConfirmed && (
             <TouchableOpacity onPress={handleDownload} style={styles.downloadButton}>
               <Download size={16} color="#4CAF50" />
@@ -133,13 +136,13 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
       <View style={styles.routeContainer}>
         <View style={styles.routePoint}>
           <Text style={styles.routeLabel}>Origin</Text>
-          <Text style={styles.routeCity}>{item.buses.origin}</Text>
+          <Text style={styles.routeCity}>{t.origin}</Text>
         </View>
         
         <View style={styles.routeDivider}>
           <View style={styles.dot} />
           <View style={styles.line} />
-          <MapPin size={16} color="#F44336" />
+          <MapPin size={16} color="#F44336" /> {/* No translation needed for icon */}
         </View>
 
         <View style={[styles.routePoint, { alignItems: 'flex-end' }]}>
@@ -151,15 +154,15 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
       <View style={styles.infoRow}>
         <View style={styles.infoItem}>
           <Calendar size={14} color="#757575" />
-          <Text style={styles.infoValue}>{new Date(item.travel_date).toLocaleDateString()}</Text>
+          <Text style={styles.infoValue}>{t.date}</Text>
         </View>
         <View style={styles.infoItem}>
           <Clock size={14} color="#757575" />
-          <Text style={styles.infoValue}>{item.buses.departure_time}</Text>
+          <Text style={styles.infoValue}>{t.time}</Text>
         </View>
         <View style={styles.infoItem}>
           <TicketIcon size={14} color="#4CAF50" />
-          <View>
+          <View> {/* No translation needed for icon */}
             <Text style={styles.seatValue}>Seat {item.seat_number}</Text>
             {isConfirmed && item.ticket_number && (
               <Text style={styles.ticketIdSmall}>ID: {item.ticket_number}</Text>
@@ -183,8 +186,8 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
             />
           </View>
           <View style={styles.qrInfo}>
-            <Text style={styles.qrText}>Scan at boarding</Text>
-            <Text style={styles.busType}>{item.buses.bus_type} Service</Text>
+            <Text style={styles.qrText}>{t["scan at boarding"]}</Text>
+            <Text style={styles.busType}>{item.buses.bus_type} {t.service}</Text>
           </View>
         </View>
       )}
@@ -200,6 +203,8 @@ export default function BusTicketsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [newTicketIds, setNewTicketIds] = useState<Set<string>>(new Set());
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const fetchTickets = useCallback(async () => {
     setLoading(true);
@@ -304,21 +309,21 @@ export default function BusTicketsScreen() {
         <TouchableOpacity onPress={() => router.push('/(tabs)/account' as any)} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Bus Tickets</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>{t["my bus tickets"]}</Text>
+        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
       </View>
 
       {loading ? (
         <BusTicketSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load bus tickets. Please check your connection.</Text>
+          <Text style={styles.errorText}>{t["failed to load bus tickets"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchTickets}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
+        <FlatList // No translation needed for icon
           data={tickets}
           renderItem={({ item }) => <TicketItem item={item} isNew={newTicketIds.has(item.id)} />}
           keyExtractor={(item) => item.id}
@@ -328,13 +333,13 @@ export default function BusTicketsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Bus size={64} color="#ccc" />
-              <Text style={styles.emptyText}>You don't have any tickets yet.</Text>
+              <Bus size={64} color="#ccc" /> {/* No translation needed for icon */}
+              <Text style={styles.emptyText}>{t["no tickets yet"]}</Text>
               <TouchableOpacity 
                 style={styles.bookButton}
                 onPress={() => router.push('/bus-booking')}
               >
-                <Text style={styles.bookButtonText}>Book a JK BUS</Text>
+                <Text style={styles.bookButtonText}>{t["book a jk bus"]}</Text>
               </TouchableOpacity>
             </View>
           }

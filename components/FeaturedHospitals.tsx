@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 // Local type for data fetched from Supabase
 type FeaturedHospital = {
@@ -68,6 +69,8 @@ const SkeletonCard = () => {
 const HospitalItem = ({ item, baseUrl }: { item: FeaturedHospital; baseUrl: string }) => {
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   return (
     <Pressable
@@ -103,7 +106,7 @@ const HospitalItem = ({ item, baseUrl }: { item: FeaturedHospital; baseUrl: stri
       <View style={styles.details}>
         <Text style={styles.title} numberOfLines={1}>{item.name}</Text>
         <View style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>See Details</Text>
+          <Text style={styles.detailsButtonText}>{t["see details"]}</Text>
         </View>
       </View>
     </Pressable>
@@ -111,13 +114,16 @@ const HospitalItem = ({ item, baseUrl }: { item: FeaturedHospital; baseUrl: stri
 };
 
 interface Props {
+  title: string;
   baseUrl?: string;
 }
 
-export default function FeaturedHospitals({ baseUrl = "" }: Props) {
+export default function FeaturedHospitals({ title, baseUrl = "" }: Props) {
   const [hospitals, setHospitals] = useState<FeaturedHospital[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -173,7 +179,7 @@ export default function FeaturedHospitals({ baseUrl = "" }: Props) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.header}>Featured Hospitals</Text>
+        <Text style={styles.header}>{title}</Text>
         <View style={styles.list}>
           <SkeletonCard />
           <SkeletonCard />
@@ -185,15 +191,15 @@ export default function FeaturedHospitals({ baseUrl = "" }: Props) {
   if (!loading && hospitals.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.header}>Featured Hospitals</Text>
-        <Text style={styles.noDataText}>No Hospitals available, Coming soon</Text>
+        <Text style={styles.header}>{title}</Text>
+        <Text style={styles.noDataText}>{t["no hospitals available"]}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Featured Hospitals</Text>
+      <Text style={styles.header}>{title}</Text>
       <FlatList
         data={hospitals}
         renderItem={renderItem}

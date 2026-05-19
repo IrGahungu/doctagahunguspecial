@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, Bus, Calendar as CalendarIcon, MapPin } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '@/lib/supabase';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
@@ -57,6 +58,8 @@ export default function BusResultsScreen() {
   const [loading, setLoading] = useState(true);
   const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchBuses = async () => {
@@ -127,19 +130,19 @@ export default function BusResultsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
+        <View style={styles.headerTitleContainer}> {/* No translation needed for icon */}
           <Text style={styles.headerTitle}>{from} to {to}</Text>
           <Text style={styles.headerSubtitle}>{formattedDate}</Text>
         </View>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
       </View>
 
       {loading || (error && results.length === 0) ? (
         <BusResultsSkeleton />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.resultsCount}>{results.length} Buses Available</Text>
-          
+          <Text style={styles.resultsCount}>{results.length} {t["buses available"]}</Text>
+
           {results.length > 0 ? (
             results.map((bus) => (
               <View key={bus.id} style={styles.busCard}>
@@ -159,12 +162,12 @@ export default function BusResultsScreen() {
                   </View>
                   <View style={styles.stationColumn}>
                     <View style={styles.stationRow}>
-                      <MapPin size={16} color="#4CAF50" />
-                      <Text style={styles.stationText}>{bus.origin} Main Terminal</Text>
+                      <MapPin size={16} color="#4CAF50" /> {/* No translation needed for icon */}
+                      <Text style={styles.stationText}>{bus.origin} {t["main terminal"]}</Text>
                     </View>
                     <View style={styles.stationRow}>
-                      <MapPin size={16} color="#F44336" />
-                      <Text style={styles.stationText}>{bus.destination} Central Station</Text>
+                      <MapPin size={16} color="#F44336" /> {/* No translation needed for icon */}
+                      <Text style={styles.stationText}>{bus.destination} {t["central station"]}</Text>
                     </View>
                   </View>
                 </View>
@@ -172,17 +175,17 @@ export default function BusResultsScreen() {
                 <TouchableOpacity 
                   style={styles.bookButton}
                   onPress={() => handleOpenSeatMap(bus)}
-                >
-                  <Text style={styles.bookButtonText}>Select Seat</Text>
+                > {/* No translation needed for icon */}
+                  <Text style={styles.bookButtonText}>{t["select seat"]}</Text>
                 </TouchableOpacity>
               </View>
             ))
           ) : (
             <View style={styles.emptyContainer}>
-              <Bus size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No buses found for this specific route on this date.</Text>
+              <Bus size={64} color="#ccc" /> {/* No translation needed for icon */}
+              <Text style={styles.emptyText}>{t["no buses found"]}</Text>
               <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
-                <Text style={styles.retryButtonText}>Try another route</Text>
+                <Text style={styles.retryButtonText}>{t["try another route"]}</Text>
               </TouchableOpacity>
             </View>
           )}

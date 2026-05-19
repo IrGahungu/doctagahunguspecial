@@ -7,6 +7,7 @@ import { useCartStore } from '@/stores/cartStore';
 import Toast from 'react-native-toast-message';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { supabase } from '@/lib/supabase';
 
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
@@ -100,6 +101,8 @@ export default function CartScreen() {
   const [hasError, setHasError] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
   const [serviceFee, setServiceFee] = useState<number>(500);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   // ✅ Fetch wallet balance from /me
   const fetchWalletBalance = useCallback(async () => {
@@ -210,29 +213,29 @@ export default function CartScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>My Cart</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{t["my cart"]}</Text>
       </View>
 
       {loadingBalance ? (
         <CartSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load wallet data. Please check your connection.</Text>
+          <Text style={styles.errorText}>{t["failed to load wallet data"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchWalletBalance}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView style={styles.content}>
           {items.length === 0 ? (
             <View style={styles.emptyCart}>
-              <ShoppingCart size={80} />
-              <Text style={styles.emptyCartTitle}>Your cart is empty!</Text>
+              <ShoppingCart size={80} /> {/* No translation needed for icon */}
+              <Text style={styles.emptyCartTitle}>{t["cart empty"]}</Text>
               <TouchableOpacity
                 style={styles.browseButton}
                 onPress={() => router.push('/')}
-              >
-                <Text style={styles.browseButtonText}>BROWSE PRODUCTS</Text>
+              > {/* No translation needed for icon */}
+                <Text style={styles.browseButtonText}>{t["browse products"]}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -255,18 +258,18 @@ export default function CartScreen() {
                       </View>
                     )}
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.productName}>{item.product.name}</Text>
+                      <Text style={styles.productName}>{item.product.name}</Text> {/* No translation needed for icon */}
                       <Text style={styles.productPrice}>
                         {getCurrency(country)} {parseFloat(String(item.product.price)).toFixed(2)}
                       </Text>
                       <View style={styles.qtyRow}>
                         <TouchableOpacity
                           style={styles.qtyButton}
-                          onPress={() => handleDecrease(item)}
+                          onPress={() => handleDecrease(item)} // No translation needed for icon
                         >
-                          <Minus size={18} color="#212121" />
+                          <Minus size={18} color="#212121" /> {/* No translation needed for icon */}
                         </TouchableOpacity>
-                        <Text style={styles.productQty}>{item.quantity}</Text>
+                        <Text style={styles.productQty}>{item.quantity}</Text> {/* No translation needed for icon */}
                         <TouchableOpacity
                           style={styles.qtyButton}
                           onPress={() => handleIncrease(item)}
@@ -281,24 +284,24 @@ export default function CartScreen() {
 
               {/* Subtotal Card */}
               <View style={styles.subtotalCard}>
-                <View style={styles.subtotalRow}>
-                  <Text style={styles.subtotalLabel}>Subtotal:</Text>
+                <View style={styles.subtotalRow}> {/* No translation needed for icon */}
+                  <Text style={styles.subtotalLabel}>{t.subtotal}:</Text>
                   <Text style={styles.subtotalValue}>{getCurrency(country)} {subtotal.toFixed(2)}</Text>
                 </View>
-                <View style={styles.subtotalRow}>
-                  <Text style={styles.subtotalLabel}>Medicine Service Fee:</Text>
+                <View style={styles.subtotalRow}> {/* No translation needed for icon */}
+                  <Text style={styles.subtotalLabel}>{t["medicine service fee"]}:</Text>
                   <Text style={styles.subtotalValue}>{getCurrency(country)} {serviceFee.toFixed(2)}</Text>
                 </View>
-                <View style={styles.subtotalRow}>
-                  <Text style={[styles.subtotalLabel, { fontWeight: 'bold' }]}>Total:</Text>
+                <View style={styles.subtotalRow}> {/* No translation needed for icon */}
+                  <Text style={[styles.subtotalLabel, { fontWeight: 'bold' }]}>{t.total}:</Text>
                   <Text style={[styles.subtotalValue, { fontWeight: 'bold' }]}>{getCurrency(country)} {total.toFixed(2)}</Text>
                 </View>
               </View>
 
               {/* Payment Method Card */}
               <View style={styles.paymentCard}>
-                <Text style={styles.paymentTitle}>Choose Payment Method</Text>
-                
+                <Text style={styles.paymentTitle}>{t["choose payment method"]}</Text>
+
                 {/* Bank Payment */}
                 <TouchableOpacity
                   style={[
@@ -306,10 +309,10 @@ export default function CartScreen() {
                     selectedMethod === 'bank' && styles.selectedOption,
                   ]}
                   onPress={() => setSelectedMethod('bank')}
-                >
-                  <CreditCard size={22} color={selectedMethod === 'bank' ? 'blue' : '#212121'} />
+                > {/* No translation needed for icon */}
+                  <CreditCard size={22} color={selectedMethod === 'bank' ? 'blue' : '#212121'} /> {/* No translation needed for icon */}
                   <Text style={[
-                    styles.paymentOptionText,
+                    styles.paymentOptionText, // No translation needed for icon
                     selectedMethod === 'bank' && { color: 'blue' }
                   ]}>
                     Bank Payment
@@ -323,10 +326,10 @@ export default function CartScreen() {
                     selectedMethod === 'wallet' && styles.selectedOption,
                   ]}
                   onPress={() => setSelectedMethod('wallet')}
-                >
-                  <Wallet size={22} color={selectedMethod === 'wallet' ? 'blue' : '#212121'} />
+                > {/* No translation needed for icon */}
+                  <Wallet size={22} color={selectedMethod === 'wallet' ? 'blue' : '#212121'} /> {/* No translation needed for icon */}
                   <Text style={[
-                    styles.paymentOptionText,
+                    styles.paymentOptionText, // No translation needed for icon
                     selectedMethod === 'wallet' && { color: 'blue' }
                   ]}>
                     Gahungu Wallet (Balance: {getCurrency(country)} {walletBalance ? walletBalance.toLocaleString() : 0})
@@ -343,7 +346,7 @@ export default function CartScreen() {
                 onPress={handleProceedToPayment}
                 disabled={!selectedMethod}
               >
-                <Text style={styles.paymentButtonText}>Proceed to Payment</Text>
+                <Text style={styles.paymentButtonText}>{t["proceed to payment"]}</Text>
               </TouchableOpacity>
             </>
           )}

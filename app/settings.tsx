@@ -6,6 +6,7 @@ import { LogOut, Bell, Palette, Languages, Globe, ArrowLeft } from 'lucide-react
 import * as SecureStore from 'expo-secure-store';
 import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore'; // This is used in handleLogout
+import { useLanguageStore, translations, Language } from '@/stores/languageStore';
 import CountryPicker from '@/components/CountryPicker';
 
 const COUNTRIES = [
@@ -21,17 +22,19 @@ const COUNTRIES = [
 export default function SettingsScreen() {
   const router = useRouter();
   const [selectedCountry, setSelectedCountry] = useState('');
+  const { language, setLanguage } = useLanguageStore();
+  const t = translations[language];
 
   const handleLogout = () => {
     Alert.alert(
-      "Confirm Logout",
-      "Are you sure you want to log out?",
+      t.confirmLogout,
+      t.logoutMessage,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t.cancel, style: "cancel" },
         {
           text: "Logout",
           style: "destructive",
-          onPress: async () => {
+          onPress: async () => { //
             // Also clear the selected country on logout
             useAuthStore.getState().setUserId(null);
             useCartStore.getState().clearItems();
@@ -63,13 +66,32 @@ export default function SettingsScreen() {
     router.push('/(tabs)');
   };
 
+  const handleLanguagePress = () => {
+    Alert.alert(
+      t.language,
+      "Select your preferred language / Hitamo ururimi / Choisissez votre langue",
+      [
+        { text: "English", onPress: () => setLanguage('en') },
+        { text: "Kirundi", onPress: () => setLanguage('rn') },
+        { text: "Français", onPress: () => setLanguage('fr') },
+        { text: t.cancel, style: "cancel" },
+      ]
+    );
+  };
+
+  const getLanguageName = (code: Language) => {
+    if (code === 'rn') return 'Kirundi';
+    if (code === 'fr') return 'Français';
+    return 'English';
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t.settings}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
 
@@ -77,34 +99,33 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <View style={styles.settingItem}>
             <Globe size={22} color="#757575" />
-            <Text style={styles.settingText}>Data Country</Text>
+            <Text style={styles.settingText}>{t.dataCountry}</Text>
           </View>
           <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
             <CountryPicker countries={COUNTRIES} selectedValue={selectedCountry} onValueChange={handleCountryChange} />
           </View>
         </View>
-
         <View style={styles.section}>
-          <View style={styles.settingItem}>
+          {/* <View style={styles.settingItem}>
             <Bell size={22} color="#757575" />
             <Text style={styles.settingText}>Push Notifications</Text>
             <Switch trackColor={{ false: '#767577', true: '#81c784' }} thumbColor={'#4CAF50'} />
-          </View>
-          <View style={styles.settingItem}>
+          </View> */}
+          {/*<View style={styles.settingItem}>
             <Palette size={22} color="#757575" />
             <Text style={styles.settingText}>Dark Mode</Text>
             <Switch trackColor={{ false: '#767577', true: '#81c784' }} thumbColor={'#4CAF50'} />
-          </View>
-          <TouchableOpacity style={styles.settingItem}>
+          </View>*/}
+          <TouchableOpacity style={styles.settingItem} onPress={handleLanguagePress}>
             <Languages size={22} color="#757575" />
-            <Text style={styles.settingText}>Language</Text>
-            <Text style={styles.languageText}>English</Text>
+            <Text style={styles.settingText}>{t.language}</Text>
+            <Text style={styles.languageText}>{getLanguageName(language)}</Text>
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <LogOut size={20} color="white" />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t.logout}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

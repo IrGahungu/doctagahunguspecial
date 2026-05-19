@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import * as SecureStore from 'expo-secure-store';
 import { supabase } from '@/lib/supabase';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -75,6 +76,8 @@ export default function BusSeatSelectionScreen() {
   const [reservedSeats, setReservedSeats] = useState<number[]>([]);
   const [country, setCountry] = useState<string | null>(null);
   const [serviceFee, setServiceFee] = useState<number>(500);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [loading, setLoading] = useState(true);
 
   const seatsCount = useMemo(() => parseInt(Array.isArray(totalSeats) ? totalSeats[0] : (totalSeats || '30'), 10), [totalSeats]);
@@ -201,19 +204,19 @@ export default function BusSeatSelectionScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Select Your Seat</Text>
+        <View style={styles.headerTitleContainer}> {/* No translation needed for icon */}
+          <Text style={styles.headerTitle}>{t["select your seat"]}</Text>
           <Text style={styles.headerSubtitle}>{company} • {from} to {to}</Text>
         </View>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
       </View>
 
       {/* Legend */}
       <View style={styles.legendContainer}>
-        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatAvailable]} /><Text style={styles.legendLabel}>Available</Text></View>
-        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatReserved]} /><Text style={styles.legendLabel}>Reserved</Text></View>
-        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatSelected]} /><Text style={styles.legendLabel}>Selected</Text></View>
-        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatVIP]} /><Text style={styles.legendLabel}>VIP</Text></View>
+        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatAvailable]} /><Text style={styles.legendLabel}>{t.available}</Text></View>
+        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatReserved]} /><Text style={styles.legendLabel}>{t.reserved}</Text></View>
+        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatSelected]} /><Text style={styles.legendLabel}>{t.selected}</Text></View>
+        <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatVIP]} /><Text style={styles.legendLabel}>{t.vip}</Text></View>
       </View>
 
       {loading ? ( // Render skeleton if loading
@@ -222,7 +225,7 @@ export default function BusSeatSelectionScreen() {
       <ScrollView contentContainerStyle={styles.seatScroll} showsVerticalScrollIndicator={false}>
         <View style={styles.busIllustration}>
           <View style={styles.driverSection}>
-            <View style={styles.steeringWheel} />
+            <View style={styles.steeringWheel} /> {/* No translation needed for icon */}
           </View>
           
           <View style={styles.gridContainer}>
@@ -230,7 +233,7 @@ export default function BusSeatSelectionScreen() {
               const isSelected = selectedSeats.includes(seat.id);
               const isReserved = seat.isReserved;
               const isVIP = seat.type === 'VIP';
-              
+
               return (
                 <Fragment key={seat.id}>
                   {index === 0 && vipCount > 0 && <Text style={styles.sectionLabel}>VIP SECTION (1.5x Price)</Text>}
@@ -267,7 +270,7 @@ export default function BusSeatSelectionScreen() {
 
       <View style={styles.footer}>
         <View>
-          <Text style={styles.selectedCount}>{selectedSeats.length} Seats Selected</Text>
+          <Text style={styles.selectedCount}>{selectedSeats.length} {t["seats selected"]}</Text>
           <Text style={styles.totalPrice}>BIF {totalAmount.toLocaleString()}</Text>
         </View>
         <TouchableOpacity 
@@ -275,7 +278,7 @@ export default function BusSeatSelectionScreen() {
           onPress={handleConfirm}
           disabled={selectedSeats.length === 0}
         >
-          <Text style={styles.confirmBtnText}>Confirm Booking</Text>
+          <Text style={styles.confirmBtnText}>{t["confirm booking"]}</Text>
         </TouchableOpacity>
       </View>
       <Toast />

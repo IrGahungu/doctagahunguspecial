@@ -7,6 +7,7 @@ import Toast from 'react-native-toast-message';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh';
 
 const renderStars = (rating: number) => {
@@ -122,6 +123,8 @@ export default function ReviewsScreen() {
   const [editingReview, setEditingReview] = useState<any>(null);
   const [userProfileName, setUserProfileName] = useState('');
 
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   useEffect(() => {
     fetchReviews();
     fetchUserProfile();
@@ -277,10 +280,10 @@ export default function ReviewsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>App Reviews</Text>
+        <Text style={styles.headerTitle}>{t["app reviews"]}</Text>
         <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.backButton}>
           <Plus size={24} color="#4CAF50" />
-        </TouchableOpacity>
+        </TouchableOpacity> {/* No translation needed for icon */}
       </View>
 
       {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} onAnimationEnd={() => setShowConfetti(false)} />}
@@ -291,10 +294,10 @@ export default function ReviewsScreen() {
           <View style={styles.averageStars}>
             {renderStars(Math.round(parseFloat(averageRating)))}
           </View>
-          <Text style={styles.totalReviews}>{reviews.length} total reviews</Text>
+          <Text style={styles.totalReviews}>{reviews.length} {t["total reviews"]}</Text>
         </View>
-        <View style={styles.recommendationBox}>
-          <Text style={styles.recommendationText}>
+        <View style={styles.recommendationBox}> {/* No translation needed for icon */}
+          <Text style={styles.recommendationText}> {/* No translation needed for icon */}
             {parseFloat(averageRating) >= 4 
               ? "Highly Recommended by Users" 
               : "Trusted healthcare companion"}
@@ -306,9 +309,9 @@ export default function ReviewsScreen() {
         <ReviewSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load reviews. Please check your connection.</Text>
+          <Text style={styles.errorText}>{t["failed to load reviews"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchReviews}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -335,11 +338,11 @@ export default function ReviewsScreen() {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.modalTitle}>{editingReview ? 'Edit Review' : 'Write a Review'}</Text>
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}> {/* No translation needed for icon */}
+                  <Text style={styles.modalTitle}>{editingReview ? t["edit review"] : t["write a review"]}</Text>
                   
                   <TextInput
-                    style={styles.input}
+                    style={styles.input} // No translation needed for icon
                     placeholder="Your Name"
                     value={name}
                     onChangeText={setName}
@@ -347,7 +350,7 @@ export default function ReviewsScreen() {
 
                   <View style={styles.ratingInputRow}>
                     <Text style={styles.label}>Tap to Rate:</Text>
-                    <View style={styles.interactiveStarRow}>
+                    <View style={styles.interactiveStarRow}> {/* No translation needed for icon */}
                       {[1, 2, 3, 4, 5].map((star) => (
                         <TouchableOpacity key={star} onPress={() => setRating(star)} style={styles.starButton}>
                           <Star
@@ -361,7 +364,7 @@ export default function ReviewsScreen() {
                   </View>
 
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[styles.input, styles.textArea]} // No translation needed for icon
                     placeholder="Your comment..."
                     multiline
                     numberOfLines={4}
@@ -374,16 +377,16 @@ export default function ReviewsScreen() {
                   <View style={styles.modalButtons}>
                     <TouchableOpacity 
                       style={[styles.modalButton, styles.cancelButton]} 
-                      onPress={() => setModalVisible(false)}
+                      onPress={() => setModalVisible(false)} // No translation needed for icon
                     >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                      <Text style={styles.cancelButtonText}>{t.cancel}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                       style={[styles.modalButton, styles.submitButton]} 
                       onPress={handleAddReview}
                       disabled={submitting}
-                    >
-                      {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{editingReview ? 'Update' : 'Submit'}</Text>}
+                    > {/* No translation needed for icon */}
+                      {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{editingReview ? t.update : t.submit}</Text>}
                     </TouchableOpacity>
                   </View>
                 </ScrollView>

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Phone, Facebook, Instagram, MessageCircle } from 'lucide-react-native';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const supportItems = [
   {
@@ -43,6 +44,8 @@ const supportItems = [
 export default function SupportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const handlePress = async (action: string, fallback?: string, needsAlert?: boolean) => {
     const execute = async () => {
@@ -69,11 +72,11 @@ export default function SupportScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Customer Support</Text>
+        <Text style={styles.headerTitle}>{t["customer support"]}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.introText}>
+        <Text style={styles.introText}> {/* No translation needed for icon */}
           Have questions or need help with your order? Reach out to us through any of the channels below.
         </Text>
 
@@ -83,11 +86,11 @@ export default function SupportScreen() {
               key={index}
               style={styles.supportItem}
               onPress={() => handlePress(item.action, (item as any).fallback, (item as any).needsAlert)}
-            >
-              <View style={styles.iconContainer}>
-                <item.icon size={24} color="#4CAF50" />
+            > {/* No translation needed for icon */}
+              <View style={styles.iconContainer}> {/* No translation needed for icon */}
+                <item.icon size={24} color="#4CAF50" /> {/* No translation needed for icon */}
               </View>
-              <View style={styles.textContainer}>
+              <View style={styles.textContainer}> {/* No translation needed for icon */}
                 <Text style={styles.supportLabel}>{item.label}</Text>
                 <Text style={styles.supportValue}>{item.value}</Text>
               </View>

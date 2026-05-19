@@ -5,6 +5,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, KeyRound } from "lucide-react-native";
 import * as SecureStore from "expo-secure-store";
 import { API_BASE_URL } from "@/config";
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const SkeletonPulse = ({ children }: { children: React.ReactNode }) => {
   const pulseAnim = useRef(new Animated.Value(0.3)).current;
@@ -56,6 +57,8 @@ const PinManagementScreen = () => {
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [loading, setLoading] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   // Determine if the user is forced to change the default PIN
   const isForcedDefaultPinChange = params.forceChangeDefaultPin === 'true';
@@ -167,19 +170,19 @@ const PinManagementScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isCheckingPin ? '...' : (hasPin ? 'Change PIN' : 'Create PIN')}
+        <Text style={styles.headerTitle}> {/* No translation needed for icon */}
+          {isCheckingPin ? '...' : (hasPin ? t["change pin"] : t["create pin"])}
         </Text>
         <View style={{ width: 40 }} />
       </View>
 
       {isCheckingPin ? (
         <PinSkeleton />
-      ) : (
+      ) : ( // No translation needed for icon
       <View style={styles.content}>
-        <KeyRound size={60} color="#4CAF50" style={{ alignSelf: 'center', marginBottom: 20 }} />
+        <KeyRound size={60} color="#4CAF50" style={{ alignSelf: 'center', marginBottom: 20 }} /> {/* No translation needed for icon */}
 
-        {hasPin && !isPinVerified && !isForcedDefaultPinChange ? (
+        {hasPin && !isPinVerified && !isForcedDefaultPinChange ? ( // No translation needed for icon
           <>
             <Text style={styles.title}>Verify Your Current PIN</Text>
             <Text style={styles.subtitle}>Please enter your current 4-digit PIN to proceed.</Text>
@@ -193,13 +196,13 @@ const PinManagementScreen = () => {
               maxLength={4}
               style={styles.input}
             />
-            <TouchableOpacity onPress={handleVerifyPin} style={styles.saveButton} disabled={loading || isPinVerified}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Verify PIN</Text>}
+            <TouchableOpacity onPress={handleVerifyPin} style={styles.saveButton} disabled={loading || isPinVerified}> {/* No translation needed for icon */}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{t["verify pin"]}</Text>}
             </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text style={styles.title}>{hasPin ? 'Set Your New PIN' : 'Set Your Transaction PIN'}</Text>
+            <Text style={styles.title}>{hasPin ? t["set new pin"] : t["set transaction pin"]}</Text>
             <Text style={styles.subtitle}>This 4-digit PIN will be used to authorize your payments.</Text>
 
             <Text style={styles.inputLabel}>New PIN (4 digits)</Text>
@@ -225,7 +228,7 @@ const PinManagementScreen = () => {
             />
 
             <TouchableOpacity onPress={handleUpdatePin} style={styles.saveButton} disabled={loading}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{hasPin ? 'Update PIN' : 'Save PIN'}</Text>}
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{hasPin ? t["update pin"] : t["save pin"]}</Text>}
             </TouchableOpacity>
           </>
         )}

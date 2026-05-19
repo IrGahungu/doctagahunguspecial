@@ -1651,7 +1651,7 @@ export default function AdminDashboard() {
             <div>
               <h3 className="text-lg font-bold text-gray-500 uppercase tracking-wider mb-4">Admin Revenue</h3>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-indigo-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl lg:col-span-2">
+                <div className="bg-linear-to-br from-indigo-600 to-blue-700 rounded-2xl p-8 text-white shadow-xl lg:col-span-2">
                   <div className="flex justify-between items-center mb-6">
                     <div>
                       <p className="text-indigo-100 font-bold uppercase tracking-widest text-xs">

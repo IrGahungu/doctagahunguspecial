@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowUpRight, ArrowDownLeft, History, FileText } from 'lucid
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import * as Print from 'expo-print';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import * as Sharing from 'expo-sharing';
 import { supabase } from '@/lib/supabase';
 
@@ -71,6 +72,8 @@ export default function TransactionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<Date | null>(new Date());
   const [userId, setUserId] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const months = useMemo(() => {
     const arr = [];
@@ -281,13 +284,13 @@ export default function TransactionsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Transactions</Text>
+        <Text style={styles.headerTitle}>{t["my transactions"]}</Text>
         <TouchableOpacity onPress={exportToPDF} style={styles.backButton}>
           <FileText size={24} color="#212121" />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.balanceSummary}>
+      <View style={styles.balanceSummary}> {/* No translation needed for icon */}
         <History size={32} color="#4CAF50" />
         <Text style={styles.summaryLabel}>Total Wallet Activity</Text>
         <Text style={styles.summarySubtext}>Review your recent spending and top-ups</Text>
@@ -305,10 +308,10 @@ export default function TransactionsScreen() {
         </View>
       </View>
 
-      <View style={styles.filterSection}>
+      <View style={styles.filterSection}> {/* No translation needed for icon */}
         <Text style={styles.filterTitle}>Filter by Month</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthPicker}>
-          <TouchableOpacity
+          <TouchableOpacity // No translation needed for icon
             style={[styles.monthButton, selectedMonth === null && styles.monthButtonActive]}
             onPress={() => setSelectedMonth(null)}
           >
@@ -319,7 +322,7 @@ export default function TransactionsScreen() {
 
           {months.map((date, idx) => {
             const isActive = selectedMonth && date.getMonth() === selectedMonth.getMonth() && date.getFullYear() === selectedMonth.getFullYear();
-            return (
+            return ( // No translation needed for icon
               <TouchableOpacity
                 key={idx}
                 style={[styles.monthButton, isActive && styles.monthButtonActive]}
@@ -338,9 +341,9 @@ export default function TransactionsScreen() {
         <TransactionSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load transactions. Please check your connection.</Text>
+          <Text style={styles.errorText}>{t["failed to load transactions"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchTransactions}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : (

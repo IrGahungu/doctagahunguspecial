@@ -2,9 +2,12 @@ import { Tabs } from 'expo-router';
 import { Home, ShoppingCart, User, Blocks, Compass } from 'lucide-react-native';
 import { View, Text } from 'react-native';
 import { useCartStore } from '@/stores/cartStore';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 export default function TabLayout() {
   const cartCount = useCartStore(state => state.cartCount); // <-- Move hook here
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   return (
     <Tabs
@@ -41,28 +44,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t.home,
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
+          title: t.explore,
           tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="categories"
         options={{
-          title: 'Categories',
+          title: t.categories,
           tabBarIcon: ({ color, size }) => <Blocks color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="cart"
         options={{
-          title: 'Cart',
+          title: t.cart,
           tabBarIcon: ({ color, size }) => (
             <View>
               <ShoppingCart color={color} size={size} />
@@ -90,7 +93,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Account',
+          title: t.profile,
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />

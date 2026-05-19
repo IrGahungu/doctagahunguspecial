@@ -15,6 +15,7 @@ import { Product } from '@/types';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const { width } = Dimensions.get('window');
 const numColumns = 2;
@@ -86,9 +87,11 @@ const ProductItem = ({
   item: Product; 
   baseUrl: string; 
   onPress: (p: Product) => void 
-}) => {
+}) => { 
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const imageUrl = item.image && !item.image.toString().startsWith('http') 
     ? `${baseUrl}${item.image}` 
@@ -127,7 +130,7 @@ const ProductItem = ({
           {item.title || item.name}
         </Text>
         <View style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>See Details</Text>
+          <Text style={styles.detailsButtonText}>{t["see details"]}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -139,6 +142,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
   const [country, setCountry] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pharmacyIds, setPharmacyIds] = useState<string[]>([]);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -272,7 +277,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ title, products: productsProp
     return (
       <View style={styles.container}>
         {title && <Text style={styles.sectionTitle}>{title}</Text>}
-        <Text style={styles.noDataText}>No Products available, Coming soon</Text>
+        <Text style={styles.noDataText}>{t["no products available"]}</Text>
       </View>
     );
   }
