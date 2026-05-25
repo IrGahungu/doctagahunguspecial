@@ -29,6 +29,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import MapView, { Marker } from 'react-native-maps';
+import { translations, useLanguageStore } from '@/stores/languageStore';
 
 const currencyMap: { [country: string]: string } = {
   Burundi: 'FBU',
@@ -121,6 +122,8 @@ export default function DoctorDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const showToast = useToastStore((state) => state.showToast);
+  const language = useLanguageStore(state => state.language);
+  const t: any = translations[language];
 
   // State for the lock mechanism
   const [showDetails, setShowDetails] = useState(false);
@@ -313,7 +316,7 @@ export default function DoctorDetailScreen() {
       try {
         const token = await SecureStore.getItemAsync("token");
         if (!token) {
-          showToast("Please log in to book.");
+          showToast(t["please log in to book"]);
           router.push('/auth');
           setIsBookingModalVisible(false);
           return;
@@ -352,11 +355,11 @@ export default function DoctorDetailScreen() {
     console.log('Starting booking payment. Fee:', bookingFee, 'Balance:', walletBalance);
 
     if (walletBalance === null || walletBalance < bookingFee) {
-      showToast("Insufficient wallet balance.");
+      showToast(t["insufficient wallet balance"]);
       return;
     }
     if (!pinCode) {
-      showToast("Please enter your PIN code.");
+      showToast(t["enter pin message"]);
       return;
     }
 
@@ -380,8 +383,8 @@ export default function DoctorDetailScreen() {
           .neq('status', 'cancelled')
           .limit(1);
 
-        if (checkError) throw new Error("Failed to check existing bookings.");
-        if (existingBookings && existingBookings.length > 0) throw new Error("You already have a booking with this doctor at this time.");
+        if (checkError) throw new Error(t["failed to check existing bookings"]);
+        if (existingBookings && existingBookings.length > 0) throw new Error(t["duplicate booking message"]);
       }
 
       // 1. Verify PIN
@@ -393,7 +396,7 @@ export default function DoctorDetailScreen() {
       });
       if (!verifyRes.ok) {
         const errData = await verifyRes.json();
-        throw new Error(errData.error || "Incorrect PIN.");
+        throw new Error(errData.error || t["incorrect pin"]);
       }
 
       // 2. Deduct Wallet
@@ -439,7 +442,7 @@ export default function DoctorDetailScreen() {
         router.push('/appointments');
       }, 4000);
     } catch (error: any) {   
-      Alert.alert("Booking Failed", error.message || "An error occurred.");
+      Alert.alert(t["appointment booking failed"], error.message || "An error occurred.");
     } finally {
       setIsPaying(false);
     }
@@ -483,7 +486,7 @@ export default function DoctorDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Icon name="arrow-back" size={24} color="#212121" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Doctor Profile</Text>
+          <Text style={styles.headerTitle}>{t["doctor profile"]}</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
         <DoctorDetailSkeleton />
@@ -494,7 +497,7 @@ export default function DoctorDetailScreen() {
   if (!doctor) {
     return (
       <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 50 }}>Doctor not found.</Text>
+        <Text style={{ textAlign: 'center', marginTop: 50 }}>{t["doctor not found"]}</Text>
       </View>
     );
   }
@@ -502,15 +505,13 @@ export default function DoctorDetailScreen() {
   return (
 
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Doctor Profile</Text>
+        <Text style={styles.headerTitle}>{t["doctor profile"]}</Text>
 
-        {/* Placeholder for right icon to balance layout */}
         <View style={styles.headerRightPlaceholder} />
       </View>
       <ScrollView
@@ -529,12 +530,11 @@ export default function DoctorDetailScreen() {
           />
         ) : (
           <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No Image</Text>
+            <Text style={styles.placeholderText}>{t["no image available"]}</Text>
           </View>
         )}
 
         <View style={styles.detailsContainer}>
-          {/* Locked Section */}
           <View style={styles.section}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                   <Icon name="person" size={22} color="green" style={{ marginRight: 8, marginBottom: 6 }} />
@@ -603,7 +603,7 @@ export default function DoctorDetailScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 4 }}>
                   <Icon name="info" size={20} color="green" style={{ marginRight: 8, marginBottom: 6 }} />
-                  <Text style={styles.bioTitle}>About</Text>
+                  <Text style={styles.bioTitle}>{t.about}</Text>
                 </View>
                 <Text style={styles.bio}>
                   {doctor.bio || `Dr. ${doctor.name} is a dedicated ${doctor.specialty?.toLowerCase()} professional.`}
@@ -613,7 +613,7 @@ export default function DoctorDetailScreen() {
                   <View style={{ marginTop: 8, marginBottom: 16 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                       <Icon name="schedule" size={20} color="green" style={{ marginRight: 8 }} />
-                      <Text style={styles.bioTitle}>Working Hours</Text>
+                      <Text style={styles.bioTitle}>{t["working hours"]}</Text>
                     </View>
                     <View style={styles.scheduleCard}>
                       {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day, index) => {
@@ -635,7 +635,7 @@ export default function DoctorDetailScreen() {
                                 )}
                               </>
                             ) : (
-                              <Text style={[styles.scheduleTime, { color: '#E53935', fontStyle: 'italic' }, isToday && styles.scheduleTextToday]}>Closed</Text>
+                              <Text style={[styles.scheduleTime, { color: '#E53935', fontStyle: 'italic' }, isToday && styles.scheduleTextToday]}>{t.closed}</Text>
                             )}
                           </View>
                         </View>
@@ -646,7 +646,7 @@ export default function DoctorDetailScreen() {
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16 }}>
                   <Icon name="event-available" size={20} color="green" style={{ marginRight: 8 }} />
-                  <Text style={styles.sectionTitle}>Availability & Booking</Text>
+                  <Text style={styles.sectionTitle}>{t["availability & booking"]}</Text>
                 </View>
                  <Calendar
                    style={styles.calendar}
@@ -674,7 +674,7 @@ export default function DoctorDetailScreen() {
                  />
                  {selectedDate && availabilityMap[selectedDate] && (
                    <View style={styles.timeSlotsContainer}>
-                     <Text style={styles.timeSlotsTitle}>Available Times</Text>
+                     <Text style={styles.timeSlotsTitle}>{t["available times"]}</Text>
                      <View style={styles.timeSlots}>
                        {availabilityMap[selectedDate].map((time) => (
                          <Pressable
@@ -709,7 +709,7 @@ export default function DoctorDetailScreen() {
                        onPress={() => handleBook('online')}
                        disabled={!(selectedDate && selectedTime)}
                      >
-                       <Text style={styles.buttonText}>Book Online</Text>
+                       <Text style={styles.buttonText}>{t["book online"]}</Text>
                         
                      </Pressable>
                    )}
@@ -725,7 +725,7 @@ export default function DoctorDetailScreen() {
                        disabled={!(selectedDate && selectedTime)}
 
                      >
-                       <Text style={styles.buttonText}>Book In Office</Text>
+                       <Text style={styles.buttonText}>{t["book in-office"]}</Text>
                      </Pressable>
                    )}
                  </View>
@@ -736,12 +736,11 @@ export default function DoctorDetailScreen() {
              style={styles.carButton}
              onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
            >
-             <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text> 
+             <Text style={styles.carButtonText}>{t["call car"]}</Text> 
            </Pressable>
            )}
          </View>
        </ScrollView>
-       {/* Booking Modal */}
        <Modal
          visible={isBookingModalVisible}
          transparent
@@ -809,7 +808,7 @@ export default function DoctorDetailScreen() {
                           : getFee(selectedAvailability?.consultation_fee_offline, doctor.consultation_fee_offline)
                         )) || !pinCode}
                      >
-                       {isPaying ? <ActivityIndicator color="#fff" /> : <Text style={styles.bookingActionButtonText}>Pay & Book</Text>} 
+                       {isPaying ? <ActivityIndicator color="#fff" /> : <Text style={styles.bookingActionButtonText}>{t["pay and book"]}</Text>} 
                      </TouchableOpacity>
                  </View>
                    </>

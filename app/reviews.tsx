@@ -75,7 +75,10 @@ const ReviewItem = ({ item, currentUserId, onEdit, onDelete }: {
   currentUserId: string | null; 
   onEdit: (review: any) => void; 
   onDelete: (id: string) => void;
-}) => (
+}) => {
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
+  return (
   <View style={styles.reviewCard}>
     <View style={styles.reviewMetadata}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -100,13 +103,14 @@ const ReviewItem = ({ item, currentUserId, onEdit, onDelete }: {
     {item.admin_reply && (
       <View style={styles.adminReplyContainer}>
         <View style={styles.adminReplyHeader}>
-          <Text style={styles.adminReplyTitle}>Gahungu Team</Text>
+          <Text style={styles.adminReplyTitle}>{t["gahungu team"] || "Gahungu Team"}</Text>
         </View>
         <Text style={styles.adminReplyText}>{item.admin_reply}</Text>
       </View>
     )}
   </View>
-);
+  );
+};
 
 export default function ReviewsScreen() {
   const router = useRouter();
@@ -175,6 +179,14 @@ export default function ReviewsScreen() {
     ? (reviews.reduce((acc, curr) => acc + Number(curr.rating), 0) / reviews.length).toFixed(1)
     : "0.0";
 
+  const openAddReviewModal = () => {
+    setEditingReview(null);
+    setName(userProfileName);
+    setRating(5);
+    setComment('');
+    setModalVisible(true);
+  };
+
   const startEditReview = (review: any) => {
     setEditingReview(review);
     setName(review.name);
@@ -185,7 +197,7 @@ export default function ReviewsScreen() {
 
   const handleAddReview = async () => {
     if (!name.trim() || !comment.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t.error || 'Error', t["fill all fields"] || 'Please fill in all fields');
       return;
     }
 
@@ -194,7 +206,7 @@ export default function ReviewsScreen() {
     try {
       const token = await SecureStore.getItemAsync('token');
       if (!token) {
-        Alert.alert('Authentication Error', 'Please log in to leave a review.');
+        Alert.alert(t["auth error"] || 'Authentication Error', t["login to review"] || 'Please log in to leave a review.');
         return;
       }
 
@@ -225,18 +237,19 @@ export default function ReviewsScreen() {
         setModalVisible(false);
         Toast.show({
           type: 'success',
-          text1: editingReview ? 'Review Updated!' : 'Review Submitted!',
-          text2: editingReview ? 'Your changes have been saved.' : 'Thank you for your feedback.',
+          text1: editingReview ? (t["review updated"] || 'Review Updated!') : (t["review submitted"] || 'Review Submitted!'),
+          text2: editingReview ? (t["changes saved"] || 'Your changes have been saved.') : (t["thanks feedback"] || 'Thank you for your feedback.'),
         });
         setName(userProfileName);
         setComment('');
         setRating(5);
+        setEditingReview(null);
       } else {
         const errorData = await response.json();
-        Alert.alert('Error', errorData.error || 'Failed to submit review');
+        Alert.alert(t.error || 'Error', errorData.error || (t["failed submit review"] || 'Failed to submit review'));
       }
     } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert(t.error || 'Error', t["something went wrong"] || 'Something went wrong. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -244,12 +257,12 @@ export default function ReviewsScreen() {
 
   const handleDeleteReview = async (id: string) => {
     Alert.alert(
-      'Delete Review',
-      'Are you sure you want to delete your review?',
+      t["delete review"] || 'Delete Review',
+      t["confirm delete review"] || 'Are you sure you want to delete your review?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.cancel || 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: t.delete || 'Delete',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -261,12 +274,12 @@ export default function ReviewsScreen() {
 
               if (response.ok) {
                 setReviews(reviews.filter(r => r.id !== id));
-                Toast.show({ type: 'success', text1: 'Review Deleted' });
+                Toast.show({ type: 'success', text1: t["review deleted"] || 'Review Deleted' });
               } else {
-                Alert.alert('Error', 'Failed to delete review');
+                Alert.alert(t.error || 'Error', t["failed delete review"] || 'Failed to delete review');
               }
             } catch (error) {
-              Alert.alert('Error', 'Connection error');
+              Alert.alert(t.error || 'Error', t["connection error"] || 'Connection error');
             }
           }
         }
@@ -281,9 +294,9 @@ export default function ReviewsScreen() {
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t["app reviews"]}</Text>
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.backButton}>
+        <TouchableOpacity onPress={openAddReviewModal} style={styles.backButton}>
           <Plus size={24} color="#4CAF50" />
-        </TouchableOpacity> {/* No translation needed for icon */}
+        </TouchableOpacity>
       </View>
 
       {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} onAnimationEnd={() => setShowConfetti(false)} />}
@@ -296,11 +309,11 @@ export default function ReviewsScreen() {
           </View>
           <Text style={styles.totalReviews}>{reviews.length} {t["total reviews"]}</Text>
         </View>
-        <View style={styles.recommendationBox}> {/* No translation needed for icon */}
-          <Text style={styles.recommendationText}> {/* No translation needed for icon */}
+        <View style={styles.recommendationBox}>
+          <Text style={styles.recommendationText}>
             {parseFloat(averageRating) >= 4 
-              ? "Highly Recommended by Users" 
-              : "Trusted healthcare companion"}
+              ? (t["highly recommended"] || "Highly Recommended by Users")
+              : (t["trusted companion"] || "Trusted healthcare companion")}
           </Text>
         </View>
       </View>
@@ -338,19 +351,19 @@ export default function ReviewsScreen() {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <ScrollView bounces={false} showsVerticalScrollIndicator={false}> {/* No translation needed for icon */}
+                <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
                   <Text style={styles.modalTitle}>{editingReview ? t["edit review"] : t["write a review"]}</Text>
                   
                   <TextInput
-                    style={styles.input} // No translation needed for icon
-                    placeholder="Your Name"
+                    style={styles.input}
+                    placeholder={t["your name"] || "Your Name"}
                     value={name}
                     onChangeText={setName}
                   />
 
                   <View style={styles.ratingInputRow}>
-                    <Text style={styles.label}>Tap to Rate:</Text>
-                    <View style={styles.interactiveStarRow}> {/* No translation needed for icon */}
+                    <Text style={styles.label}>{t["tap to rate"] || "Tap to Rate:"}</Text>
+                    <View style={styles.interactiveStarRow}>
                       {[1, 2, 3, 4, 5].map((star) => (
                         <TouchableOpacity key={star} onPress={() => setRating(star)} style={styles.starButton}>
                           <Star
@@ -364,8 +377,8 @@ export default function ReviewsScreen() {
                   </View>
 
                   <TextInput
-                    style={[styles.input, styles.textArea]} // No translation needed for icon
-                    placeholder="Your comment..."
+                    style={[styles.input, styles.textArea]}
+                    placeholder={t["your comment"] || "Your comment..."}
                     multiline
                     numberOfLines={4}
                     value={comment}
@@ -385,7 +398,7 @@ export default function ReviewsScreen() {
                       style={[styles.modalButton, styles.submitButton]} 
                       onPress={handleAddReview}
                       disabled={submitting}
-                    > {/* No translation needed for icon */}
+                    >
                       {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitButtonText}>{editingReview ? t.update : t.submit}</Text>}
                     </TouchableOpacity>
                   </View>

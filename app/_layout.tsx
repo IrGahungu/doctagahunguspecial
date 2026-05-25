@@ -44,7 +44,7 @@ export default function RootLayout() {
       if (!token || !userId) return;
 
       // 🛑 Avoid redirect loop: check if we are already in auth or payment screens
-      const inAuthGroup = segments[0] === 'auth' || segments[0] === 'login-payment-fee';
+      const inAuthGroup = segments[0] === 'auth' || segments[0] === 'login-payment-fee' || segments[0] === 'pin-management';
       if (inAuthGroup) return;
 
       const lastPayment = await SecureStore.getItemAsync(`last_login_payment_${userId}`);
@@ -111,7 +111,7 @@ export default function RootLayout() {
       </Stack>
 
       <StatusBar style="dark" backgroundColor="#E0F7FA" translucent={false} />
-      <Toast topOffset={screenHeight * 0.45} />
+      <Toast topOffset={60} />
     </>
   );
 }

@@ -96,7 +96,6 @@ export default function PaymentScreen() {
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t.payment}</Text>
-        {/* Placeholder for right icon to balance layout */}
         <View style={styles.headerRightPlaceholder} />
       </View>
       <ScrollView
@@ -121,11 +120,11 @@ export default function PaymentScreen() {
             <Text style={styles.detailLabel}>{t.type}</Text>
             <Text style={styles.detailValue}>{type === 'online' ? t.online : t["in-office"]}</Text>
           </View>
-          <View style={styles.detailRow}> {/* No translation needed for icon */}
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t["consultation fee"]}</Text>
             <Text style={styles.detailValue}>BIF {parsedConsultationFee.toLocaleString()}</Text>
           </View>
-          <View style={styles.detailRow}> {/* No translation needed for icon */}
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>{t["doctor service fee"]}</Text>
             {loadingFee ? (
               <SkeletonPulse>

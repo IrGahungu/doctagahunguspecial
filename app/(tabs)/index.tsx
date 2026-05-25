@@ -96,6 +96,7 @@ const INSURANCE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v
 //
 
 export default function MainScreen() {
+  console.log('[MainScreen] Rendering...');
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [contentKey, setContentKey] = useState(0);
@@ -151,14 +152,14 @@ const onRefresh = useCallback(() => {
 //
 const renderMainContent = () => (
   <View key={contentKey}>
-    <Carousel baseUrl={BANNER_URL_PREFIX} /> {/* No title prop */}
-    <CategorySlider/> {/* No title prop */}
+    <Carousel baseUrl={BANNER_URL_PREFIX} />
+    <CategorySlider/>
     <DealSection title={t["deals of the day"]} baseUrl={DEAL_URL_PREFIX} />
     <ProductGrid title={t["recommended for you"]} baseUrl={MEDICINE_URL_PREFIX} />
     <FeaturedPharmacies title={t["featured pharmacies"]} baseUrl={PHARMACY_URL_PREFIX} />
     <FeaturedHospitals title={t["featured hospitals"]} baseUrl={HOSPITAL_URL_PREFIX} />
     <FeaturedDoctors title={t["featured doctors"]} baseUrl={DOCTOR_URL_PREFIX} />
-    <FeaturedInsurances title={t["featured insurances"]} baseUrl={INSURANCE_URL_PREFIX} /> {/* Title is inside component */}
+    <FeaturedInsurances title={t["featured insurances"]} baseUrl={INSURANCE_URL_PREFIX} />
     <View style={{ height: 20 }} />
   </View>
 );
@@ -177,7 +178,7 @@ return (
         onPress={() => router.push('/search')}
       >
         <View style={styles.searchBar}>
-          <Icon name="search" size={20} color="#2874F0" /> {/* No translation needed for icon */}
+          <Icon name="search" size={20} color="#2874F0" />
           <Text style={styles.searchPlaceholder}>{t.searchPlaceholderText}</Text>
         </View>
       </TouchableOpacity>

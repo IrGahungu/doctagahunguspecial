@@ -9,6 +9,7 @@ import { API_BASE_URL } from '@/config';
 import QRCode from 'react-native-qrcode-svg';
 import { captureRef } from 'react-native-view-shot';
 import * as MediaLibrary from 'expo-media-library';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 type Booking = {
   id: string;
@@ -86,6 +87,8 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
   const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
   const status = item.status?.toLowerCase() || '';
   const isConfirmed = status === 'confirmed' || status === 'completed';
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const handleDownload = async () => {
     try {
@@ -115,18 +118,18 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
       <View style={styles.cardHeader}>
         <View style={styles.doctorInfo}>
           <User size={20} color="#4CAF50" style={{ marginRight: 8 }} />
-          <Text style={styles.doctorName} numberOfLines={1}>{item.doctor_name || 'Unknown Doctor'}</Text>
+          <Text style={styles.doctorName} numberOfLines={1}>{item.doctor_name || t["unknown doctor"]}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getMainStatusColor(status) }]}>
           <Text style={styles.statusText}>
-            {(status === 'confirmed' || status === 'completed') ? 'Confirmed' : (status === 'cancelled' ? 'Cancelled' : 'Pending')}
+            {(status === 'confirmed' || status === 'completed') ? t.confirmed : (status === 'cancelled' ? t.cancelled : t.pending)}
           </Text>
         </View>
       </View>
 
       {item.ticket_number && (
         <View style={styles.ticketContainer}>
-          <Text style={styles.ticketLabel}>Ticket Number:</Text>
+          <Text style={styles.ticketLabel}>{t["ticket number"]}:</Text>
           <Text style={styles.ticketValue}>{item.ticket_number}</Text>
         </View>
       )}
@@ -148,7 +151,7 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
         <View style={styles.detailItem}>
           <MapPin size={16} color="#757575" />
           <Text style={styles.detailText}>
-            {item.type === 'online' ? 'Online Consultation' : 'In-Office Visit'}
+            {item.type === 'online' ? t["online consultation"] : t["in-office visit"]}
           </Text>
         </View>
       </View>
@@ -165,7 +168,7 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
             })}
             size={100}
           />
-          <Text style={styles.qrLabel}>{item.doctor_name} with Dr. Gahungu App</Text>
+          <Text style={styles.qrLabel}>{item.doctor_name} {t["with dr gahungu app"]}</Text>
         </View>
       )}
 
@@ -173,11 +176,11 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {(status === 'confirmed' || status === 'completed') ? (
             <View style={[styles.statusBadge, { backgroundColor: getSubStatusColor(status) }]}>
-              <Text style={styles.statusText}>{status === 'completed' ? 'Complete' : 'Incomplete'}</Text>
+              <Text style={styles.statusText}>{status === 'completed' ? t.complete : t.incomplete}</Text>
             </View>
           ) : status === 'cancelled' ? (
             <View style={[styles.statusBadge, { backgroundColor: '#607D8B' }]}>
-              <Text style={styles.statusText}>Refunded</Text>
+              <Text style={styles.statusText}>{t.refunded}</Text>
             </View>
           ) : <View />}
           
@@ -193,7 +196,7 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
             styles.amountText,
             status === 'cancelled' && { color: '#757575' }
           ]}>
-            Paid: {item.amount.toLocaleString()} FBU
+            {t.paid}: {item.amount.toLocaleString()} FBU
           </Text>
         )}
       </View>
@@ -208,6 +211,8 @@ export default function AppointmentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
@@ -302,7 +307,7 @@ export default function AppointmentsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Appointments</Text>
+        <Text style={styles.headerTitle}>{t["my appointments"]}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -310,14 +315,14 @@ export default function AppointmentsScreen() {
         <AppointmentSkeleton />
       ) : hasError ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load appointments. Please check your connection.</Text>
+          <Text style={styles.errorText}>{t["failed to load appointments"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchBookings}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t.retry}</Text>
           </TouchableOpacity>
         </View>
       ) : bookings.length === 0 ? (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No appointments found.</Text>
+          <Text style={styles.emptyText}>{t["no appointments found"]}</Text>
         </View>
       ) : (
         <FlatList

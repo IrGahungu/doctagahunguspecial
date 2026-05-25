@@ -6,6 +6,7 @@ import ProductGrid from '@/components/ProductGrid';
 import { Product } from '@/types';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '@/lib/supabase';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import * as SecureStore from "expo-secure-store";
 
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
@@ -71,6 +72,8 @@ export default function CategoryDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t: any = translations[language];
 
   useEffect(() => {
     navigation.getParent()?.setOptions({
@@ -131,7 +134,7 @@ export default function CategoryDetailScreen() {
     }
 
     if (products.length === 0) {
-      return <Text style={styles.noProducts}>No medicines found for this category.</Text>;
+      return <Text style={styles.noProducts}>{t["no medicines found for this category"]}</Text>;
     }
 
     return <ProductGrid products={products} scrollEnabled={true} baseUrl={MEDICINE_URL_PREFIX} />;
@@ -144,11 +147,11 @@ export default function CategoryDetailScreen() {
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          Medicines for {name || '...'}
+          {t["medicines for"]} {name || '...'}
         </Text>
       </View>
       <Text style={styles.headerQuote}>
-        "Dieu avec Gahungu, Votre Santé est assurée"
+        {t["Dieu avec Gahungu, Votre Santé est assurée"]}
       </Text>
       <View style={styles.contentArea}>
         {renderContent()}

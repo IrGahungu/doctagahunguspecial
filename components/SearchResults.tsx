@@ -109,6 +109,7 @@ type SearchResultsProps = {
 const { width } = Dimensions.get('window');
 
 const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProps) => {
+  console.log('[SearchResults Component] Rendering...');
   console.log('SearchResults received results:', JSON.stringify(results, null, 2));
   const router = useRouter(); // Using Expo Router instead of React Navigation
   const [country, setCountry] = React.useState<string | null>(null);
@@ -268,7 +269,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" /> {/* No translation needed for icon */}
+        <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.loadingText}>{t["searching for"]} "{query}"...</Text>
       </View>
     );
@@ -276,7 +277,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
 
   if (allResults.length === 0 && query) {
     return (
-      <View style={styles.noResults}> {/* No translation needed for icon */}
+      <View style={styles.noResults}>
         <Icon name="search-off" size={40} color="#ccc" />
         <Text style={styles.noResultsText}>{t["no results found for"]} "{query}"</Text>
         <Text style={styles.noResultsSubText}>{t["try different keywords"]}</Text>
@@ -315,7 +316,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
             </Text>
           )}
           {item.type === 'medicine' && item.pharmacies && item.pharmacies.length > 0 && (
-            <Text style={styles.itemSubtext}> {/* No translation needed for icon */}
+          <Text style={styles.itemSubtext}>
               Available in {item.pharmacies.length} pharmac{item.pharmacies.length > 1 ? 'ies' : 'y'}
             </Text>
           )}
@@ -324,22 +325,25 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
           )}
           {item.type === 'hospital' && (
             <View style={{ marginTop: 4 }}>
-              {item.available_blood_types && (
-                <Text style={styles.itemSubtext} numberOfLines={1}> {/* No translation needed for icon */}
-                  <Icon name="bloodtype" size={12} color="#f44336" /> {formatArrayString(item.available_blood_types)}
-                </Text>
+              {!!item.available_blood_types && (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name="bloodtype" size={12} color="#f44336" style={{ marginRight: 4 }} />
+                  <Text style={styles.itemSubtext} numberOfLines={1}>{formatArrayString(item.available_blood_types)}</Text>
+                </View>
               )}
-              {item.medical_equipment && (
-                <Text style={styles.itemSubtext} numberOfLines={1}> {/* No translation needed for icon */}
-                  <Icon name="medical-services" size={12} color="#4caf50" /> {formatArrayString(item.medical_equipment)}
-                </Text>
+              {!!item.medical_equipment && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Icon name="medical-services" size={12} color="#4caf50" style={{ marginRight: 4 }} />
+                  <Text style={styles.itemSubtext} numberOfLines={1}>{formatArrayString(item.medical_equipment)}</Text>
+                </View>
               )}
             </View>
           )}
-          {item.address && item.type !== 'hospital' && item.type !== 'doctor' && (
-            <Text style={styles.itemAddress} numberOfLines={1}>
-              <Icon name="location-on" size={12} color="#888" /> {item.address}
-            </Text>
+          {!!item.address && item.type !== 'hospital' && item.type !== 'doctor' && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <Icon name="location-on" size={12} color="#888" style={{ marginRight: 4 }} />
+              <Text style={styles.itemAddress} numberOfLines={1}>{item.address}</Text>
+            </View>
           )}
         </View>
       </TouchableOpacity>
@@ -357,7 +361,7 @@ const SearchResults = ({ results, query, onClose, isLoading }: SearchResultsProp
       keyboardDismissMode="on-drag"
       onScrollBeginDrag={() => Keyboard.dismiss()}
       style={styles.container}
-      ListHeaderComponent={ // No translation needed for icon
+      ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.title}>{t["results for"]} "{query}"</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>

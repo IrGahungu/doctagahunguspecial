@@ -205,10 +205,10 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
       <View style={styles.postHeader}>
         <View style={styles.postHeaderLeft}>
           <Image source={{ uri: item.avatar }} style={styles.postAvatar} />
-          <Text style={styles.postUsername}>{item.title}</Text> {/* No translation needed for icon */}
+          <Text style={styles.postUsername}>{item.title}</Text>
         </View>
-        {!!item.tag && <Text style={styles.postTag}>{item.tag}</Text>} {/* No translation needed for icon */}
-      </View> {/* No translation needed for icon */}
+        {!!item.tag && <Text style={styles.postTag}>{item.tag}</Text>}
+      </View>
 
       <View style={styles.postDescriptionContainer}>
         <Text style={styles.captionText}>{item.caption}</Text>
@@ -216,26 +216,26 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
 
       <View style={styles.postLinksContainer}>
         {item.website && item.show_website !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.website, "their website")}> {/* No translation needed for icon */}
-            <Globe size={14} color="#4CAF50" /> {/* No translation needed for icon */}
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.website, "their website")}>
+            <Globe size={14} color="#4CAF50" />
             <Text style={styles.postLinkText}>{t["link to website"]}</Text>
           </TouchableOpacity>
         )}
         {item.whatsapp && item.show_whatsapp !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(`whatsapp://send?phone=${item.whatsapp}`, "WhatsApp")}> {/* No translation needed for icon */}
-            <MessageCircle size={14} color="#25D366" /> {/* No translation needed for icon */}
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(`whatsapp://send?phone=${item.whatsapp}`, "WhatsApp")}>
+            <MessageCircle size={14} color="#25D366" />
             <Text style={styles.postLinkText}>{t["click to whatsapp"]}</Text>
           </TouchableOpacity>
         )}
         {item.instagram && item.show_instagram !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.instagram, "Instagram")}> {/* No translation needed for icon */}
-            <Instagram size={14} color="#E1306C" /> {/* No translation needed for icon */}
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.instagram, "Instagram")}>
+            <Instagram size={14} color="#E1306C" />
             <Text style={styles.postLinkText}>{t["follow on instagram"]}</Text>
           </TouchableOpacity>
         )}
         {item.twitter && item.show_twitter !== false && (
-          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.twitter, "X")}> {/* No translation needed for icon */}
-            <Twitter size={14} color="#000" /> {/* No translation needed for icon */}
+          <TouchableOpacity style={styles.postLinkItem} onPress={() => handleExternalLink(item.twitter, "X")}>
+            <Twitter size={14} color="#000" />
             <Text style={styles.postLinkText}>{t["follow on x"]}</Text>
           </TouchableOpacity>
         )}
@@ -255,7 +255,7 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
             />
           ) : (
             <Image source={{ uri: item.images[currentImageIndex] }} style={styles.postImage} resizeMode="cover" />
-          )} {/* No translation needed for icon */}
+          )}
 
           {item.images.length > 1 ? (
             <>
@@ -271,7 +271,7 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
                 ))}
               </View>
             </>
-          ) : null} {/* No translation needed for icon */}
+          ) : null}
 
           {/* Multi-heart burst animation */}
           <View style={styles.heartOverlay}>
@@ -297,16 +297,16 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
 
       <View style={styles.postActions}>
         <View style={styles.postActionsLeft}>
-          <TouchableOpacity style={styles.actionIcon} onPress={toggleLike}> {/* No translation needed for icon */}
-            <Heart size={24} color={isLiked ? "#E1306C" : "#333"} fill={isLiked ? "#E1306C" : "transparent"} /> {/* No translation needed for icon */}
+          <TouchableOpacity style={styles.actionIcon} onPress={toggleLike}>
+            <Heart size={24} color={isLiked ? "#E1306C" : "#333"} fill={isLiked ? "#E1306C" : "transparent"} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIcon} onPress={handleShare}> {/* No translation needed for icon */}
-            <Send size={24} color="#333" /> {/* No translation needed for icon */}
+          <TouchableOpacity style={styles.actionIcon} onPress={handleShare}>
+            <Send size={24} color="#333" />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity> {/* No translation needed for icon */}
-          <Bookmark size={24} color="#333" /> {/* No translation needed for icon */}
-        </TouchableOpacity> {/* No translation needed for icon */}
+        <TouchableOpacity>
+          <Bookmark size={24} color="#333" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.postFooter}>
@@ -319,6 +319,7 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function ExploreScreen() {
+  console.log('[ExploreScreen] Rendering...');
   const router = useRouter();
   const [stories, setStories] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);

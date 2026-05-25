@@ -1,4 +1,4 @@
-import React, { useState, useMemo, Fragment, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -204,14 +204,12 @@ export default function BusSeatSelectionScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}> {/* No translation needed for icon */}
+        <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>{t["select your seat"]}</Text>
           <Text style={styles.headerSubtitle}>{company} • {from} to {to}</Text>
         </View>
-        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
+        <View style={{ width: 40 }} />
       </View>
-
-      {/* Legend */}
       <View style={styles.legendContainer}>
         <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatAvailable]} /><Text style={styles.legendLabel}>{t.available}</Text></View>
         <View style={styles.legendItem}><View style={[styles.seatLegend, styles.seatReserved]} /><Text style={styles.legendLabel}>{t.reserved}</Text></View>
@@ -225,7 +223,7 @@ export default function BusSeatSelectionScreen() {
       <ScrollView contentContainerStyle={styles.seatScroll} showsVerticalScrollIndicator={false}>
         <View style={styles.busIllustration}>
           <View style={styles.driverSection}>
-            <View style={styles.steeringWheel} /> {/* No translation needed for icon */}
+            <View style={styles.steeringWheel} />
           </View>
           
           <View style={styles.gridContainer}>
@@ -235,7 +233,7 @@ export default function BusSeatSelectionScreen() {
               const isVIP = seat.type === 'VIP';
 
               return (
-                <Fragment key={seat.id}>
+                <View key={seat.id} style={{ alignItems: 'center' }}>
                   {index === 0 && vipCount > 0 && <Text style={styles.sectionLabel}>VIP SECTION (1.5x Price)</Text>}
                   {index === vipCount && <View style={styles.sectionDivider}><Text style={styles.sectionLabel}>STANDARD SECTION</Text></View>}
                   
@@ -260,7 +258,7 @@ export default function BusSeatSelectionScreen() {
                       {seat.number}
                     </Text>
                   </TouchableOpacity>
-                </Fragment>
+                </View>
               );
             })}
           </View>

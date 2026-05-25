@@ -93,7 +93,7 @@ const PinManagementScreen = () => {
 
   // Step 1: Verify old PIN
   const handleVerifyPin = async () => {
-    if (!oldPin) return Alert.alert("Error", "Please enter your current PIN");
+    if (!oldPin) return Alert.alert(t.error || "Error", t["enter current pin message"]);
 
     setLoading(true);
     try {
@@ -111,12 +111,12 @@ const PinManagementScreen = () => {
 
       if (res.ok) {
         setIsPinVerified(true);
-        Alert.alert("Success", "PIN verified. You can now set a new one.");
+        Alert.alert(t.yes || "Success", "PIN verified. You can now set a new one.");
       } else {
-        Alert.alert("Error", data.error || "Incorrect PIN");
+        Alert.alert(t.error || "Error", data.error || t["incorrect pin"]);
       }
     } catch (err) {
-      Alert.alert("Error", "Failed to verify PIN");
+      Alert.alert(t.error || "Error", "Failed to verify PIN");
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ const PinManagementScreen = () => {
   // Step 2: Set new PIN
   const handleUpdatePin = async () => {
     if (!newPin || !confirmPin) {
-      return Alert.alert("Error", "Please fill out all fields.");
+      return Alert.alert(t.error || "Error", t["fill all fields"]);
     }
     if (newPin !== confirmPin) {
       return Alert.alert("Error", "PINs do not match.");
@@ -148,17 +148,17 @@ const PinManagementScreen = () => {
 
       const data = await res.json();
       if (res.ok) {
-        Alert.alert("Success", "PIN updated successfully!");
+        Alert.alert(t.yes || "Success", t["pin updated"]);
         setOldPin("");
         setNewPin("");
         setConfirmPin("");
         setIsPinVerified(false);
         router.back();
       } else {
-        Alert.alert("Error", data.error || "Could not update PIN");
+        Alert.alert(t.error || "Error", data.error || "Could not update PIN");
       }
     } catch (err) {
-      Alert.alert("Error", "Failed to update PIN");
+      Alert.alert(t.error || "Error", "Failed to update PIN");
     } finally {
       setLoading(false);
     }
@@ -170,7 +170,7 @@ const PinManagementScreen = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}> {/* No translation needed for icon */}
+        <Text style={styles.headerTitle}>
           {isCheckingPin ? '...' : (hasPin ? t["change pin"] : t["create pin"])}
         </Text>
         <View style={{ width: 40 }} />
@@ -178,15 +178,15 @@ const PinManagementScreen = () => {
 
       {isCheckingPin ? (
         <PinSkeleton />
-      ) : ( // No translation needed for icon
+      ) : (
       <View style={styles.content}>
-        <KeyRound size={60} color="#4CAF50" style={{ alignSelf: 'center', marginBottom: 20 }} /> {/* No translation needed for icon */}
+        <KeyRound size={60} color="#4CAF50" style={{ alignSelf: 'center', marginBottom: 20 }} />
 
-        {hasPin && !isPinVerified && !isForcedDefaultPinChange ? ( // No translation needed for icon
+        {hasPin && !isPinVerified && !isForcedDefaultPinChange ? (
           <>
-            <Text style={styles.title}>Verify Your Current PIN</Text>
-            <Text style={styles.subtitle}>Please enter your current 4-digit PIN to proceed.</Text>
-            <Text style={styles.inputLabel}>Current PIN</Text>
+            <Text style={styles.title}>{t["verify current pin"]}</Text>
+            <Text style={styles.subtitle}>{t["enter current pin message"]}</Text>
+            <Text style={styles.inputLabel}>{t["current pin"]}</Text>
             <TextInput
               value={oldPin}
               onChangeText={setOldPin}
@@ -196,16 +196,16 @@ const PinManagementScreen = () => {
               maxLength={4}
               style={styles.input}
             />
-            <TouchableOpacity onPress={handleVerifyPin} style={styles.saveButton} disabled={loading || isPinVerified}> {/* No translation needed for icon */}
+            <TouchableOpacity onPress={handleVerifyPin} style={styles.saveButton} disabled={loading || isPinVerified}>
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{t["verify pin"]}</Text>}
             </TouchableOpacity>
           </>
         ) : (
           <>
             <Text style={styles.title}>{hasPin ? t["set new pin"] : t["set transaction pin"]}</Text>
-            <Text style={styles.subtitle}>This 4-digit PIN will be used to authorize your payments.</Text>
+            <Text style={styles.subtitle}>{t["pin authorization message"]}</Text>
 
-            <Text style={styles.inputLabel}>New PIN (4 digits)</Text>
+            <Text style={styles.inputLabel}>{t["new pin"]}</Text>
             <TextInput
               value={newPin}
               onChangeText={setNewPin}
@@ -216,7 +216,7 @@ const PinManagementScreen = () => {
               style={styles.input}
             />
 
-            <Text style={styles.inputLabel}>Confirm New PIN</Text>
+            <Text style={styles.inputLabel}>{t["confirm new pin"]}</Text>
             <TextInput
               value={confirmPin}
               onChangeText={setConfirmPin}

@@ -156,8 +156,8 @@ export default function WalletDetailsScreen() {
         {loading ? (
           <WalletSkeleton />
         ) : (
-          <> {/* No translation needed for icon */}
-            <View style={styles.monetizationGoalCard}> {/* No translation needed for icon */}
+          <>
+            <View style={styles.monetizationGoalCard}>
               <Text style={styles.progressTitle}>Monetization Goal</Text>
               <Text style={styles.summaryItem}>Threshold: {monetizationGoal.toLocaleString()} EP</Text>
             </View>
@@ -190,7 +190,7 @@ export default function WalletDetailsScreen() {
         )}
 
         {/* Daily Summary Card */}
-        <View style={styles.summaryCard}> {/* No translation needed for icon */}
+        <View style={styles.summaryCard}>
           <Text style={styles.summaryCardTitle}>Daily Summary</Text>
           <Text style={styles.summaryItem}>• Posts Liked Today: {postsLikedToday}</Text>
           <Text style={styles.summaryItem}>• Stories Viewed Today: {storiesViewedToday}</Text>

@@ -20,6 +20,7 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { Link, useRouter } from "expo-router";
 import { API_BASE_URL } from "@/config";
 import CountryPicker from "@/components/CountryPicker";
+import { useLanguageStore, translations } from "@/stores/languageStore";
 
 const backgroundImage = require("@/assets/images/two.jpg");
 
@@ -36,6 +37,8 @@ const COUNTRIES = [
 const AuthScreen = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [password, setPassword] = useState("");
@@ -70,13 +73,13 @@ const AuthScreen = () => {
   const validateForm = () => {
     const newErrors: { whatsappNumber?: string; password?: string; country?: string } = {};
     if (!whatsappNumber.trim()) {
-      newErrors.whatsappNumber = "WhatsApp number is required.";
+      newErrors.whatsappNumber = t["whatsapp required"];
     }
     if (!password) {
-      newErrors.password = "Password is required.";
+      newErrors.password = t["password required"];
     }
     if (!country) {
-      newErrors.country = "Please select a country.";
+      newErrors.country = t["country required"];
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -106,7 +109,7 @@ const AuthScreen = () => {
         console.log("Parsed JSON response:", data);
       } catch (err) {
         console.error("Failed to parse JSON:", err);
-        Alert.alert("Login Error", "Invalid server response. Check console logs.");
+        Alert.alert(t["login error"], t["invalid response"]);
         return;
       }
 
@@ -118,11 +121,11 @@ const AuthScreen = () => {
       } else {
         const errorMessage = data.error || data.message || "Unknown error";
         console.warn("Login failed:", errorMessage);
-        Alert.alert("Login failed ❌", errorMessage);
+        Alert.alert(t["login failed alert"], errorMessage);
       }
     } catch (err) {
       console.error("Network or fetch error:", err);
-      Alert.alert("Error", "Could not connect to server");
+      Alert.alert(t.error || "Error", t["connection error"] || "Could not connect to server");
     } finally {
       setLoading(false);
     }
@@ -155,17 +158,17 @@ const AuthScreen = () => {
           <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.innerContainer}>
               <View style={styles.headingContainer}>
-                <Text style={styles.label}>Welcome to GAHUNGU PHARMACY</Text>
+                <Text style={styles.label}>{t["welcome message"]}</Text>
                 <Text style={styles.description}>
-                  Dieu avec Dr. Gahungu, Votre Santé est assurée.
+                  {t["Dieu avec Gahungu, Votre Santé est assurée"]}
                 </Text>
               </View>
 
               <View style={styles.form}>
                 <View>
-                  <Text style={styles.hintText}>Tanguza kode y'Igihugu urimwo nkuku: +25777990118</Text>
+                  <Text style={styles.hintText}>{t["whatsapp hint"]}</Text>
                   <TextInput
-                    placeholder="Enter your WhatsApp number"
+                    placeholder={t["enter whatsapp"]}
                     placeholderTextColor="#757575"
                     value={whatsappNumber}
                     onChangeText={(text) => {
@@ -182,10 +185,10 @@ const AuthScreen = () => {
                 </View>
 
                 <View>
-                  <Text style={styles.hintText}>Shiramwo ya code yawe</Text>
+                  <Text style={styles.hintText}>{t["password hint"]}</Text>
                   <View style={[styles.inputContainer, !!errors.password && styles.inputError]}>
                     <TextInput
-                      placeholder="Enter your password"
+                      placeholder={t["enter password"]}
                       placeholderTextColor="#757575"
                       value={password}
                       onChangeText={(text) => {
@@ -212,7 +215,7 @@ const AuthScreen = () => {
                 </View>
 
                 <View>
-                  <Text style={styles.hintText}>Cagura Igihugu ushaka kuzoronderamwo</Text>
+                  <Text style={styles.hintText}>{t["country hint"]}</Text>
                   <CountryPicker
                     countries={COUNTRIES}
                     selectedValue={country}
@@ -233,7 +236,7 @@ const AuthScreen = () => {
                   {loading ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.loginButtonText}>Login</Text>
+                    <Text style={styles.loginButtonText}>{t.login}</Text>
                   )}
                 </TouchableOpacity>
 
@@ -241,13 +244,13 @@ const AuthScreen = () => {
                   onPress={() => router.push("/auth/verify-credentials" as any)}
                   style={styles.forgotPasswordContainer}
                 >
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                  <Text style={styles.forgotPasswordText}>{t["forgot password"]}</Text>
                 </TouchableOpacity>
 
                 <View style={styles.registerContainer}>
-                  <Text style={styles.registerText}>Don’t have an account? </Text>
+                  <Text style={styles.registerText}>{t["dont have account"]}</Text>
                   <Link href={"/auth/register" as any}>
-                    <Text style={styles.registerLink}>Register</Text>
+                    <Text style={styles.registerLink}>{t.register}</Text>
                   </Link>
                 </View>
               </View>

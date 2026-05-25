@@ -5,47 +5,49 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Phone, Facebook, Instagram, MessageCircle } from 'lucide-react-native';
 import { useLanguageStore, translations } from '@/stores/languageStore';
 
-const supportItems = [
-  {
-    icon: MessageCircle,
-    label: 'Forgot PIN',
-    value: 'Contact the Admin on WhatsApp: +25777990118',
-    action: 'https://wa.me/25777990118',
-    needsAlert: true,
-  },
-  {
-    icon: Mail,
-    label: 'Email',
-    value: 'gahungujean12@gmail.com',
-    action: 'mailto:gahungujean12@gmail.com',
-  },
-  {
-    icon: Phone,
-    label: 'Phone',
-    value: '+25777990118',
-    action: 'tel:+25777990118',
-  },
-  {
-    icon: Facebook,
-    label: 'Facebook',
-    value: 'Gahungu Jean Kevin Lepetit',
-    action: 'fb://profile/100008327296325', // Facebook App URL
-    fallback: 'https://www.facebook.com/GahunguJeanKevinLepetit', // Web URL
-  },
-  {
-    icon: Instagram,
-    label: 'Instagram',
-    value: 'd.lepetitkevin',
-    action: 'instagram://user?username=d.lepetitkevin', // Instagram App URL
-    fallback: 'https://www.instagram.com/d.lepetitkevin', // Web URL
-  },
-];
-
 export default function SupportScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const language = useLanguageStore(state => state.language);
   const t = translations[language];
+
+  const supportItems = [
+    {
+      icon: MessageCircle,
+      label: t["forgot pin"],
+      value: 'Contact the Admin on WhatsApp: +25777990118',
+      action: 'https://wa.me/25777990118',
+      needsAlert: true,
+    },
+    {
+      icon: Mail,
+      label: 'Email',
+      value: 'gahungujean12@gmail.com',
+      action: 'mailto:gahungujean12@gmail.com',
+      needsAlert: true,
+    },
+    {
+      icon: Phone,
+      label: 'Phone',
+      value: '+25777990118',
+      action: 'tel:+25777990118',
+    },
+    {
+      icon: Facebook,
+      label: 'Facebook',
+      value: 'Gahungu Jean Kevin Lepetit',
+      action: 'fb://profile/100008327296325', // Facebook App URL
+      fallback: 'https://www.facebook.com/GahunguJeanKevinLepetit', // Web URL
+      needsAlert: true,
+    },
+    {
+      icon: Instagram,
+      label: 'Instagram',
+      value: 'd.lepetitkevin',
+      action: 'instagram://user?username=d.lepetitkevin', // Instagram App URL
+      fallback: 'https://www.instagram.com/d.lepetitkevin', // Web URL
+      needsAlert: true,
+    },
+  ];
 
   const handlePress = async (action: string, fallback?: string, needsAlert?: boolean) => {
     const execute = async () => {
@@ -55,12 +57,12 @@ export default function SupportScreen() {
       } else if (fallback) {
         await Linking.openURL(fallback);
       } else {
-        Alert.alert(`Don't know how to open this URL: ${action}`);
+        Alert.alert(`${t["cannot open url"]} ${action}`);
       }
     };
 
     if (needsAlert) {
-      Alert.alert("Leave App", "You are about to leave the app to open WhatsApp. Do you want to continue?", [{ text: "No", style: "cancel" }, { text: "Yes", onPress: execute }]);
+      Alert.alert(t["leave app"], t["leave app whatsapp message"], [{ text: t.no, style: "cancel" }, { text: t.yes, onPress: execute }]);
     } else {
       await execute();
     }
@@ -73,11 +75,12 @@ export default function SupportScreen() {
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t["customer support"]}</Text>
+        <View style={styles.headerPlaceholder} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.introText}> {/* No translation needed for icon */}
-          Have questions or need help with your order? Reach out to us through any of the channels below.
+        <Text style={styles.introText}>
+          {t["support intro"]}
         </Text>
 
         <View style={styles.supportSection}>
@@ -86,11 +89,11 @@ export default function SupportScreen() {
               key={index}
               style={styles.supportItem}
               onPress={() => handlePress(item.action, (item as any).fallback, (item as any).needsAlert)}
-            > {/* No translation needed for icon */}
-              <View style={styles.iconContainer}> {/* No translation needed for icon */}
-                <item.icon size={24} color="#4CAF50" /> {/* No translation needed for icon */}
+            >
+              <View style={styles.iconContainer}>
+                <item.icon size={24} color="#4CAF50" />
               </View>
-              <View style={styles.textContainer}> {/* No translation needed for icon */}
+              <View style={styles.textContainer}>
                 <Text style={styles.supportLabel}>{item.label}</Text>
                 <Text style={styles.supportValue}>{item.value}</Text>
               </View>
@@ -126,9 +129,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: 'Roboto-Bold',
     textAlign: 'center',
-    marginRight: 40, // Balance the back button
   },
   headerPlaceholder: {
     width: 40,

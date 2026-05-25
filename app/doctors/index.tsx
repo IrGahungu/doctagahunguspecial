@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import type { Doctor } from '@/types';
 
 const { width } = Dimensions.get('window');
@@ -37,6 +38,8 @@ export default function AllDoctorsScreen() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -129,7 +132,7 @@ export default function AllDoctorsScreen() {
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          All Doctors
+          {t["all doctors"]}
         </Text>
         <View style={styles.headerPlaceholder} />
       </View>
@@ -160,7 +163,7 @@ export default function AllDoctorsScreen() {
           columnWrapperStyle={styles.columnWrapper}
           ListEmptyComponent={
             <Text style={{ textAlign: 'center', marginTop: 20 }}>
-              No doctors found.
+              {t["no doctors found"]}
             </Text>
           }
         />

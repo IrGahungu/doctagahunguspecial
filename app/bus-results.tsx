@@ -130,11 +130,11 @@ export default function BusResultsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}> {/* No translation needed for icon */}
+        <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>{from} to {to}</Text>
           <Text style={styles.headerSubtitle}>{formattedDate}</Text>
         </View>
-        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
+        <View style={{ width: 40 }} />
       </View>
 
       {loading || (error && results.length === 0) ? (
@@ -162,11 +162,11 @@ export default function BusResultsScreen() {
                   </View>
                   <View style={styles.stationColumn}>
                     <View style={styles.stationRow}>
-                      <MapPin size={16} color="#4CAF50" /> {/* No translation needed for icon */}
+                      <MapPin size={16} color="#4CAF50" />
                       <Text style={styles.stationText}>{bus.origin} {t["main terminal"]}</Text>
                     </View>
                     <View style={styles.stationRow}>
-                      <MapPin size={16} color="#F44336" /> {/* No translation needed for icon */}
+                      <MapPin size={16} color="#F44336" />
                       <Text style={styles.stationText}>{bus.destination} {t["central station"]}</Text>
                     </View>
                   </View>
@@ -175,14 +175,14 @@ export default function BusResultsScreen() {
                 <TouchableOpacity 
                   style={styles.bookButton}
                   onPress={() => handleOpenSeatMap(bus)}
-                > {/* No translation needed for icon */}
+                >
                   <Text style={styles.bookButtonText}>{t["select seat"]}</Text>
                 </TouchableOpacity>
               </View>
             ))
           ) : (
             <View style={styles.emptyContainer}>
-              <Bus size={64} color="#ccc" /> {/* No translation needed for icon */}
+              <Bus size={64} color="#ccc" />
               <Text style={styles.emptyText}>{t["no buses found"]}</Text>
               <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
                 <Text style={styles.retryButtonText}>{t["try another route"]}</Text>

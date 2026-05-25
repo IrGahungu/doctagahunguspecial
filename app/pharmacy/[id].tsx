@@ -18,6 +18,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { supabase } from '@/lib/supabase';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
@@ -113,6 +114,8 @@ export default function PharmacyDetailScreen() {
   const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const showToast = useToastStore(state => state.showToast);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
   const [showCallCarButton, setShowCallCarButton] = useState(true);
 
   useEffect(() => {
@@ -288,7 +291,7 @@ export default function PharmacyDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Icon name="arrow-back" size={24} color="#212121" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pharmacy Details</Text>
+          <Text style={styles.headerTitle}>{t["pharmacy details"]}</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
         <PharmacyDetailSkeleton />
@@ -314,7 +317,7 @@ export default function PharmacyDetailScreen() {
               <Icon name="arrow-back" size={24} color="#212121" />
             </TouchableOpacity>
     
-            <Text style={styles.headerTitle}>Pharmacy Details</Text>
+            <Text style={styles.headerTitle}>{t["pharmacy details"]}</Text>
     
             {/* Placeholder for right icon to balance layout */}
             <View style={styles.headerRightPlaceholder} />
@@ -335,7 +338,7 @@ export default function PharmacyDetailScreen() {
                 <View style={{ marginTop: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
                     <Icon name="location-on" size={20} color="#4CAF50" />
-                    <Text style={styles.subSectionTitle}>Locations</Text>
+                    <Text style={styles.subSectionTitle}>{t["locations"]}</Text>
                   </View>
 
                   {pharmacy.location && pharmacy.location.length > 0 ? (
@@ -352,7 +355,7 @@ export default function PharmacyDetailScreen() {
                         ) : null}
                         <TouchableOpacity onPress={() => openMap(loc)} style={styles.mapButton}>
                           <Icon name="map" size={16} color="#fff" />
-                          <Text style={styles.mapButtonText}>View on Map</Text>
+                          <Text style={styles.mapButtonText}>{t["view on map"]}</Text>
                         </TouchableOpacity>
                       </View>
                     ))
@@ -365,7 +368,7 @@ export default function PharmacyDetailScreen() {
                 <View style={{ marginTop: 15 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
                     <Icon name="access-time" size={20} color="#4CAF50" />
-                    <Text style={styles.subSectionTitle}>Opening Hours</Text>
+                    <Text style={styles.subSectionTitle}>{t["opening hours"]}</Text>
                   </View>
                   <View style={{ marginLeft: 30 }}>
                     {pharmacy.opening_hours && pharmacy.opening_hours.length > 0 ? (
@@ -397,7 +400,7 @@ export default function PharmacyDetailScreen() {
                 {/* Accepted Insurances */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5, marginTop: 15 }}>
                   <Icon name="verified-user" style={styles.icon} color="#4CAF50" size={20} />
-                  <Text style={styles.subSectionTitle}>Accepted Insurances</Text>
+                  <Text style={styles.subSectionTitle}>{t["accepted insurances"]}</Text>
                 </View>
                 {pharmacy.accepted_insurances && pharmacy.accepted_insurances.length > 0 ? (
                   pharmacy.accepted_insurances.map((insurance, index) => (
@@ -414,7 +417,7 @@ export default function PharmacyDetailScreen() {
                 <View style={{ marginTop: 10, marginBottom: 15 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
                     <Icon name="contact-phone" size={20} color="#4CAF50" />
-                    <Text style={styles.subSectionTitle}>Contact Details</Text>
+                    <Text style={styles.subSectionTitle}>{t["contact details"]}</Text>
                   </View>
                   <View style={{ marginLeft: 30 }}>
                     {pharmacy.contact_email ? (

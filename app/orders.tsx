@@ -148,7 +148,7 @@ export default function OrdersScreen() {
         <Text style={styles.orderId}>{t["order hash"]}{String(item.id || '').substring(0, 8)}</Text>
         <Text style={styles.orderDate}>{t["placed on"]} {new Date(item.created_at).toLocaleDateString()}</Text>
         <Text style={styles.orderTotal}>{t.total} BIF {Number(item.total_amount || 0).toFixed(2)}</Text>
-      </View> {/* No translation needed for icon */}
+      </View>
       <View style={styles.statusContainer}>
         <Text style={styles.checkStatusText}>Check your order status</Text>
         <ChevronRight size={22} color="#757575" />
@@ -174,7 +174,7 @@ export default function OrdersScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList // No translation needed for icon
+        <FlatList
           data={orders}
           renderItem={renderOrderItem}
           keyExtractor={(item) => item.id}
@@ -182,9 +182,9 @@ export default function OrdersScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>You have no orders yet.</Text>
-              <TouchableOpacity onPress={() => router.push('/')}> {/* No translation needed for icon */}
+              <TouchableOpacity onPress={() => router.push('/')}>
                 <Text style={styles.browseButton}>{t["start shopping"]}</Text>
-              </TouchableOpacity> {/* No translation needed for icon */}
+              </TouchableOpacity>
             </View>
           }
           onRefresh={fetchOrders}

@@ -221,7 +221,7 @@ export default function PrescriptionsScreen() {
       </View>
 
       {item.pharmacies.length > 0 && (
-        <View style={styles.pharmaciesSection}> {/* No translation needed for icon */}
+        <View style={styles.pharmaciesSection}>
           <Text style={styles.sectionSubTitle}>Available at:</Text>
           {item.pharmacies.map((pharmacy) => (
             <TouchableOpacity
@@ -255,7 +255,7 @@ export default function PrescriptionsScreen() {
       )}
 
       {item.insurances.length > 0 && (
-        <View style={styles.insurancesSection}> {/* No translation needed for icon */}
+        <View style={styles.insurancesSection}>
           <Text style={styles.sectionSubTitle}>Covered by:</Text>
           <View style={styles.insuranceTags}>
             {item.insurances.map((insurance, index) => (

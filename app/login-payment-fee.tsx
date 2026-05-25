@@ -249,8 +249,8 @@ export default function LoginPaymentFeeScreen() {
           const data = await res.json();
           Toast.show({
             type: 'error',
-            text1: 'Error',
-            text2: data.error || 'Incorrect PIN',
+            text1: t["incorrect pin"] || 'Wrong PIN detected',
+            text2: t.retry || 'please try again',
           });
           setPin('');
         } catch (e) {
@@ -261,8 +261,8 @@ export default function LoginPaymentFeeScreen() {
           } else {
             Toast.show({
               type: 'info',
-              text1: 'Connection Weak',
-              text2: 'Cannot verify PIN right now.',
+              text1: t["connection error"] || 'Connection Weak',
+              text2: t.retry || 'Cannot verify PIN right now.',
             });
             setPin('');
           }
@@ -320,8 +320,8 @@ export default function LoginPaymentFeeScreen() {
         setWalletBalance(newLocalBalance);
         Toast.show({
           type: 'success',
-          text1: 'Payment Successful',
-          text2: 'Welcome to Gahungu Pharmacy!',
+          text1: t["payment successful"] || 'Payment Successful',
+          text2: t["Dieu avec Gahungu, Votre Santé est assurée"] || 'Welcome to Gahungu Pharmacy!',
         });
         router.replace('/(tabs)');
       } else {
@@ -335,8 +335,8 @@ export default function LoginPaymentFeeScreen() {
     } catch (err) {
       Toast.show({
         type: 'error',
-        text1: 'Internet Required',
-        text2: 'Please connect to the internet to validate access.',
+        text1: t["connection error"] || 'Internet Required',
+        text2: t["retry connection"] || 'Please connect to the internet to validate access.',
       });
     } finally {
       setLoading(false);
@@ -354,11 +354,11 @@ export default function LoginPaymentFeeScreen() {
   const handlePayFeePress = () => {
     if (isDefaultPin) {
       Alert.alert(
-        'Security Alert',
-        'Your PIN is currently "1616" (default). For your security, you must change it before you can pay the access fee.',
+        t["wallet security"] || 'Security Alert',
+        t["default pin alert message"] || 'Your PIN is currently "1616" (default). For your security, you must change it before you can pay the access fee.',
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Change PIN', onPress: () => router.push({ pathname: '/pin-management', params: { forceChangeDefaultPin: 'true' } }) },
+          { text: t.cancel, style: 'cancel' },
+          { text: t["change pin"], onPress: () => router.push({ pathname: '/pin-management', params: { forceChangeDefaultPin: 'true' } }) },
         ]
       );
       return;
@@ -378,12 +378,12 @@ export default function LoginPaymentFeeScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      "Confirm Logout",
-      "Are you sure you want to log out?",
+      t.confirmLogout || "Confirm Logout",
+      t.logoutMessage || "Are you sure you want to log out?",
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t.cancel || "Cancel", style: "cancel" },
         {
-          text: "Logout",
+          text: t.logout || "Logout",
           style: "destructive",
           onPress: async () => {
             // Clear global state and token
@@ -413,7 +413,7 @@ export default function LoginPaymentFeeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <ShieldCheck size={48} color="#4CAF50" /> {/* No translation needed for icon */}
+        <ShieldCheck size={48} color="#4CAF50" />
         <Text style={styles.title}>{t["secure access fee"]}</Text>
         <Text style={styles.subtitle}>
           {t["access fee message"]}
@@ -422,7 +422,7 @@ export default function LoginPaymentFeeScreen() {
 
       <View style={styles.card}>
         <View style={styles.feeRow}>
-          <Text style={styles.feeLabel}>Access Fee</Text>
+          <Text style={styles.feeLabel}>{t["access fee"]}</Text>
           <Text style={styles.feeAmount}>{fee.toLocaleString()} {currency}</Text>
         </View>
         
@@ -430,9 +430,9 @@ export default function LoginPaymentFeeScreen() {
 
         <View style={styles.walletInfo}>
           <View style={styles.walletRow}>
-            <View style={styles.walletHeader}> {/* No translation needed for icon */}
-              <Wallet size={20} color="#212121" /> {/* No translation needed for icon */}
-              <Text style={styles.walletTitle}>Gahungu Wallet</Text>
+            <View style={styles.walletHeader}>
+              <Wallet size={20} color="#212121" />
+              <Text style={styles.walletTitle}>{t["gahungu wallet"]}</Text>
             </View>
             
             <TouchableOpacity 
@@ -446,13 +446,12 @@ export default function LoginPaymentFeeScreen() {
               }}
               style={styles.eyeButton}
             >
-              {/* No translation needed for icon */}
               {isBalanceVisible ? <EyeOff size={20} color="#4CAF50" /> : <Eye size={20} color="#757575" />}
             </TouchableOpacity>
           </View>
 
           <Text style={styles.balanceText}>
-            Available Balance: <Text style={styles.balanceValue}>
+            {t["available balance"]}: <Text style={styles.balanceValue}>
               {isBalanceVisible ? `${walletBalance.toLocaleString()} ${currency}` : '****'}
             </Text>
           </Text>
@@ -472,7 +471,7 @@ export default function LoginPaymentFeeScreen() {
       {isDefaultPin && (
         <View style={styles.warningBox}>
           <ShieldCheck size={20} color="#F44336" />
-          <Text style={styles.warningText}>Default PIN: 1616. Change it now!</Text>
+          <Text style={styles.warningText}>{t["default pin warning"]}</Text>
         </View>
       )}
 
@@ -505,7 +504,7 @@ export default function LoginPaymentFeeScreen() {
           onPress={() => { setFetchingData(true); fetchData(); }}
         >
           <PlusCircle size={20} color="#F44336" />
-          <Text style={styles.retryText}>Retry Connection</Text>
+          <Text style={styles.retryText}>{t["retry connection"]}</Text>
         </TouchableOpacity>
       )}
 
@@ -549,10 +548,11 @@ export default function LoginPaymentFeeScreen() {
                 <Text>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalVerify} onPress={handlePinSubmit} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalVerifyText}>Verify</Text>}
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalVerifyText}>{t.verify}</Text>}
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
+          <Toast topOffset={50} />
         </View>
       </Modal>
 

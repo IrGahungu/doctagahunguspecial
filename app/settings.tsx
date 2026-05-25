@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useCartStore } from '@/stores/cartStore'; // This is used in handleLogout
 import { useLanguageStore, translations, Language } from '@/stores/languageStore';
 import CountryPicker from '@/components/CountryPicker';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 const COUNTRIES = [
   "Burundi",
@@ -24,6 +25,17 @@ export default function SettingsScreen() {
   const [selectedCountry, setSelectedCountry] = useState('');
   const { language, setLanguage } = useLanguageStore();
   const t = translations[language];
+
+  const [langOpen, setLangOpen] = useState(false);
+  const [langItems, setLangItems] = useState([
+    { label: 'English', value: 'en' },
+    { label: 'Kirundi', value: 'rn' },
+    { label: 'Français', value: 'fr' },
+  ]);
+
+  const onLangOpen = useCallback(() => {
+    // Placeholder for closing other pickers if necessary
+  }, []);
 
   const handleLogout = () => {
     Alert.alert(
@@ -66,25 +78,6 @@ export default function SettingsScreen() {
     router.push('/(tabs)');
   };
 
-  const handleLanguagePress = () => {
-    Alert.alert(
-      t.language,
-      "Select your preferred language / Hitamo ururimi / Choisissez votre langue",
-      [
-        { text: "English", onPress: () => setLanguage('en') },
-        { text: "Kirundi", onPress: () => setLanguage('rn') },
-        { text: "Français", onPress: () => setLanguage('fr') },
-        { text: t.cancel, style: "cancel" },
-      ]
-    );
-  };
-
-  const getLanguageName = (code: Language) => {
-    if (code === 'rn') return 'Kirundi';
-    if (code === 'fr') return 'Français';
-    return 'English';
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -105,22 +98,29 @@ export default function SettingsScreen() {
             <CountryPicker countries={COUNTRIES} selectedValue={selectedCountry} onValueChange={handleCountryChange} />
           </View>
         </View>
-        <View style={styles.section}>
-          {/* <View style={styles.settingItem}>
-            <Bell size={22} color="#757575" />
-            <Text style={styles.settingText}>Push Notifications</Text>
-            <Switch trackColor={{ false: '#767577', true: '#81c784' }} thumbColor={'#4CAF50'} />
-          </View> */}
-          {/*<View style={styles.settingItem}>
-            <Palette size={22} color="#757575" />
-            <Text style={styles.settingText}>Dark Mode</Text>
-            <Switch trackColor={{ false: '#767577', true: '#81c784' }} thumbColor={'#4CAF50'} />
-          </View>*/}
-          <TouchableOpacity style={styles.settingItem} onPress={handleLanguagePress}>
+        <View style={[styles.section, { zIndex: 1000, overflow: 'visible' }]}>
+          <View style={styles.settingItem}>
             <Languages size={22} color="#757575" />
             <Text style={styles.settingText}>{t.language}</Text>
-            <Text style={styles.languageText}>{getLanguageName(language)}</Text>
-          </TouchableOpacity>
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+            <DropDownPicker
+              open={langOpen}
+              value={language}
+              items={langItems}
+              setOpen={setLangOpen}
+              setValue={(callback) => {
+                const val = typeof callback === 'function' ? callback(language) : callback;
+                setLanguage(val as Language);
+              }}
+              setItems={setLangItems}
+              onOpen={onLangOpen}
+              placeholder="Select Language"
+              style={styles.dropdown}
+              dropDownContainerStyle={styles.dropdownContainer}
+              listMode="SCROLLVIEW"
+            />
+          </View>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -171,6 +171,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 24,
+  },
+  dropdown: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F5F5F5',
+    minHeight: 45,
+  },
+  dropdownContainer: {
+    borderColor: '#F5F5F5',
+    borderRadius: 8,
   },
   settingItem: {
     flexDirection: 'row',

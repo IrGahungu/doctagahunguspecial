@@ -179,7 +179,7 @@ export default function FeaturedInsurances({ title, baseUrl = "" }: Props) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.header}>{title}</Text>{/* This header is outside the scrollable area */}
+        <Text style={styles.header}>{title}</Text>
         <View style={styles.list}>
           <SkeletonCard />
           <SkeletonCard />

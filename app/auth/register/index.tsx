@@ -21,12 +21,15 @@ import { API_BASE_URL } from "@/config";
 import * as SecureStore from "expo-secure-store";
 import DropDownPicker, { ItemType } from "react-native-dropdown-picker";
 import { countries } from "@/constants/countries"; // Now expects [{ name: '...', code: '...' }]
+import { useLanguageStore, translations } from "@/stores/languageStore";
 
 const backgroundImage = require("@/assets/images/two.jpg");
 
 const RegisterScreen = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const [fullname, setFullname] = useState("");
   const [password, setPassword] = useState("");
@@ -53,14 +56,19 @@ const RegisterScreen = () => {
   // Secret Question state
   const [secretAnswer, setSecretAnswer] = useState<string | null>(null);
   const [secretAnswerOpen, setSecretAnswerOpen] = useState(false);
-  const [secretAnswerItems, setSecretAnswerItems] = useState([
-    { label: "Head", value: "Head" },
-    { label: "Legs", value: "Legs" },
-    { label: "Lips", value: "Lips" },
-    { label: "Body", value: "Body" },
-    { label: "Eyes", value: "Eyes" },
-    { label: "Fingers", value: "Fingers" },
-  ]);
+  const [secretAnswerItems, setSecretAnswerItems] = useState<any[]>([]);
+
+  // React to language changes for secret answer items
+  React.useEffect(() => {
+    setSecretAnswerItems([
+      { label: t.head, value: "Head" },
+      { label: t.legs, value: "Legs" },
+      { label: t.lips, value: "Lips" },
+      { label: t.body, value: "Body" },
+      { label: t.eyes, value: "Eyes" },
+      { label: t.fingers, value: "Fingers" },
+    ]);
+  }, [language, t]);
 
   // Helper function to convert country code to flag emoji
   const getFlagEmoji = (countryCode: string): string | null => {
@@ -100,7 +108,7 @@ const RegisterScreen = () => {
   const validateFullname = (text: string) => {
     setFullname(text);
     if (!text.trim()) {
-      setErrors((prev) => ({ ...prev, fullname: "Full name is required." }));
+      setErrors((prev) => ({ ...prev, fullname: t["fullname required"] }));
     } else {
       setErrors((prev) => ({ ...prev, fullname: undefined }));
     }
@@ -125,8 +133,8 @@ const RegisterScreen = () => {
       }
     }
 
-    if (text.length > 0 && !hasMinLength) errorMsg = "Password must be at least 8 characters.";
-    else if (hasMinLength && (!hasLetters || !hasNumbers)) errorMsg = "Password must contain both letters and numbers.";
+    if (text.length > 0 && !hasMinLength) errorMsg = t["password must be at least 8 characters"];
+    else if (hasMinLength && (!hasLetters || !hasNumbers)) errorMsg = t["password must contain both letters and numbers"];
 
     setPasswordStrength(score);
     setErrors((prev) => ({ ...prev, password: errorMsg }));
@@ -153,15 +161,15 @@ const RegisterScreen = () => {
 
       const data = await res.json();
       if (res.ok && data.exists) {
-        setWhatsappCheckError("This WhatsApp number is already registered.");
+        setWhatsappCheckError(t["whatsapp registered error"]);
       } else if (!res.ok) {
-        setWhatsappCheckError(data.error || "Error checking WhatsApp number.");
+        setWhatsappCheckError(data.error || t["error checking whatsapp"]);
       } else {
         setWhatsappCheckError(undefined); // Number is unique
       }
     } catch (err) {
       console.error("WhatsApp uniqueness check error:", err);
-      setWhatsappCheckError("Could not verify WhatsApp number. Please try again.");
+      setWhatsappCheckError(t["connection error"] || "Could not verify WhatsApp number. Please try again.");
     } finally {
       setIsCheckingWhatsapp(false);
     }
@@ -170,7 +178,7 @@ const RegisterScreen = () => {
   const validateWhatsapp = (text: string) => {
     setWhatsappNumber(text);
     if (text.length > 0 && (text.length < 10 || !text.startsWith("+"))) { // Basic format validation
-      setErrors((prev) => ({ ...prev, whatsappNumber: "Enter a valid number with country code (e.g., +1...)." }));
+      setErrors((prev) => ({ ...prev, whatsappNumber: t["whatsapp format error"] }));
       setWhatsappCheckError(undefined); // Clear uniqueness error if format is invalid
       setIsCheckingWhatsapp(false);
     } else {
@@ -187,22 +195,22 @@ const RegisterScreen = () => {
 
   const validateConfirmPassword = (text: string, pass: string) => {
     setConfirmPassword(text);
-    if (text && text !== pass) setErrors((prev) => ({ ...prev, confirmPassword: "Passwords do not match." }));
+    if (text && text !== pass) setErrors((prev) => ({ ...prev, confirmPassword: t["passwords dont match"] }));
     else setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
   };
 
   const validateForm = () => {
     const newErrors: typeof errors = {};
 
-    if (!fullname.trim()) newErrors.fullname = "Full name is required.";
-    if (!password) newErrors.password = "Password is required.";
-    if (!confirmPassword) newErrors.confirmPassword = "Please confirm your password.";
-    if (password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match.";
-    if (!country) newErrors.country = "Please select your country.";
-    if (!whatsappNumber) newErrors.whatsappNumber = "A valid WhatsApp number is required.";
-    if (!secretAnswer) newErrors.secretAnswer = "Please answer the secret question.";
+    if (!fullname.trim()) newErrors.fullname = t["fullname required"];
+    if (!password) newErrors.password = t["password required"];
+    if (!confirmPassword) newErrors.confirmPassword = t["confirm password required"];
+    if (password !== confirmPassword) newErrors.confirmPassword = t["passwords dont match"];
+    if (!country) newErrors.country = t["country required"];
+    if (!whatsappNumber) newErrors.whatsappNumber = t["whatsapp required"];
+    if (!secretAnswer) newErrors.secretAnswer = t["secret answer required"];
     if (whatsappCheckError) newErrors.whatsappNumber = whatsappCheckError; // Add uniqueness error
-    if (isCheckingWhatsapp) newErrors.whatsappNumber = "Checking WhatsApp number..."; // Prevent submission while checking
+    if (isCheckingWhatsapp) newErrors.whatsappNumber = t["checking whatsapp"]; // Prevent submission while checking
 
     const combinedErrors = { ...errors, ...newErrors };
     setErrors(combinedErrors);
@@ -231,14 +239,14 @@ const RegisterScreen = () => {
 
       const data = await res.json();
       if (res.ok) {
-        Alert.alert("✅ Registered", "You can now log in!");
+        Alert.alert(t["registered alert title"], t["registered alert message"]);
         router.push("/auth");
       } else {
-        Alert.alert("❌ Registration failed", data.error || "Unknown error");
+        Alert.alert(t["registration failed"], data.error || "Unknown error");
       }
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Could not connect to server");
+      Alert.alert(t.error || "Error", t["connection error"] || "Could not connect to server");
     } finally {
       setLoading(false);
     }
@@ -248,11 +256,11 @@ const RegisterScreen = () => {
     if (!validateForm()) return;
 
     Alert.alert(
-      "Confirm Your Details",
-      `Is this information correct?\n\nFull Name: ${fullname}\nWhatsApp: ${whatsappNumber}\nCountry: ${country}\nSecret Answer: ${secretAnswer}`,
+      t["confirm details title"],
+      `${t["confirm details message"]}\n\n${t["full name"]}: ${fullname}\nWhatsApp: ${whatsappNumber}\n${t.language === 'en' ? 'Country' : t.dataCountry}: ${country}\n${t.language === 'rn' ? 'Inyishu' : 'Secret Answer'}: ${secretAnswer}`,
       [
-        { text: "No", style: "cancel" },
-        { text: "OK", onPress: proceedWithRegistration },
+        { text: t.no, style: "cancel" },
+        { text: t.yes || "OK", onPress: proceedWithRegistration },
       ]
     );
   };
@@ -279,17 +287,17 @@ const RegisterScreen = () => {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                   <ArrowLeft size={28} color="black" />
                 </TouchableOpacity>
-                <Text style={styles.label}>Create an Account</Text>
+                <Text style={styles.label}>{t["create account"]}</Text>
                 <View style={styles.headerSpacer} />{/* This is a spacer */}
               </View>
               <View style={styles.headingContainer}>
-                <Text style={styles.description}>Welcome to Dr. Gahungu, You Already healed!</Text>
+                <Text style={styles.description}>{t["registration welcome"]}</Text>
               </View>
               <View style={styles.form}>
                 {/* Full Name */}
-                <Text style={styles.hintText}>Shiramwo Izina ryawe nkuku: GAHUNGU</Text>
+                <Text style={styles.hintText}>{t["fullname hint"]}</Text>
                 <TextInput
-                  placeholder="Full Name"
+                  placeholder={t["full name"]}
                   placeholderTextColor="gray"
                   value={fullname}
                   onChangeText={validateFullname}
@@ -300,10 +308,10 @@ const RegisterScreen = () => {
                 {errors.fullname && <Text style={styles.errorText}>{errors.fullname}</Text>}
 
                 {/* Password */}
-                <Text style={styles.hintText}>Indome nibiharuro kandi bikwire umunani nkuku: Gahungu12345</Text>
+                <Text style={styles.hintText}>{t["password hint long"]}</Text>
                 <View style={[styles.inputContainer, !!errors.password && styles.inputError]}>
                   <TextInput
-                    placeholder="Password"
+                    placeholder={t.password}
                     placeholderTextColor="gray"
                     value={password}
                     onChangeText={validatePassword}
@@ -331,10 +339,10 @@ const RegisterScreen = () => {
                 )}
 
                 {/* Confirm Password */}
-                <Text style={styles.hintText}>Subizamwo iyo Password waruhejeje gushiramwo</Text>
+                <Text style={styles.hintText}>{t["confirm password hint"]}</Text>
                 <View style={[styles.inputContainer, !!errors.confirmPassword && styles.inputError]}>
                   <TextInput
-                    placeholder="Confirm Password"
+                    placeholder={t["confirm new pin"] || "Confirm Password"}
                     placeholderTextColor="gray"
                     value={confirmPassword}
                     onChangeText={(text) => validateConfirmPassword(text, password)}
@@ -349,7 +357,7 @@ const RegisterScreen = () => {
                 {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
 
                 {/* Country Dropdown */}
-                <Text style={styles.hintText}>Fyonda hama ucagure igihugu urimwo ubu</Text>
+                <Text style={styles.hintText}>{t["country hint long"]}</Text>
                 <View style={{ zIndex: 2000 }}>
                   <DropDownPicker
                     open={countryOpen}
@@ -370,8 +378,8 @@ const RegisterScreen = () => {
                       }
                     }}
                     searchable={true}
-                    placeholder="Select your country"
-                    searchPlaceholder="Search country..."
+                    placeholder={t["select country"]}
+                    searchPlaceholder={t["search country"]}
                     listMode="SCROLLVIEW"
                     style={[styles.dropdown, errors.country && styles.inputError]} // Keep this for styling the input box
                     dropDownContainerStyle={styles.dropdownContainer}
@@ -380,10 +388,10 @@ const RegisterScreen = () => {
                 </View>
 
                 {/* WhatsApp Number */}
-                <Text style={styles.hintText}>Tanguza kode y'Igihugu urimwo nkuku: +25777990118</Text>
+                <Text style={styles.hintText}>{t["whatsapp hint"]}</Text>
                 <View style={[styles.inputContainer, (!!errors.whatsappNumber || !!whatsappCheckError) && styles.inputError]}>
                   <TextInput
-                    placeholder="WhatsApp Number"
+                    placeholder={t["whatsapp number"]}
                     placeholderTextColor="gray"
                     value={whatsappNumber}
                     onChangeText={validateWhatsapp}
@@ -401,7 +409,7 @@ const RegisterScreen = () => {
 
                 {/* Secret Question */}
                 <View style={{ zIndex: 1000 }}>
-                  <Text style={styles.secretQuestionLabel}>Nikihe gihimba ukunda cane kuri wewe? Ugifate kumutwe!!</Text>
+                  <Text style={styles.secretQuestionLabel}>{t["secret question label"]}</Text>
                   <DropDownPicker
                     open={secretAnswerOpen}
                     value={secretAnswer}
@@ -415,7 +423,7 @@ const RegisterScreen = () => {
                         setErrors((prev) => ({ ...prev, secretAnswer: undefined }));
                       }
                     }}
-                    placeholder="Select an answer"
+                    placeholder={t["select answer"]}
                     listMode="SCROLLVIEW"
                     style={[styles.dropdown, errors.secretAnswer && styles.inputError]} // Keep this for styling the input box
                     dropDownContainerStyle={styles.dropdownContainer}
@@ -426,10 +434,10 @@ const RegisterScreen = () => {
                 {/* Gender */}
                 <View style={styles.genderContainer}>
                   <TouchableOpacity style={[styles.genderButton, gender === "male" && styles.genderButtonActive]} onPress={() => setGender("male")}>
-                    <Text style={styles.genderButtonText}>Male</Text>
+                    <Text style={styles.genderButtonText}>{t.male}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.genderButton, gender === "female" && styles.genderButtonActive]} onPress={() => setGender("female")}>
-                    <Text style={styles.genderButtonText}>Female</Text>
+                    <Text style={styles.genderButtonText}>{t.female}</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -442,15 +450,15 @@ const RegisterScreen = () => {
                     {agreedToTerms ? <CheckSquare color="#4CAF50" size={24} /> : <Square color="black" size={24} />}
                   </TouchableOpacity>
                   <Text style={styles.termsText}>
-                    Fyonda muri kano ga case, hama uzoba wemeye Dr. IR. Gahungu's{' '}
+                    {t["terms agree start"]}{' '}
                     <Text style={styles.linkText} onPress={() => router.push('/terms')}>
-                      Terms and Conditions
+                      {t["terms and conditions"]}
                     </Text>
                     .
                   </Text>
                 </View>
                 <TouchableOpacity style={[styles.registerButton, (loading || isCheckingWhatsapp || !agreedToTerms) && styles.buttonDisabled]} onPress={handleRegister} disabled={loading || isCheckingWhatsapp || !agreedToTerms}>
-                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.registerButtonText}>Register</Text>}
+                  {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.registerButtonText}>{t.register}</Text>}
                 </TouchableOpacity>
               </View>
             </View>

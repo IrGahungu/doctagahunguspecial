@@ -112,10 +112,10 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
       )}
       <View style={styles.cardHeader}>
         <View style={styles.companyInfo}>
-          <Bus size={20} color="#4CAF50" /> {/* No translation needed for icon */}
+          <Bus size={20} color="#4CAF50" />
           <Text style={styles.companyName}>{item.buses.company}</Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}> {/* No translation needed for icon */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isConfirmed && (
             <TouchableOpacity onPress={handleDownload} style={styles.downloadButton}>
               <Download size={16} color="#4CAF50" />
@@ -142,7 +142,7 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
         <View style={styles.routeDivider}>
           <View style={styles.dot} />
           <View style={styles.line} />
-          <MapPin size={16} color="#F44336" /> {/* No translation needed for icon */}
+          <MapPin size={16} color="#F44336" />
         </View>
 
         <View style={[styles.routePoint, { alignItems: 'flex-end' }]}>
@@ -162,7 +162,7 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
         </View>
         <View style={styles.infoItem}>
           <TicketIcon size={14} color="#4CAF50" />
-          <View> {/* No translation needed for icon */}
+          <View>
             <Text style={styles.seatValue}>Seat {item.seat_number}</Text>
             {isConfirmed && item.ticket_number && (
               <Text style={styles.ticketIdSmall}>ID: {item.ticket_number}</Text>
@@ -310,7 +310,7 @@ export default function BusTicketsScreen() {
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t["my bus tickets"]}</Text>
-        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
+        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (
@@ -323,7 +323,7 @@ export default function BusTicketsScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList // No translation needed for icon
+        <FlatList
           data={tickets}
           renderItem={({ item }) => <TicketItem item={item} isNew={newTicketIds.has(item.id)} />}
           keyExtractor={(item) => item.id}
@@ -333,7 +333,7 @@ export default function BusTicketsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Bus size={64} color="#ccc" /> {/* No translation needed for icon */}
+              <Bus size={64} color="#ccc" />
               <Text style={styles.emptyText}>{t["no tickets yet"]}</Text>
               <TouchableOpacity 
                 style={styles.bookButton}

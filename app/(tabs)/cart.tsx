@@ -229,12 +229,12 @@ export default function CartScreen() {
         <ScrollView style={styles.content}>
           {items.length === 0 ? (
             <View style={styles.emptyCart}>
-              <ShoppingCart size={80} /> {/* No translation needed for icon */}
+              <ShoppingCart size={80} />
               <Text style={styles.emptyCartTitle}>{t["cart empty"]}</Text>
               <TouchableOpacity
                 style={styles.browseButton}
                 onPress={() => router.push('/')}
-              > {/* No translation needed for icon */}
+              >
                 <Text style={styles.browseButtonText}>{t["browse products"]}</Text>
               </TouchableOpacity>
             </View>
@@ -258,7 +258,7 @@ export default function CartScreen() {
                       </View>
                     )}
                     <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.productName}>{item.product.name}</Text> {/* No translation needed for icon */}
+                      <Text style={styles.productName}>{item.product.name}</Text>
                       <Text style={styles.productPrice}>
                         {getCurrency(country)} {parseFloat(String(item.product.price)).toFixed(2)}
                       </Text>
@@ -267,9 +267,9 @@ export default function CartScreen() {
                           style={styles.qtyButton}
                           onPress={() => handleDecrease(item)} // No translation needed for icon
                         >
-                          <Minus size={18} color="#212121" /> {/* No translation needed for icon */}
+                          <Minus size={18} color="#212121" />
                         </TouchableOpacity>
-                        <Text style={styles.productQty}>{item.quantity}</Text> {/* No translation needed for icon */}
+                        <Text style={styles.productQty}>{item.quantity}</Text>
                         <TouchableOpacity
                           style={styles.qtyButton}
                           onPress={() => handleIncrease(item)}
@@ -284,15 +284,15 @@ export default function CartScreen() {
 
               {/* Subtotal Card */}
               <View style={styles.subtotalCard}>
-                <View style={styles.subtotalRow}> {/* No translation needed for icon */}
+                <View style={styles.subtotalRow}>
                   <Text style={styles.subtotalLabel}>{t.subtotal}:</Text>
                   <Text style={styles.subtotalValue}>{getCurrency(country)} {subtotal.toFixed(2)}</Text>
                 </View>
-                <View style={styles.subtotalRow}> {/* No translation needed for icon */}
+                <View style={styles.subtotalRow}>
                   <Text style={styles.subtotalLabel}>{t["medicine service fee"]}:</Text>
                   <Text style={styles.subtotalValue}>{getCurrency(country)} {serviceFee.toFixed(2)}</Text>
                 </View>
-                <View style={styles.subtotalRow}> {/* No translation needed for icon */}
+                <View style={styles.subtotalRow}>
                   <Text style={[styles.subtotalLabel, { fontWeight: 'bold' }]}>{t.total}:</Text>
                   <Text style={[styles.subtotalValue, { fontWeight: 'bold' }]}>{getCurrency(country)} {total.toFixed(2)}</Text>
                 </View>
@@ -309,8 +309,8 @@ export default function CartScreen() {
                     selectedMethod === 'bank' && styles.selectedOption,
                   ]}
                   onPress={() => setSelectedMethod('bank')}
-                > {/* No translation needed for icon */}
-                  <CreditCard size={22} color={selectedMethod === 'bank' ? 'blue' : '#212121'} /> {/* No translation needed for icon */}
+                >
+                  <CreditCard size={22} color={selectedMethod === 'bank' ? 'blue' : '#212121'} />
                   <Text style={[
                     styles.paymentOptionText, // No translation needed for icon
                     selectedMethod === 'bank' && { color: 'blue' }
@@ -326,8 +326,8 @@ export default function CartScreen() {
                     selectedMethod === 'wallet' && styles.selectedOption,
                   ]}
                   onPress={() => setSelectedMethod('wallet')}
-                > {/* No translation needed for icon */}
-                  <Wallet size={22} color={selectedMethod === 'wallet' ? 'blue' : '#212121'} /> {/* No translation needed for icon */}
+                >
+                  <Wallet size={22} color={selectedMethod === 'wallet' ? 'blue' : '#212121'} />
                   <Text style={[
                     styles.paymentOptionText, // No translation needed for icon
                     selectedMethod === 'wallet' && { color: 'blue' }

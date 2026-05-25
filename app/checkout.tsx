@@ -272,7 +272,7 @@ export default function CheckoutScreen() {
         <CheckoutSkeleton />
       ) : (
         <>
-          {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />} {/* No translation needed for icon */}
+          {showConfetti && <ConfettiCannon count={200} origin={{ x: -10, y: 0 }} fadeOut={true} />}
 
           <ScrollView contentContainerStyle={styles.content}>
             <View style={styles.summaryCard}>
@@ -292,7 +292,7 @@ export default function CheckoutScreen() {
             </View>
 
             <View style={styles.paymentMethodCard}>
-              <Wallet size={24} color="#4CAF50" /> {/* No translation needed for icon */}
+              <Wallet size={24} color="#4CAF50" />
               <Text style={styles.paymentMethodText}>{t["paying with gahungu wallet"]}</Text>
             </View>
 
@@ -313,7 +313,7 @@ export default function CheckoutScreen() {
         onRequestClose={() => setIsPinModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}> {/* No translation needed for icon */}
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t["enter wallet pin"]}</Text>
             <Text style={styles.modalSubtitle}>Please enter your 4-digit PIN to confirm payment.</Text>
             
@@ -333,7 +333,7 @@ export default function CheckoutScreen() {
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => setIsPinModalVisible(false)}
-              > {/* No translation needed for icon */}
+              >
                 <Text style={styles.cancelButtonText}>{t.cancel}</Text>
               </TouchableOpacity>
               
@@ -341,7 +341,7 @@ export default function CheckoutScreen() {
                 style={[styles.modalButton, styles.verifyButton]} 
                 onPress={handleVerifyAndPay}
                 disabled={isLoading}
-              > {/* No translation needed for icon */}
+              >
                 {isLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (

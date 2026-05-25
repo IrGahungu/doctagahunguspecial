@@ -19,6 +19,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import Toast from '@/components/Toast';
 import { useToastStore } from '@/stores/toastStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -118,6 +119,8 @@ export default function InsuranceDetailScreen() {
   const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const showToast = useToastStore((state) => state.showToast);
+  const language = useLanguageStore(state => state.language);
+  const t: any = translations[language];
   const [showCallCarButton, setShowCallCarButton] = useState(true);
 
   useEffect(() => {
@@ -198,7 +201,7 @@ export default function InsuranceDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Icon name="arrow-back" size={24} color="#212121" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Insurance Details</Text>
+          <Text style={styles.headerTitle}>{t["insurance details"]}</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
         <InsuranceDetailSkeleton />
@@ -209,7 +212,7 @@ export default function InsuranceDetailScreen() {
   if (!insurance) {
     return (
       <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 50 }}>Insurance not found.</Text>
+        <Text style={{ textAlign: 'center', marginTop: 50 }}>{t["insurance not found"]}</Text>
       </View>
     );
   }
@@ -226,7 +229,7 @@ export default function InsuranceDetailScreen() {
       if (insurance.insurance_plans && insurance.insurance_plans.trim().startsWith('[')) {
         parsedPlans = JSON.parse(insurance.insurance_plans);
       } else if (insurance.insurance_plans) {
-        parsedPlans = [{ title: 'Standard Plan', description: insurance.insurance_plans, price: '' }];
+        parsedPlans = [{ title: t["standard plan"], description: insurance.insurance_plans, price: '' }];
       }
     } catch (e) { console.error("Error parsing plans", e); }
 
@@ -271,7 +274,7 @@ export default function InsuranceDetailScreen() {
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Insurance Details</Text>
+        <Text style={styles.headerTitle}>{t["insurance details"]}</Text>
 
         {/* Placeholder for right icon to balance layout */}
         <View style={styles.headerRightPlaceholder} />
@@ -281,7 +284,7 @@ export default function InsuranceDetailScreen() {
           <Image source={{ uri: insurance.image && !insurance.image.startsWith('http') ? `${INSURANCE_URL_PREFIX}${insurance.image}` : insurance.image }} style={styles.insuranceImage} resizeMode="cover" />
         ) : (
           <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No Image Available</Text>
+            <Text style={styles.placeholderText}>{t["no image available"]}</Text>
           </View>
         )}
         <View style={styles.detailsContainer}>
@@ -291,7 +294,7 @@ export default function InsuranceDetailScreen() {
               <View>
                 {/* Insurance Plans */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🛡️ Insurance Type</Text>
+                  <Text style={styles.infoTitle}>🛡️ {t["insurance type"]}</Text>
                   {parsedPlans.length > 0 ? (
                     parsedPlans.map((plan, idx) => (
                       <View key={idx} style={styles.planItem}>
@@ -303,45 +306,45 @@ export default function InsuranceDetailScreen() {
                       </View>
                     ))
                   ) : (
-                    <Text style={styles.infoText}>No plan details available.</Text>
+                    <Text style={styles.infoText}>{t["no plan details available"]}</Text>
                   )}
                 </View>
 
                 {/* Coverage Summary */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>📋 Coverage Summary</Text>
-                  <Text style={styles.infoText}>{insurance.coverage_summary || 'N/A'}</Text>
+                  <Text style={styles.infoTitle}>📋 {t["coverage summary"]}</Text>
+                  <Text style={styles.infoText}>{insurance.coverage_summary || t.new}</Text>
                 </View>
 
                 {/* Claim Process */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>📄 Claim Process</Text>
-                  <Text style={styles.infoText}>{insurance.claim_process || 'N/A'}</Text>
+                  <Text style={styles.infoTitle}>📄 {t["claim process"]}</Text>
+                  <Text style={styles.infoText}>{insurance.claim_process || t.new}</Text>
                 </View>
 
                 {/* Partner Hospitals */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🏥 Partner Hospitals</Text>
+                  <Text style={styles.infoTitle}>🏥 {t["partner hospitals"]}</Text>
                   {parsedHospitals.length > 0 ? (
                     parsedHospitals.map((item, idx) => (
                       <Text key={idx} style={styles.infoText}>➢ {item}</Text>
                     ))
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
                 {/* Partner Pharmacies */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>💊 Partner Pharmacies</Text>
+                  <Text style={styles.infoTitle}>💊 {t["partner pharmacies"]}</Text>
                   {parsedPharmacies.length > 0 ? (
                     parsedPharmacies.map((item, idx) => (
                       <Text key={idx} style={styles.infoText}>➢ {item}</Text>
                     ))
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
                 {/* Office Locations & Map */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🏢 Office Locations</Text>
+                  <Text style={styles.infoTitle}>🏢 {t["office locations"]}</Text>
                   {parsedLocations.length > 0 ? (
                     <View>
                       {parsedLocations.map((loc, i) => (
@@ -371,11 +374,11 @@ export default function InsuranceDetailScreen() {
                             <TouchableOpacity
                               onPress={() => {
                                 Alert.alert(
-                                  "Leave App",
-                                  "You are about to leave the app to open Google Maps. Do you want to continue?",
+                                  t["leave app"],
+                                  t["you are about to leave the app to open Google Maps. do you want to continue?"],
                                   [
-                                    { text: "No", style: "cancel" },
-                                    { text: "Yes", onPress: () => {
+                                    { text: t.no, style: "cancel" },
+                                    { text: t.yes, onPress: () => {
                                       const url = Platform.select({
                                         ios: `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
                                         android: `geo:${loc.latitude},${loc.longitude}?q=${loc.latitude},${loc.longitude}`
@@ -387,32 +390,32 @@ export default function InsuranceDetailScreen() {
                               }}
                               style={styles.mapButton}
                             >
-                              <Text style={styles.mapButtonText}>Open in Google Maps</Text>
+                              <Text style={styles.mapButtonText}>{t["open in google maps"]}</Text>
                             </TouchableOpacity>
                           )}
                         </View>
                       ))}
                     </View>
-                  ) : <Text style={styles.infoText}>No office locations available.</Text>}
+                  ) : <Text style={styles.infoText}>{t["no office locations available"]}</Text>}
                 </View>
 
                 {/* Contact Details */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>📞 Contact Details</Text>
+                  <Text style={styles.infoTitle}>📞 {t["contact details"]}</Text>
                   <View style={styles.contactContainer}>
                     {parsedContact.email && (
                       <TouchableOpacity onPress={() => {
                         Alert.alert(
-                          "Leave App",
-                          "You may quit the app to send an email. Do you want to continue?",
+                          t["leave app"],
+                          t["leave app email message"],
                           [
-                            { text: "No", style: "cancel" },
-                            { text: "Yes", onPress: () => Linking.openURL(`mailto:${parsedContact.email}`) }
+                            { text: t.no, style: "cancel" },
+                            { text: t.yes, onPress: () => Linking.openURL(`mailto:${parsedContact.email}`) }
                           ]
                         );
                       }}>
                         <Text style={styles.contactText}>
-                          <Text style={styles.contactLabel}>Email: </Text>
+                          <Text style={styles.contactLabel}>{t.email}: </Text>
                           <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.email}</Text>
                         </Text>
                       </TouchableOpacity>
@@ -420,22 +423,22 @@ export default function InsuranceDetailScreen() {
                     {parsedContact.phone && (
                       <TouchableOpacity onPress={() => Linking.openURL(`tel:${parsedContact.phone}`)}>
                         <Text style={styles.contactText}>
-                          <Text style={styles.contactLabel}>Phone: </Text>
+                          <Text style={styles.contactLabel}>{t.phone}: </Text>
                           <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.phone}</Text>
                         </Text>
                       </TouchableOpacity>
                     )}
                     {parsedContact.office && (
-                      <Text style={styles.contactText}><Text style={styles.contactLabel}>Office: </Text>{parsedContact.office}</Text>
+                      <Text style={styles.contactText}><Text style={styles.contactLabel}>{t.office}: </Text>{parsedContact.office}</Text>
                     )}
                     {parsedContact.website && (
                       <TouchableOpacity onPress={() => {
                         Alert.alert(
-                          "Leave App",
-                          "You may quit the app to visit this website. Do you want to continue?",
+                          t["leave app"],
+                          t["leave app website message"],
                           [
-                            { text: "No", style: "cancel" },
-                            { text: "Yes", onPress: () => {
+                            { text: t.no, style: "cancel" },
+                            { text: t.yes, onPress: () => {
                               const url = parsedContact.website || '';
                               Linking.openURL(url.startsWith('http') ? url : `https://${url}`);
                             }}
@@ -443,13 +446,13 @@ export default function InsuranceDetailScreen() {
                         );
                       }}>
                         <Text style={styles.contactText}>
-                          <Text style={styles.contactLabel}>Web: </Text>
+                          <Text style={styles.contactLabel}>{t.web}: </Text>
                           <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.website}</Text>
                         </Text>
                       </TouchableOpacity>
                     )}
                     {!parsedContact.email && !parsedContact.phone && !parsedContact.office && !parsedContact.website && (
-                      <Text style={styles.infoText}>No contact details available.</Text>
+                      <Text style={styles.infoText}>{t["no contact details available"]}</Text>
                     )}
                   </View>
                 </View>
@@ -460,7 +463,7 @@ export default function InsuranceDetailScreen() {
             style={styles.carButton}
             onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
           >
-            <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
+            <Text style={styles.carButtonText}>{t["call car"]}</Text>
           </Pressable>
           )}
         </View>

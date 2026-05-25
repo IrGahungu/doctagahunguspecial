@@ -65,8 +65,8 @@ const SkeletonCard = () => {
         <DoctorSkeleton />
       </View>
       <View style={styles.infoContainer}>
-        <Animated.View style={[styles.skeletonText, { width: '80%', opacity: pulseAnim }]} />
-        <Animated.View style={[styles.skeletonText, { width: '60%', opacity: pulseAnim, marginTop: 4 }]} />
+        <View style={[styles.skeletonText, { width: '80%', opacity: 0.3 }]} />
+        <View style={[styles.skeletonText, { width: '60%', opacity: 0.3, marginTop: 4 }]} />
       </View>
     </View>
   );
@@ -111,7 +111,7 @@ const DoctorItem = ({ doctor, baseUrl }: { doctor: Doctor; baseUrl: string }) =>
       </View>
       <View style={styles.infoContainer}>
         <Text style={styles.name}>{doctor.name}</Text>
-        {doctor.specialty && <Text style={styles.specialty}>{doctor.specialty}</Text>}
+        {!!doctor.specialty && <Text style={styles.specialty}>{doctor.specialty}</Text>}
         <View style={styles.detailsButton}>
           <Text style={styles.detailsButtonText}>{t["see details"]}</Text>
         </View>
@@ -176,7 +176,7 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
     return (
       <View style={styles.section}>
         <View style={styles.header}>
-          <Text style={styles.title}>{title}</Text> {/* Title is a prop, already translated */}
+          <Text style={styles.title}>{title}</Text>
         </View>
         <View style={styles.row}>
           <SkeletonCard />
@@ -189,7 +189,7 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
   if (!loading && doctors.length === 0) {
     return (
       <View style={styles.section}>
-        <Text style={styles.title}>{title}</Text> {/* Title is a prop, already translated */}
+        <Text style={styles.title}>{title}</Text>
         <Text style={styles.noDataText}>{t["no doctors available"]}</Text>
       </View>
     );
@@ -197,7 +197,7 @@ export default function FeaturedDoctors({ title, items: itemsProp, onViewAll, ba
   return (
     <View style={styles.section}>
       <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text> {/* Title is a prop, already translated */}
+        <Text style={styles.title}>{title}</Text>
         {onViewAll && (
           <Pressable onPress={onViewAll}>
             <Text style={styles.viewAll}>View All</Text>

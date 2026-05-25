@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import * as SecureStore from 'expo-secure-store';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - 48) / 2;
@@ -38,6 +39,8 @@ export default function AllInsurancesScreen() {
   const [insurances, setInsurances] = useState<Insurance[]>([]);
   const [loading, setLoading] = useState(true);
   const [country, setCountry] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -114,7 +117,7 @@ export default function AllInsurancesScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>All Insurances</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{t["all insurances"]}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
       {loading ? (

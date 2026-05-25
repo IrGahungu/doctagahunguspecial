@@ -183,7 +183,7 @@ export default function UpdateProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButtonHeader}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
+        <View style={{ width: 40 }} />
       </View>
 
       {isFetching ? (
@@ -205,7 +205,6 @@ export default function UpdateProfileScreen() {
         value={fullname}
         onChangeText={setFullname}
       />
- {/* No translation needed for icon */}
       <TextInput
         style={styles.input}
         placeholder={t["whatsapp number"]}

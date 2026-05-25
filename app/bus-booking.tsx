@@ -62,19 +62,19 @@ export default function BusBookingScreen() {
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t["book a jk bus"]}</Text>
-        <View style={{ width: 40 }} /> {/* No translation needed for icon */}
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroSection}> {/* No translation needed for icon */}
-          <Bus size={60} color="#4CAF50" /> {/* No translation needed for icon */}
+        <View style={styles.heroSection}>
+          <Bus size={60} color="#4CAF50" />
           <Text style={styles.heroTitle}>{t["travel with comfort"]}</Text>
           <Text style={styles.heroSubtitle}>{t["safe and reliable journeys"]}</Text>
         </View>
 
-        <View style={styles.popularSection}> {/* No translation needed for icon */}
+        <View style={styles.popularSection}>
           <Text style={styles.popularTitle}>Popular Routes</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}> {/* No translation needed for icon */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}>
             {POPULAR_ROUTES.map((route, index) => (
               <TouchableOpacity 
                 key={index} 
@@ -91,8 +91,8 @@ export default function BusBookingScreen() {
 
         <View style={styles.bookingCard}>
           <View style={styles.inputGroup}>
-            <View style={styles.iconBox}> {/* No translation needed for icon */}
-              <MapPin size={20} color="#757575" /> {/* No translation needed for icon */}
+            <View style={styles.iconBox}>
+              <MapPin size={20} color="#757575" />
             </View>
             <View style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>{t.from}</Text>
@@ -108,8 +108,8 @@ export default function BusBookingScreen() {
           <View style={styles.divider} />
 
           <View style={styles.inputGroup}>
-            <View style={styles.iconBox}> {/* No translation needed for icon */}
-              <MapPin size={20} color="#F44336" /> {/* No translation needed for icon */}
+            <View style={styles.iconBox}>
+              <MapPin size={20} color="#F44336" />
             </View>
             <View style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>{t.to}</Text>
@@ -129,7 +129,7 @@ export default function BusBookingScreen() {
             activeOpacity={0.7}
             onPress={() => setShow(true)}
           >
-            <View style={styles.iconBox}> {/* No translation needed for icon */}
+            <View style={styles.iconBox}>
               <CalendarIcon size={20} color="#2874F0" />
             </View>
             <View style={styles.inputWrapper}>
@@ -152,12 +152,12 @@ export default function BusBookingScreen() {
             style={styles.searchButton} // No translation needed for icon
             onPress={handleSearch}
           >
-            <Search size={20} color="#fff" /> {/* No translation needed for icon */}
+            <Search size={20} color="#fff" />
             <Text style={styles.searchButtonText}>{t["search buses"]}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.infoBox}> {/* No translation needed for icon */}
+        <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>{t["why choose jk bus"]}</Text>
           <Text style={styles.infoItem}>• Air-conditioned modern fleet</Text>
           <Text style={styles.infoItem}>• Experienced and professional drivers</Text>

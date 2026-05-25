@@ -11,6 +11,7 @@ import { useCartStore } from "@/stores/cartStore";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import * as Progress from 'react-native-progress';
+import { useLanguageStore, translations } from "@/stores/languageStore";
 
 
 type UserProfile = {
@@ -73,6 +74,7 @@ const AccountSkeleton = () => (
 );
 
 export default function AccountScreen() {
+  console.log('[AccountScreen] Rendering...');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
@@ -89,19 +91,21 @@ export default function AccountScreen() {
   const [displayProgress, setDisplayProgress] = useState(0);
   const [monetizationGoal, setMonetizationGoal] = useState(50000);
   const router = useRouter();
+  const language = useLanguageStore(state => state.language);
+  const t: any = translations[language];
 
   const menuItems = [
-    { id: "1", title: "Orders", icon: ShoppingBag, info: "Check your order status", route: "/orders" },
-    { id: "6", title: "My Appointments", icon: Calendar, info: "View your scheduled doctor visits", route: "/appointments" },
-    { id: "7", title: "View My Transactions", icon: History, info: "Check your wallet history", route: "/transactions" },
-    { id: "8", title: "Book a JK BUS", icon: Bus, info: "Travel with comfort", route: "/bus-booking" },
-    //{ id: "11", title: "My Prescriptions", icon: Pill, info: "Search for multiple medicines", route: "/prescriptions" },
-    { id: "9", title: "My Bus Tickets", icon: Bus, info: "View your reserved seats", route: "/bus-tickets" },
-    { id: "2", title: "Reviews", icon: Star, info: "See what others are saying about the app", route: "/reviews" },
-    { id: "5", title: "Transaction PIN", icon: KeyRound, info: "Set or change your payment PIN", route: "/pin-management" },
-    { id: "3", title: "Customer Support", icon: Headphones, info: "Gahungu is glad to help", route: "/support" },
-    { id: "10", title: "Update Profile", icon: User, info: "Manage your personal information", route: "/update-profile" },
-    { id: "4", title: "Settings", icon: Settings, info: "App settings and preferences", route: "/settings" },
+    { id: "1", title: t["my orders"], icon: ShoppingBag, info: t["orders description"], route: "/orders" },
+    { id: "6", title: t["my appointments"], icon: Calendar, info: t["appointments description"], route: "/appointments" },
+    { id: "7", title: t["view my transactions"], icon: History, info: t["transactions description"], route: "/transactions" },
+    { id: "8", title: t["book a jk bus"], icon: Bus, info: t["bus booking description"], route: "/bus-booking" },
+    //{ id: "11", title: t["my prescriptions"], icon: Pill, info: "Search for multiple medicines", route: "/prescriptions" },
+    { id: "9", title: t["my bus tickets"], icon: Bus, info: t["bus tickets description"], route: "/bus-tickets" },
+    { id: "2", title: t.reviews, icon: Star, info: t["reviews description"], route: "/reviews" },
+    { id: "5", title: t["transaction pin"], icon: KeyRound, info: t["pin description"], route: "/pin-management" },
+    { id: "3", title: t["customer support"], icon: Headphones, info: t["support description"], route: "/support" },
+    { id: "10", title: t["update profile"], icon: User, info: t["update profile description"], route: "/update-profile" },
+    { id: "4", title: t.settings, icon: Settings, info: t["settings description"], route: "/settings" },
   ];
 
   // Fetch profile from backend
@@ -256,7 +260,7 @@ export default function AccountScreen() {
             })}
           >
           <View style={styles.monetizationHeader}>
-            <Text style={styles.monetizationTitle}>Monetization Goal</Text>
+            <Text style={styles.monetizationTitle}>{t["monetization goal"]}</Text>
             <Text style={styles.monetizationValue}>{Math.round(Math.min(engagementPoints / monetizationGoal, 1) * 100)}%</Text>
           </View>
           <Progress.Bar 
@@ -300,7 +304,7 @@ export default function AccountScreen() {
                 <Text style={styles.menuTitle}>{item.title}</Text>
                 <Text style={styles.menuInfo}>{item.info}</Text>
               </View>
-              {item.title === "Orders" && activeOrdersCount > 0 && (
+              {item.id === "1" && activeOrdersCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{activeOrdersCount}</Text>
                 </View>
@@ -311,7 +315,7 @@ export default function AccountScreen() {
           })}
         </View>
 
-        <Text style={styles.versionText}>Version 1.0.0</Text>
+        <Text style={styles.versionText}>{t.version} 1.0.0</Text>
         </ScrollView>
       )}
     </View>

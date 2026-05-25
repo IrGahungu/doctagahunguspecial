@@ -23,6 +23,7 @@ import Toast from '@/components/Toast';
 import { useCartStore } from '@/stores/cartStore';
 import { supabase } from '@/lib/supabase';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -107,6 +108,8 @@ export default function ProductDetailScreen() {
   const [selectedPharmacyId, setSelectedPharmacyId] = useState<string | null>(null);
   const [showAddToCartButton, setShowAddToCartButton] = useState(true); // Default to true
   const [showCallCarButton, setShowCallCarButton] = useState(true);
+  const language = useLanguageStore(state => state.language);
+  const t: any = translations[language];
 
   useEffect(() => {
     const fetchCountry = async () => {
@@ -371,7 +374,7 @@ export default function ProductDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Icon name="arrow-back" size={24} color="#212121" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Product Details</Text>
+          <Text style={styles.headerTitle}>{t["product details"]}</Text>
           <View style={styles.headerIconContainer}>
             <Icon name="shopping-cart" size={28} color="gray" />
           </View>
@@ -415,7 +418,7 @@ export default function ProductDetailScreen() {
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Product Details</Text>
+        <Text style={styles.headerTitle}>{t["product details"]}</Text>
 
         <View style={styles.headerIconContainer} ref={cartIconRef}>
           <TouchableOpacity onPress={() => router.push('/cart')}>
@@ -454,7 +457,7 @@ export default function ProductDetailScreen() {
 
           {/* Available At Lock */}
           <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available At</Text>
+          <Text style={styles.sectionTitle}>{t["available at"]}</Text>
             {product.pharmacies && product.pharmacies.length > 0 ? (
               product.pharmacies.map((pharmacy) => (
                 <View key={pharmacy.id} style={styles.pharmacyRow}>
@@ -509,7 +512,7 @@ export default function ProductDetailScreen() {
                       <View style={{ marginBottom: 8 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <Icon name="location-on" size={16} color="#4CAF50" />
-                          <Text style={{ marginLeft: 8, fontWeight: 'bold', color: '#616161' }}>Locations</Text>
+                          <Text style={{ marginLeft: 8, fontWeight: 'bold', color: '#616161' }}>{t["locations"]}</Text>
                         </View>
                         <View style={{ paddingLeft: 24 }}>
                           {(pharmacy as any).locations && (pharmacy as any).locations.length > 0
@@ -524,7 +527,7 @@ export default function ProductDetailScreen() {
                         <View>
                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                             <Icon name="verified-user" size={16} color="#4CAF50" />
-                            <Text style={{ marginLeft: 8, fontWeight: 'bold', color: '#616161' }}>Insurances</Text>
+                            <Text style={{ marginLeft: 8, fontWeight: 'bold', color: '#616161' }}>{t["insurances"]}</Text>
                           </View>
                           <View style={{ paddingLeft: 24 }}>
                             {pharmacy.insurances.map((ins: string, i: number) => (

@@ -107,7 +107,7 @@ const PharmacyItem = ({ item, baseUrl }: { item: SimplePharmacy; baseUrl: string
       </View>
       <View style={styles.details}>
         <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.detailsButton}> {/* No translation needed for icon */}
+        <View style={styles.detailsButton}>
           <Text style={styles.detailsButtonText}>{t["see details"]}</Text>
         </View>
       </View>

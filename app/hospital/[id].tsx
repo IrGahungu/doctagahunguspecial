@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import { useLocalSearchParams, useNavigation, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 import Toast from '@/components/Toast';
 import { useToastStore } from '@/stores/toastStore';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -106,6 +107,8 @@ export default function HospitalDetailScreen() {
   const insets = useSafeAreaInsets();
   const [error, setError] = useState<string | null>(null);
   const showToast = useToastStore((state) => state.showToast);
+  const language = useLanguageStore(state => state.language);
+  const t: any = translations[language];
   const [showCallCarButton, setShowCallCarButton] = useState(true);
 
   useEffect(() => {
@@ -186,7 +189,7 @@ export default function HospitalDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Icon name="arrow-back" size={24} color="#212121" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Hospital Details</Text>
+          <Text style={styles.headerTitle}>{t["hospital details"]}</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
         <HospitalDetailSkeleton />
@@ -197,7 +200,7 @@ export default function HospitalDetailScreen() {
   if (!hospital) {
     return (
       <View style={styles.container}>
-        <Text style={{ textAlign: 'center', marginTop: 50 }}>Hospital not found.</Text>
+        <Text style={{ textAlign: 'center', marginTop: 50 }}>{t["hospital not found"]}</Text>
       </View>
     );
   }
@@ -268,15 +271,13 @@ export default function HospitalDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top, paddingBottom: 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#212121" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Hospital Details</Text>
+        <Text style={styles.headerTitle}>{t["hospital details"]}</Text>
 
-        {/* Placeholder for right icon to balance layout */}
         <View style={styles.headerRightPlaceholder} />
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -289,25 +290,21 @@ export default function HospitalDetailScreen() {
         )}
         <View style={styles.detailsContainer}>
           <Text style={styles.hospitalName}>{hospital.name || 'Unknown Hospital'}</Text>
-          {/* Locked Section */}
           <View style={styles.section}>
               <View>
 
-                {/* Service Summary */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>📋 Service Summary</Text>
-                  <Text style={styles.infoText}>{hospital.service_summary || 'N/A'}</Text>
+                  <Text style={styles.infoTitle}>📋 {t["service summary"]}</Text>
+                  <Text style={styles.infoText}>{hospital.service_summary || t.new}</Text>
                 </View>
 
-                {/* Admission Process */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>📄 Admission Process</Text>
-                  <Text style={styles.infoText}>{hospital.admission_process || 'N/A'}</Text>
+                  <Text style={styles.infoTitle}>📄 {t["admission process"]}</Text>
+                  <Text style={styles.infoText}>{hospital.admission_process || t.new}</Text>
                 </View>
 
-                {/* Available Services */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🛠️ Available Services</Text>
+                  <Text style={styles.infoTitle}>🛠️ {t["available services"]}</Text>
                   {parsedServices.length > 0 ? (
                     parsedServices.map((service, idx) => (
                       <View key={idx} style={{ marginBottom: 8 }}>
@@ -315,12 +312,11 @@ export default function HospitalDetailScreen() {
                         {service.description ? <Text style={[styles.infoText, { fontSize: 13, color: '#666', marginLeft: 10 }]}>{service.description}</Text> : null}
                       </View>
                     ))
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
-                {/* Available Blood Types */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🩸 Available Blood Types</Text>
+                  <Text style={styles.infoTitle}>🩸 {t["available blood types"]}</Text>
                   {parsedBloodTypes.length > 0 ? (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                       {parsedBloodTypes.map((bt, idx) => (
@@ -329,12 +325,11 @@ export default function HospitalDetailScreen() {
                         </View>
                       ))}
                     </View>
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
-                {/* Medical Equipment */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🩺 Medical Equipment</Text>
+                  <Text style={styles.infoTitle}>🩺 {t["medical equipment"]}</Text>
                   {parsedEquipment.length > 0 ? (
                     parsedEquipment.map((eq, idx) => (
                       <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: '#eee' }}>
@@ -344,32 +339,29 @@ export default function HospitalDetailScreen() {
                         </View>
                       </View>
                     ))
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
-                {/* Partner Insurances */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🏥 Insurances</Text>
+                  <Text style={styles.infoTitle}>🏥 {t["insurances"]}</Text>
                   {parsedInsurances.length > 0 ? (
                     parsedInsurances.map((item, idx) => (
                       <Text key={idx} style={styles.infoText}>➢ {item}</Text>
                     ))
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
-                {/* Partner Pharmacies */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>💊 Partner Pharmacies</Text>
+                  <Text style={styles.infoTitle}>💊 {t["pharmacies"]}</Text>
                   {parsedPharmacies.length > 0 ? (
                     parsedPharmacies.map((item, idx) => (
                       <Text key={idx} style={styles.infoText}>➢ {item}</Text>
                     ))
-                  ) : <Text style={styles.infoText}>N/A</Text>}
+                  ) : <Text style={styles.infoText}>{t.new}</Text>}
                 </View>
 
-                {/* Office Locations & Map */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>🏢 Locations</Text>
+                  <Text style={styles.infoTitle}>🏢 {t["locations"]}</Text>
                   {parsedLocations.length > 0 ? (
                     <View>
                       {parsedLocations.map((loc, i) => (
@@ -399,11 +391,11 @@ export default function HospitalDetailScreen() {
                             <TouchableOpacity
                               onPress={() => {
                                 Alert.alert(
-                                  "Leave App",
-                                  "You are about to leave the app to open Google Maps. Do you want to continue?",
+                                  t["leave app"],
+                                  t["you are about to leave the app to open Google Maps. do you want to continue?"],
                                   [
-                                    { text: "No", style: "cancel" },
-                                    { text: "Yes", onPress: () => {
+                                    { text: t["no"], style: "cancel" },
+                                    { text: t["yes"], onPress: () => {
                                       const url = Platform.select({
                                         ios: `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`,
                                         android: `geo:${loc.latitude},${loc.longitude}?q=${loc.latitude},${loc.longitude}`
@@ -415,32 +407,31 @@ export default function HospitalDetailScreen() {
                               }}
                               style={styles.mapButton}
                             >
-                              <Text style={styles.mapButtonText}>Open in Google Maps</Text>
+                              <Text style={styles.mapButtonText}> {t["open google maps"]} </Text>
                             </TouchableOpacity>
                           )}
                         </View>
                       ))}
                     </View>
-                  ) : <Text style={styles.infoText}>No locations available.</Text>}
+                  ) : <Text style={styles.infoText}>{t["no office locations available"]}</Text>}
                 </View>
 
-                {/* Contact Details */}
                 <View style={styles.infoBlock}>
-                  <Text style={styles.infoTitle}>📞 Contact Details</Text>
+                  <Text style={styles.infoTitle}>📞 {t["contact details"]}</Text>
                   <View style={styles.contactContainer}>
                     {parsedContact.email && (
                       <TouchableOpacity onPress={() => {
                         Alert.alert(
-                          "Leave App",
-                          "You may quit the app to send an email. Do you want to continue?",
+                          t["leave app"],
+                          t["leave app email message"],
                           [
-                            { text: "No", style: "cancel" },
-                            { text: "Yes", onPress: () => Linking.openURL(`mailto:${parsedContact.email}`) }
+                            { text: t["no"], style: "cancel" },
+                            { text: t["yes"], onPress: () => Linking.openURL(`mailto:${parsedContact.email}`) }
                           ]
                         );
                       }}>
                         <Text style={styles.contactText}>
-                          <Text style={styles.contactLabel}>Email: </Text>
+                          <Text style={styles.contactLabel}>{t.email}: </Text>
                           <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.email}</Text>
                         </Text>
                       </TouchableOpacity>
@@ -448,22 +439,22 @@ export default function HospitalDetailScreen() {
                     {parsedContact.phone && (
                       <TouchableOpacity onPress={() => Linking.openURL(`tel:${parsedContact.phone}`)}>
                         <Text style={styles.contactText}>
-                          <Text style={styles.contactLabel}>Phone: </Text>
+                          <Text style={styles.contactLabel}>{t.phone}: </Text>
                           <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.phone}</Text>
                         </Text>
                       </TouchableOpacity>
                     )}
                     {parsedContact.office && (
-                      <Text style={styles.contactText}><Text style={styles.contactLabel}>Office: </Text>{parsedContact.office}</Text>
+                      <Text style={styles.contactText}><Text style={styles.contactLabel}>{t.office}: </Text>{parsedContact.office}</Text>
                     )}
                     {parsedContact.website && (
                       <TouchableOpacity onPress={() => {
                         Alert.alert(
-                          "Leave App",
-                          "You may quit the app to visit this website. Do you want to continue?",
+                          t["leave app"],
+                          t["leave app website message"],
                           [
-                            { text: "No", style: "cancel" },
-                            { text: "Yes", onPress: () => {
+                            { text: t["no"], style: "cancel" },
+                            { text: t["yes"], onPress: () => {
                               const url = parsedContact.website || '';
                               Linking.openURL(url.startsWith('http') ? url : `https://${url}`);
                             }}
@@ -471,13 +462,13 @@ export default function HospitalDetailScreen() {
                         );
                       }}>
                         <Text style={styles.contactText}>
-                          <Text style={styles.contactLabel}>Web: </Text>
+                          <Text style={styles.contactLabel}>{t.web}: </Text>
                           <Text style={{ color: '#1E88E5', textDecorationLine: 'underline' }}>{parsedContact.website}</Text>
                         </Text>
                       </TouchableOpacity>
                     )}
                     {!parsedContact.email && !parsedContact.phone && !parsedContact.office && !parsedContact.website && (
-                      <Text style={styles.infoText}>No contact details available.</Text>
+                      <Text style={styles.infoText}>{t["no contact details available"]}</Text>
                     )}
                   </View>
                 </View>
@@ -489,7 +480,7 @@ export default function HospitalDetailScreen() {
             style={styles.carButton}
             onPress={() => showToast('Dr. IR. Gahungu ariko arabikora.', 1000)}
           >
-            <Text style={styles.carButtonText}>Fyonda ngaha uhamagare umuduga ugushikana</Text>
+            <Text style={styles.carButtonText}> {t["call car"]} </Text>
           </Pressable>
           )}
           

@@ -138,6 +138,7 @@ const Firework = ({ startX, delay, color }: { startX: number, delay: number, col
 };
 
 export default function Header() {
+  console.log('[Header Component] Rendering...');
   const language = useLanguageStore(state => state.language);
   const t = translations[language];
   const [fullname, setFullname] = useState<string>("");
@@ -148,7 +149,6 @@ export default function Header() {
   const [country, setCountry] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const blinkAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const blink = Animated.loop(
@@ -168,28 +168,6 @@ export default function Header() {
     blink.start();
     return () => blink.stop();
   }, [blinkAnim]);
-
-  // Rotation animation for the refresh icon
-  useEffect(() => {
-    if (networkStatus === 'Checking...') {
-      Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
-    } else {
-      rotateAnim.stopAnimation();
-      rotateAnim.setValue(0);
-    }
-  }, [networkStatus]);
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
 
   const checkNetwork = async () => {
     setNetworkStatus('Checking...');
@@ -279,8 +257,6 @@ export default function Header() {
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top + 10 }]}>
       <View style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderBottomLeftRadius: 30, borderBottomRightRadius: 30, zIndex: -1 }]} pointerEvents="none">
-
-        {/* Faster Balloons - Increased Density */}
         <FloatingParticle startX={width * 0.05} duration={2500} size={20} color="#FFCDD2" delay={0} />
         <FloatingParticle startX={width * 0.1} duration={2800} size={22} color="#EF9A9A" delay={1200} />
         <FloatingParticle startX={width * 0.15} duration={3000} size={18} color="#E1BEE7" delay={500} />
@@ -300,8 +276,6 @@ export default function Header() {
         <FloatingParticle startX={width * 0.85} duration={2400} size={24} color="#F0F4C3" delay={400} />
         <FloatingParticle startX={width * 0.9} duration={2800} size={22} color="#E6EE9C" delay={1700} />
         <FloatingParticle startX={width * 0.95} duration={3200} size={17} color="#FFECB3" delay={700} />
-
-        {/* Firecracker Sparks - Increased Density */}
         <Firework startX={width * 0.1} color="#FF5252" delay={1200} />
         <Firework startX={width * 0.15} color="#FF4081" delay={2500} />
         <Firework startX={width * 0.3} color="#FFAB40" delay={300} />
@@ -317,15 +291,16 @@ export default function Header() {
         <View style={styles.headerRow}>
           <View style={styles.leftInfoContainer}>
             {isLoggedIn ? (
-              <Text style={styles.welcomeText}>
-                {t["murahawe ikaze kwa Dr. Gahungu:"]} {' '}
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#4CAF50" />
-                ) : (
-                  fullname
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.welcomeText}>
+                  {t["murahawe ikaze kwa Dr. Gahungu:"]} {' '}
+                  {!isLoading && fullname}
+                </Text>
+                {isLoading && (
+                  <ActivityIndicator size="small" color="#4CAF50" style={{ marginLeft: 4 }} />
                 )}
-              </Text>
-            ) : ( //
+              </View>
+            ) : (
               <Text style={styles.welcomeText}>{t["murahawe ikaze kwa Dr. Gahungu:"]}</Text>
             )}
 
@@ -338,17 +313,8 @@ export default function Header() {
                 }
               ]} />
               <Text style={[styles.networkText, { color: networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336' }]}>
-                Net: {networkStatus}
+                Live: {networkStatus}
               </Text>
-              <TouchableOpacity 
-                onPress={checkNetwork} 
-                style={styles.refreshButton}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                  <Icon name="refresh" size={12} color={networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336'} />
-                </Animated.View>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -425,9 +391,6 @@ const styles = StyleSheet.create({
   networkText: {
     fontSize: 8,
     fontWeight: 'bold',
-  },
-  refreshButton: {
-    marginLeft: 4,
   },
   welcomeText: {
     fontSize: 10,

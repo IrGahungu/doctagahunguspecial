@@ -43,7 +43,9 @@ const CategoryItem = ({ category }: { category: Category }) => {
     >
       <Animated.View style={[styles.categoryItem, { transform: [{ scale }] }]}>
         <View style={styles.iconCircle}>
-          <Text style={styles.categoryIcon}>{category.icon}</Text>
+          <Text style={styles.categoryIcon}>
+            {category.icon ? String(category.icon) : '📦'}
+          </Text>
         </View>
         <Text numberOfLines={1} style={styles.categoryName}>
           {category.name}

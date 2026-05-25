@@ -93,6 +93,7 @@ const RecentSearchesSkeleton = () => (
 );
 
 export default function SearchScreen() {
+  console.log('[SearchScreen] Rendering...');
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]); // Suggestions from API
@@ -368,8 +369,8 @@ export default function SearchScreen() {
       {isLoading ? (
         <SearchSkeleton />
       ) : searchError ? (
-        <View style={styles.center}> {/* No translation needed for icon */}
-          <Icon name="wifi-off" size={60} color="#BDBDBD" /> {/* No translation needed for icon */}
+        <View style={styles.center}>
+          <Icon name="wifi-off" size={60} color="#BDBDBD" />
           <Text style={styles.errorText}>{searchError}</Text>
           <Text style={styles.emptyText}>Please check your internet connection and try again.</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => performFinalSearch(query)}>
@@ -392,8 +393,8 @@ export default function SearchScreen() {
             query.length === 0 && !isFetchingSuggestions ? (
               isInitialLoad ? (
                 <RecentSearchesSkeleton />
-              ) : recentSearches.length > 0 ? ( // No translation needed for icon
-              <View style={styles.recentSearchesContainer}> {/* No translation needed for icon */}
+              ) : recentSearches.length > 0 ? (
+              <View style={styles.recentSearchesContainer}>
                 <View style={styles.recentSearchesHeader}>
                   <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
                   <TouchableOpacity onPress={clearRecentSearches} style={styles.clearAllButton}>
@@ -457,8 +458,8 @@ export default function SearchScreen() {
           ListEmptyComponent={
             query.length < 2 ? ( // If query is less than 2 characters
                 (recentSearches.length === 0 && !isInitialLoad) ? ( // And no recent searches or not initial load
-                  <View style={styles.center}> {/* No translation needed for icon */}
-                    <Icon name="search" size={60} color="#BDBDBD" /> {/* No translation needed for icon */}
+                  <View style={styles.center}>
+                    <Icon name="search" size={60} color="#BDBDBD" />
                     <Text style={styles.emptyText}>Type at least 2 characters to see suggestions</Text>
                 </View>
                 ) : null // Otherwise, render nothing (null)
