@@ -372,7 +372,7 @@ export default function SearchScreen() {
         <View style={styles.center}>
           <Icon name="wifi-off" size={60} color="#BDBDBD" />
           <Text style={styles.errorText}>{searchError}</Text>
-          <Text style={styles.emptyText}>Please check your internet connection and try again.</Text>
+          <Text style={styles.emptyText}>{t["please check your internet connection and try again"]}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => performFinalSearch(query)}>
             <Icon name="refresh" size={20} color="#fff" style={{ marginRight: 5 }} />
             <Text style={styles.retryButtonText}>Retry</Text>
@@ -396,9 +396,9 @@ export default function SearchScreen() {
               ) : recentSearches.length > 0 ? (
               <View style={styles.recentSearchesContainer}>
                 <View style={styles.recentSearchesHeader}>
-                  <Text style={styles.recentSearchesTitle}>Recent Searches</Text>
+                  <Text style={styles.recentSearchesTitle}>{t["recent searches"]}</Text>
                   <TouchableOpacity onPress={clearRecentSearches} style={styles.clearAllButton}>
-                    <Text style={styles.clearAllButtonText}>Clear All</Text>
+                    <Text style={styles.clearAllButtonText}>{t["clear all"]}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.recentSearchesGrid}> 

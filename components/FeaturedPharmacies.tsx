@@ -226,6 +226,7 @@ const styles = StyleSheet.create({
     paddingTop: 12 
   },
   title: { 
+    fontFamily: 'Roboto-Bold',
     fontSize: 16,
     color: '#212121',
     alignItems: 'center',

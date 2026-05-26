@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   iconCircle: {
     backgroundColor: '#e0e0e0',
-    borderRadius: 50,
+    borderRadius: 10,
     width: 50,
     height: 50,
     justifyContent: 'center',

@@ -114,6 +114,20 @@ export default function AccountScreen() {
       setDisplayProgress(0);
       const fetchProfile = async () => {
         setIsLoading(true);
+
+        // 1. Load initial stats from local storage for immediate UI feedback
+        const points = await SecureStore.getItemAsync('totalEngagementPoints');
+        const pl = await SecureStore.getItemAsync('postsLikedToday');
+        const sv = await SecureStore.getItemAsync('storiesViewedToday');
+        const ep = await SecureStore.getItemAsync('epEarnedToday');
+
+        if (points) setEngagementPoints(parseInt(points));
+        setDailyStats({
+          postsLikedToday: parseInt(pl || '0'),
+          storiesViewedToday: parseInt(sv || '0'),
+          epEarnedToday: parseInt(ep || '0'),
+        });
+
         const token = await SecureStore.getItemAsync("token");
         if (!token) {
           // If no token, redirect to login. This is a good safeguard.
@@ -128,7 +142,11 @@ export default function AccountScreen() {
           const data = await res.json();
           if (res.ok) {
             setProfile(data);
-            setEngagementPoints(data.engagement_points || 0);
+            const dbPoints = data.engagement_points || 0;
+            setEngagementPoints(dbPoints);
+            
+            // 2. Sync local cache with the source of truth (Database)
+            await SecureStore.setItemAsync('totalEngagementPoints', dbPoints.toString());
 
             // Fetch button visibility from correct config endpoint to stay in sync
             const settingsRes = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
@@ -154,22 +172,10 @@ export default function AccountScreen() {
           } else {
             console.error("Failed to fetch profile:", data.error);
           }
-
-          // Always fetch Engagement Points and Daily Stats for the Progress Bar from local storage
-          const points = await SecureStore.getItemAsync('totalEngagementPoints');
-          const pl = await SecureStore.getItemAsync('postsLikedToday');
-          const sv = await SecureStore.getItemAsync('storiesViewedToday');
-          const ep = await SecureStore.getItemAsync('epEarnedToday');
-
-          const currentPoints = parseInt(points || '0');
-          setEngagementPoints(currentPoints);
-          setDailyStats({
-            postsLikedToday: parseInt(pl || '0'),
-            storiesViewedToday: parseInt(sv || '0'),
-            epEarnedToday: parseInt(ep || '0'),
-          });
-
-          const currentGoal = monetizationGoal; // Use the most recent state value
+          
+          // Use the latest fetched points or the fallback
+          const currentPoints = res.ok ? (data.engagement_points || 0) : parseInt(points || '0');
+          const currentGoal = res.ok ? (data.monetization_goal || monetizationGoal) : monetizationGoal;
 
           // Animate the progress bar after a short delay to allow screen transition to settle
           setTimeout(() => {

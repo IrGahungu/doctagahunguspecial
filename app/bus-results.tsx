@@ -199,7 +199,7 @@ export default function BusResultsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E0F7FA' },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#E0F7FA' },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee', justifyContent: 'center', alignItems: 'center' },
+  backButton: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: 'black', backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
   headerTitleContainer: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 16, fontFamily: 'Roboto-Bold', color: '#212121' },
   headerSubtitle: { fontSize: 12, color: '#757575' },

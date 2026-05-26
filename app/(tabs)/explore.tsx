@@ -87,17 +87,6 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
     }
   }, [initialViewedIndices]);
 
-  // Effect to record view for the first image when the post component mounts
-  useEffect(() => {
-    // Award EP for the first image ONLY if it hasn't been viewed according to both server and local state
-    const alreadyViewed = initialViewedIndices[0] || viewedIndices[0];
-    if (item.images.length > 0 && !alreadyViewed) {
-      console.log(`[Post ${item.id}] Recording first view (index 0)`);
-      setViewedIndices(prev => ({ ...prev, 0: true }));
-      onNextImage(0); // This triggers EP and backend recording for the first image
-    }
-  }, [item.id, initialViewedIndices[0], onNextImage]); 
-  
   // Multi-heart animation refs
 
   const recordPostLike = async () => {
@@ -412,7 +401,10 @@ export default function ExploreScreen() {
 
         if (profileRes.ok) {
           const profileData = await profileRes.json();
-          setEngagementPoints(profileData.engagement_points || 0);
+          const dbPoints = profileData.engagement_points || 0;
+          setEngagementPoints(dbPoints);
+          // Sync cache with DB value
+          await SecureStore.setItemAsync('totalEngagementPoints', dbPoints.toString());
         }
         const storiesData = await storiesRes.json();
         const postsData = await postsRes.json();

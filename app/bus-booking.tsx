@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Platform, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Bus, MapPin, Calendar as CalendarIcon, Search } from 'lucide-react-native';
 import Toast from 'react-native-toast-message';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLanguageStore, translations } from '@/stores/languageStore';
+import { supabase } from '@/lib/supabase';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 const POPULAR_ROUTES = [
   { from: 'Bujumbura', to: 'Gitega' },
@@ -16,12 +18,55 @@ const POPULAR_ROUTES = [
 
 export default function BusBookingScreen() {
   const router = useRouter();
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [from, setFrom] = useState<string | null>(null);
+  const [to, setTo] = useState<string | null>(null);
   const [date, setDate] = useState(new Date());
   const [show, setShow] = useState(false);
+
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
+  const [fromItems, setFromItems] = useState<{label: string, value: string}[]>([]);
+  const [toItems, setToItems] = useState<{label: string, value: string}[]>([]);
+  const [loadingRoutes, setLoadingRoutes] = useState(true);
+
   const language = useLanguageStore(state => state.language);
   const t = translations[language];
+
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      setLoadingRoutes(true);
+      try {
+        const { data, error } = await supabase.from('buses').select('origin, destination');
+        if (error) throw error;
+
+        if (data) {
+          const uniqueOrigins = Array.from(new Set(data.map(b => b.origin))).sort();
+          const uniqueDestinations = Array.from(new Set(data.map(b => b.destination))).sort();
+
+          setFromItems(uniqueOrigins.map(city => ({ label: city, value: city })));
+          setToItems(uniqueDestinations.map(city => ({ label: city, value: city })));
+        }
+      } catch (err) {
+        console.error('Error fetching routes:', err);
+        Toast.show({
+          type: 'error',
+          text1: 'Fetch Error',
+          text2: 'Could not load available routes.',
+        });
+      } finally {
+        setLoadingRoutes(false);
+      }
+    };
+    fetchRoutes();
+  }, []);
+
+  const onFromOpen = useCallback(() => {
+    setToOpen(false);
+  }, []);
+
+  const onToOpen = useCallback(() => {
+    setFromOpen(false);
+  }, []);
 
   const onChange = (event: any, selectedDate?: Date) => {
     setShow(false);
@@ -48,8 +93,8 @@ export default function BusBookingScreen() {
     router.push({
       pathname: '/bus-results',
       params: { 
-        from: from.trim(), 
-        to: to.trim(), 
+        from: from ? from.trim() : '', 
+        to: to ? to.trim() : '', 
         date: date.toISOString() 
       }
     });
@@ -72,7 +117,7 @@ export default function BusBookingScreen() {
           <Text style={styles.heroSubtitle}>{t["safe and reliable journeys"]}</Text>
         </View>
 
-        <View style={styles.popularSection}>
+        {/*<View style={styles.popularSection}>
           <Text style={styles.popularTitle}>Popular Routes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.popularScroll}>
             {POPULAR_ROUTES.map((route, index) => (
@@ -88,37 +133,60 @@ export default function BusBookingScreen() {
             ))}
           </ScrollView>
         </View>
+        */}
 
         <View style={styles.bookingCard}>
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, { zIndex: 3000 }]}>
             <View style={styles.iconBox}>
               <MapPin size={20} color="#757575" />
             </View>
             <View style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>{t.from}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Origin City"
-                value={from}
-                onChangeText={setFrom}
-              />
+              {loadingRoutes ? (
+                <ActivityIndicator size="small" color="#4CAF50" style={{ alignSelf: 'flex-start', marginTop: 5 }} />
+              ) : (
+                <DropDownPicker
+                  open={fromOpen}
+                  value={from}
+                  items={fromItems}
+                  setOpen={setFromOpen}
+                  setValue={setFrom}
+                  setItems={setFromItems}
+                  onOpen={onFromOpen}
+                  placeholder={t["origin city"] || "Select Origin"}
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  listMode="SCROLLVIEW"
+                />
+              )}
             </View>
           </View>
 
           <View style={styles.divider} />
 
-          <View style={styles.inputGroup}>
+          <View style={[styles.inputGroup, { zIndex: 2000 }]}>
             <View style={styles.iconBox}>
               <MapPin size={20} color="#F44336" />
             </View>
             <View style={styles.inputWrapper}>
               <Text style={styles.inputLabel}>{t.to}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Destination City"
-                value={to}
-                onChangeText={setTo}
-              />
+              {loadingRoutes ? (
+                <ActivityIndicator size="small" color="#4CAF50" style={{ alignSelf: 'flex-start', marginTop: 5 }} />
+              ) : (
+                <DropDownPicker
+                  open={toOpen}
+                  value={to}
+                  items={toItems}
+                  setOpen={setToOpen}
+                  setValue={setTo}
+                  setItems={setToItems}
+                  onOpen={onToOpen}
+                  placeholder={t["destination city"] || "Select Destination"}
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownContainer}
+                  listMode="SCROLLVIEW"
+                />
+              )}
             </View>
           </View>
 
@@ -133,7 +201,7 @@ export default function BusBookingScreen() {
               <CalendarIcon size={20} color="#2874F0" />
             </View>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>Departure Date</Text>
+              <Text style={styles.inputLabel}>{t["departure date"]}</Text>
               <Text style={styles.dateText}>{date.toLocaleDateString()}</Text>
             </View>
           </TouchableOpacity>
@@ -157,12 +225,14 @@ export default function BusBookingScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.infoBox}>
+       {/* <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>{t["why choose jk bus"]}</Text>
           <Text style={styles.infoItem}>• Air-conditioned modern fleet</Text>
           <Text style={styles.infoItem}>• Experienced and professional drivers</Text>
           <Text style={styles.infoItem}>• Real-time GPS tracking for safety</Text>
         </View>
+       */}
+
       </ScrollView>
       <Toast />
     </SafeAreaView>
@@ -201,7 +271,19 @@ const styles = StyleSheet.create({
   iconBox: { width: 40, alignItems: 'center' },
   inputWrapper: { flex: 1, marginLeft: 8 },
   inputLabel: { fontSize: 12, color: '#757575', fontFamily: 'Roboto-Medium' },
-  input: { fontSize: 16, color: '#212121', paddingVertical: 4, fontFamily: 'Roboto-Regular' },
+  input: { fontSize: 13, color: '#212121', paddingVertical: 4, fontFamily: 'Roboto-Regular' },
+  dropdown: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    minHeight: 30,
+  },
+  dropdownContainer: {
+    borderWidth: 1,
+    borderColor: '#F5F5F5',
+    borderRadius: 8,
+    elevation: 5,
+  },
   dateText: { fontSize: 16, color: '#212121', paddingVertical: 4, fontFamily: 'Roboto-Regular' },
   divider: { height: 1, backgroundColor: '#F5F5F5', marginHorizontal: 40 },
   searchButton: {

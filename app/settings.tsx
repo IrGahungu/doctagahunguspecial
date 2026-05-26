@@ -44,7 +44,7 @@ export default function SettingsScreen() {
       [
         { text: t.cancel, style: "cancel" },
         {
-          text: "Logout",
+          text: t.logout,
           style: "destructive",
           onPress: async () => { //
             // Also clear the selected country on logout

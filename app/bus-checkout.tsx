@@ -117,21 +117,32 @@ const BusCheckoutSkeleton = () => (
         const res = await fetch(`${API_BASE_URL}/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const data = await res.json();
-        if (res.ok && data.engagement_points !== undefined) {
-          setEngagementPoints(data.engagement_points);
-          setUserId(data.id); // Also set userId here
-          setError(null); // Clear any previous errors
+        
+        if (res.ok) {
+          const data = await res.json();
+          if (data.engagement_points !== undefined) {
+            setEngagementPoints(data.engagement_points);
+            setUserId(data.id); // Also set userId here
+            setError(null); // Clear any previous errors
+          }
         }
 
         // Fetch the dynamic threshold from backend
-        const configRes = await fetch(`${API_BASE_URL}/config/bus-booking-threshold`, {
+        const configRes = await fetch(`${API_BASE_URL}/api/config/bus-booking-threshold`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const configData = await configRes.json();
-        if (configRes.ok && configData.min_ep_required) {
-          setMinEpRequired(configData.min_ep_required);
-          setError(null); // Clear any previous errors
+
+        if (configRes.ok) {
+          const configText = await configRes.text();
+          try {
+            const configData = JSON.parse(configText);
+            if (configData.min_ep_required) {
+              setMinEpRequired(configData.min_ep_required);
+              setError(null); // Clear any previous errors
+            }
+          } catch (e) {
+            console.error('Failed to parse threshold config:', e);
+          }
         }
       } catch (error) {
         console.error('Error fetching engagement points:', error);
@@ -198,14 +209,16 @@ const BusCheckoutSkeleton = () => (
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const walletData = await walletRes.json();
+      const walletText = await walletRes.text();
+      let walletData: any = {};
+      try { walletData = JSON.parse(walletText); } catch (e) {}
 
       if (!walletRes.ok) {
         Toast.show({
           type: 'error',
           text1: 'Wallet Error',
           visibilityTime: 3000,
-          text2: walletData.error || 'Failed to fetch balance.',
+          text2: (walletData as any).error || 'Failed to fetch balance.',
         });
         return;
       }
@@ -265,7 +278,9 @@ const BusCheckoutSkeleton = () => (
         body: JSON.stringify({ pin_code: pin }),
       });
 
-      const verifyData = await verifyRes.json();
+      const verifyText = await verifyRes.text();
+      let verifyData: any = {};
+      try { verifyData = JSON.parse(verifyText); } catch (e) {}
 
       if (!verifyRes.ok || !verifyData.success) {
         throw new Error(

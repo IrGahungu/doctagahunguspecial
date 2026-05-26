@@ -160,8 +160,7 @@ export default function BusSeatSelectionScreen() {
 
   const totalAmount = useMemo(() => {
     return selectedSeats.reduce((sum, seatId) => {
-      const seat = seatLayout.find(s => s.id === seatId);
-      const currentPrice = seat?.type === 'VIP' ? basePrice * 1.5 : basePrice;
+      const currentPrice = basePrice; // For now, VIP seats have the same price as standard seats
       return sum + currentPrice;
     }, 0);
   }, [selectedSeats, basePrice, seatLayout]);
@@ -234,7 +233,7 @@ export default function BusSeatSelectionScreen() {
 
               return (
                 <View key={seat.id} style={{ alignItems: 'center' }}>
-                  {index === 0 && vipCount > 0 && <Text style={styles.sectionLabel}>VIP SECTION (1.5x Price)</Text>}
+                  {index === 0 && vipCount > 0 && <Text style={styles.sectionLabel}>VIP SECTION</Text>}
                   {index === vipCount && <View style={styles.sectionDivider}><Text style={styles.sectionLabel}>STANDARD SECTION</Text></View>}
                   
                   <TouchableOpacity
@@ -244,9 +243,7 @@ export default function BusSeatSelectionScreen() {
                       { width: seatWidth },
                       isVIP && styles.seatVIP,
                       isReserved && styles.seatReserved,
-                      isSelected && (isVIP ? styles.seatVIPSelected : styles.seatSelected),
-                      // Calculate aisle margin based on the middle column
-                      (index % numColumns === Math.floor(numColumns / 2) - 1) && { marginRight: 25 }
+                      isSelected && (isVIP ? styles.seatVIPSelected : styles.seatSelected)
                     ]}
                     onPress={() => toggleSeat(seat.id)}
                   >
@@ -287,7 +284,7 @@ export default function BusSeatSelectionScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E0F7FA' },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#E0F7FA' },
-  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee', justifyContent: 'center', alignItems: 'center' },
+  backButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: 'black', justifyContent: 'center', alignItems: 'center' },
   headerTitleContainer: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 18, fontFamily: 'Roboto-Bold', color: '#212121' },
   headerSubtitle: { fontSize: 12, color: '#757575' },

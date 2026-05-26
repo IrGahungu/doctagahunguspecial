@@ -257,7 +257,7 @@ const RegisterScreen = () => {
 
     Alert.alert(
       t["confirm details title"],
-      `${t["confirm details message"]}\n\n${t["full name"]}: ${fullname}\nWhatsApp: ${whatsappNumber}\n${t.language === 'en' ? 'Country' : t.dataCountry}: ${country}\n${t.language === 'rn' ? 'Inyishu' : 'Secret Answer'}: ${secretAnswer}`,
+      `${t["confirm details message"]}\n\n${t["full name"]}: ${fullname}\nWhatsApp: ${whatsappNumber}\n${language === 'en' ? 'Country' : t.country}: ${country}\n${t["secret answer"]}: ${secretAnswer ? (t as any)[secretAnswer.toLowerCase()] : ''}`,
       [
         { text: t.no, style: "cancel" },
         { text: t.yes || "OK", onPress: proceedWithRegistration },
@@ -342,7 +342,7 @@ const RegisterScreen = () => {
                 <Text style={styles.hintText}>{t["confirm password hint"]}</Text>
                 <View style={[styles.inputContainer, !!errors.confirmPassword && styles.inputError]}>
                   <TextInput
-                    placeholder={t["confirm new pin"] || "Confirm Password"}
+                    placeholder={t["confirm password"] || "Confirm Password"}
                     placeholderTextColor="gray"
                     value={confirmPassword}
                     onChangeText={(text) => validateConfirmPassword(text, password)}

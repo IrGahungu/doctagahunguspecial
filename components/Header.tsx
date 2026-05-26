@@ -293,7 +293,7 @@ export default function Header() {
             {isLoggedIn ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={styles.welcomeText}>
-                  {t["murahawe ikaze kwa Dr. Gahungu:"]} {' '}
+                  {t["murahawe ikaze kuri MELANA:"]} {' '}
                   {!isLoading && fullname}
                 </Text>
                 {isLoading && (
@@ -301,7 +301,7 @@ export default function Header() {
                 )}
               </View>
             ) : (
-              <Text style={styles.welcomeText}>{t["murahawe ikaze kwa Dr. Gahungu:"]}</Text>
+              <Text style={styles.welcomeText}>{t["murahawe ikaze kuri MELANA:"]}</Text>
             )}
 
             <View style={[styles.networkTester, { borderColor: networkStatus === 'Excellent' ? '#4CAF50' : networkStatus === 'Checking...' ? '#FFA000' : '#F44336' }]}>
