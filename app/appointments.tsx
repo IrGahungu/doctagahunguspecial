@@ -168,7 +168,7 @@ const AppointmentItem = ({ item }: { item: Booking }) => {
             })}
             size={100}
           />
-          <Text style={styles.qrLabel}>{item.doctor_name} {t["with dr gahungu app"]}</Text>
+          <Text style={styles.qrLabel}>{item.doctor_name} {t["with melana"]}</Text>
         </View>
       )}
 

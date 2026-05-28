@@ -135,8 +135,8 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
 
       <View style={styles.routeContainer}>
         <View style={styles.routePoint}>
-          <Text style={styles.routeLabel}>Origin</Text>
-          <Text style={styles.routeCity}>{t.origin}</Text>
+          <Text style={styles.routeLabel}>{t.origin}</Text>
+          <Text style={styles.routeCity}>{item.buses.origin}</Text>
         </View>
         
         <View style={styles.routeDivider}>
@@ -146,7 +146,7 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
         </View>
 
         <View style={[styles.routePoint, { alignItems: 'flex-end' }]}>
-          <Text style={styles.routeLabel}>Destination</Text>
+          <Text style={styles.routeLabel}>{t.destination}</Text>
           <Text style={styles.routeCity}>{item.buses.destination}</Text>
         </View>
       </View>
@@ -154,16 +154,16 @@ const TicketItem = ({ item, isNew }: { item: BusTicket; isNew?: boolean }) => {
       <View style={styles.infoRow}>
         <View style={styles.infoItem}>
           <Calendar size={14} color="#757575" />
-          <Text style={styles.infoValue}>{t.date}</Text>
+          <Text style={styles.infoValue}>{new Date(item.travel_date).toLocaleDateString(language)}</Text>
         </View>
         <View style={styles.infoItem}>
           <Clock size={14} color="#757575" />
-          <Text style={styles.infoValue}>{t.time}</Text>
+          <Text style={styles.infoValue}>{item.buses.departure_time}</Text>
         </View>
         <View style={styles.infoItem}>
           <TicketIcon size={14} color="#4CAF50" />
           <View>
-            <Text style={styles.seatValue}>Seat {item.seat_number}</Text>
+            <Text style={styles.seatValue}>{t.seat} {item.seat_number}</Text>
             {isConfirmed && item.ticket_number && (
               <Text style={styles.ticketIdSmall}>ID: {item.ticket_number}</Text>
             )}

@@ -106,7 +106,7 @@ const RegisterScreen = () => {
   };
 
   const validateFullname = (text: string) => {
-    setFullname(text);
+    setFullname(text.toUpperCase());
     if (!text.trim()) {
       setErrors((prev) => ({ ...prev, fullname: t["fullname required"] }));
     } else {

@@ -83,9 +83,9 @@ export default function PaymentScreen() {
   const handlePayment = (method: 'Gahungu Wallet' | 'Gahungu Card') => {
     console.log(`Processing payment for ${doctorName} on ${date} at ${time} (${type}) with ${method}. Total: ${totalAmount}`);
     if (method === 'Gahungu Wallet') {
-      showToast('DR. IR. Gahungu ariko arabijengajenga,vuba birakora!', 7000);
+      showToast(t["wallet payment maintenance"], 7000);
     } else {
-      showToast('Card payments are currently under maintenance.', 4000);
+      showToast(t["card maintenance"], 4000);
     }
   };
 

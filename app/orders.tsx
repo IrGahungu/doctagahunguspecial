@@ -150,7 +150,7 @@ export default function OrdersScreen() {
         <Text style={styles.orderTotal}>{t.total} BIF {Number(item.total_amount || 0).toFixed(2)}</Text>
       </View>
       <View style={styles.statusContainer}>
-        <Text style={styles.checkStatusText}>Check your order status</Text>
+        <Text style={styles.checkStatusText}>{t["check order status"]}</Text>
         <ChevronRight size={22} color="#757575" />
       </View>
     </TouchableOpacity>
@@ -181,7 +181,7 @@ export default function OrdersScreen() {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>You have no orders yet.</Text>
+              <Text style={styles.emptyText}>{t["no orders yet"]}</Text>
               <TouchableOpacity onPress={() => router.push('/')}>
                 <Text style={styles.browseButton}>{t["start shopping"]}</Text>
               </TouchableOpacity>

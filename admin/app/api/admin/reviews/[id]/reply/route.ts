@@ -31,9 +31,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { isAdmin, error, status } = await checkAdmin(request);
-  if (!isAdmin) return NextResponse.json({ error }, { status });
+
+  if (!isAdmin) {
+    return NextResponse.json({ error }, { status });
+  }
 
   const { id } = await params;
+
   const { admin_reply } = await request.json();
 
   const { data, error: dbError } = await supabaseAdmin
@@ -45,7 +49,11 @@ export async function PUT(
 
   if (dbError) {
     console.error("Error saving review reply:", dbError);
-    return NextResponse.json({ error: "Failed to save reply" }, { status: 500 });
+
+    return NextResponse.json(
+      { error: "Failed to save reply" },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json(data);

@@ -5,8 +5,9 @@ import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, X, Plus, Check, P
 import { Video, ResizeMode } from 'expo-av';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as SecureStore from 'expo-secure-store';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useLanguageStore, translations } from '@/stores/languageStore';
+import { useAuthStore } from '@/stores/authStore';
 import { API_BASE_URL } from '@/config';
 import { supabase } from '@/lib/supabase';
 
@@ -322,10 +323,8 @@ export default function ExploreScreen() {
   const isTimerActiveRef = useRef(isTimerActive);
   const [viewedImages, setViewedImages] = useState<Record<string, boolean>>({});
   const [showConfetti, setShowConfetti] = useState(false);
-  const [engagementPoints, setEngagementPoints] = useState(0); // Total EP
-  const [postsLikedToday, setPostsLikedToday] = useState(0);
-  const [storiesViewedToday, setStoriesViewedToday] = useState(0);
-  const [epEarnedToday, setEpEarnedToday] = useState(0);
+  const { engagementPoints, postsLikedToday, storiesViewedToday, epEarnedToday, addPoints, syncFromDatabase, initializeStats } = useAuthStore();
+
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [viewedPostImages, setViewedPostImages] = useState<Record<string, boolean>>({});
   const [rewardText, setRewardText] = useState('');
@@ -335,6 +334,7 @@ export default function ExploreScreen() {
     epPostView: 300,
     epStoryView: 500,
     storyDuration: 45000,
+    monetizationGoal: 50000,
   });
 
   const progress = useRef(new Animated.Value(0)).current;
@@ -351,112 +351,67 @@ export default function ExploreScreen() {
   const walletGraffitiAnimations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
 
   // Effect to load/save daily stats and reset if new day
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = await SecureStore.getItemAsync('token');
-        const storedCountry = await SecureStore.getItemAsync('user_country') || 'Burundi';
-        const headers = { Authorization: `Bearer ${token}` };
+  useFocusEffect(
+    useCallback(() => {
+      const initialize = async () => {
+        await initializeStats();
+        await syncFromDatabase();
 
-      const [storiesRes, postsRes, interactionsRes, profileRes, configRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/stories`, { headers }),
-        fetch(`${API_BASE_URL}/posts`, { headers }),
-        fetch(`${API_BASE_URL}/interactions/me`, { headers }),
-        fetch(`${API_BASE_URL}/me`, { headers }),
-        fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers })
-      ]);
+        // 2. Fetch fresh data from DB (Source of Truth)
+        try {
+          const token = await SecureStore.getItemAsync('token');
+          const storedCountry = await SecureStore.getItemAsync('user_country') || 'Burundi';
+          const headers = { Authorization: `Bearer ${token}` };
 
-        if (!storiesRes.ok || !postsRes.ok) {
-          throw new Error('Failed to fetch essential explore data');
-        }
+          const [storiesRes, postsRes, interactionsRes, configRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/stories`, { headers }),
+            fetch(`${API_BASE_URL}/posts`, { headers }),
+            fetch(`${API_BASE_URL}/interactions/me`, { headers }),
+            fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers })
+          ]);
 
-        if (configRes.ok) {
-          const cfg = await configRes.json();
-          setConfig({
-            epPostLike: cfg.ep_post_like || 200,
-            epPostView: cfg.ep_post_view || 300,
-            epStoryView: cfg.ep_story_view || 500,
-            storyDuration: cfg.story_duration || 45000,
-          });
-        }
+          if (!storiesRes.ok || !postsRes.ok) throw new Error('Failed to fetch essential explore data');
 
-        if (interactionsRes.ok) {
-          const { likedPostIds: serverLikes, viewedStories, viewedPosts } = await interactionsRes.json();
-          console.log('[ExploreScreen] Fetched interactions. Viewed posts count:', viewedPosts.length);
-          setLikedPostIds(new Set(serverLikes));
+          if (configRes.ok) {
+            const cfg = await configRes.json();
+            setConfig({
+              epPostLike: cfg.ep_post_like || 200,
+              epPostView: cfg.ep_post_view || 300,
+              epStoryView: cfg.ep_story_view || 500,
+              storyDuration: cfg.story_duration || 45000,
+              monetizationGoal: cfg.monetization_goal || 50000,
+            });
+          }
+
+          if (interactionsRes.ok) {
+            const { likedPostIds: serverLikes, viewedStories, viewedPosts } = await interactionsRes.json();
+            setLikedPostIds(new Set(serverLikes));
+            
+            const storyMap: Record<string, boolean> = {};
+            viewedStories.forEach((v: any) => storyMap[`${v.story_id}-${v.image_index}`] = true);
+            setViewedImages(storyMap);
+
+            const postMap: Record<string, boolean> = {};
+            viewedPosts.forEach((v: any) => postMap[`${v.post_id}-${v.image_index}`] = true);
+            setViewedPostImages(postMap);
+          }
+
+          const storiesData = await storiesRes.json();
+          const postsData = await postsRes.json();
           
-          const storyMap: Record<string, boolean> = {};
-          viewedStories.forEach((v: any) => {
-            storyMap[`${v.story_id}-${v.image_index}`] = true;
-          });
-          setViewedImages(storyMap);
+          setStories(storiesData.map((s: any) => ({ ...s, images: typeof s.images === 'string' ? JSON.parse(s.images) : s.images })));
+          setPosts(postsData.map((p: any) => ({ ...p, images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images })));
 
-          const postMap: Record<string, boolean> = {};
-          viewedPosts.forEach((v: any) => {
-            postMap[`${v.post_id}-${v.image_index}`] = true;
-          });
-          console.log('[ExploreScreen] constructed viewedPostImages map keys:', Object.keys(postMap).slice(0, 5), '...');
-          setViewedPostImages(postMap);
+          setIsLoading(false);
+        } catch (err) {
+          console.error("Error fetching explore data:", err);
+          setIsLoading(false);
         }
+      };
 
-        if (profileRes.ok) {
-          const profileData = await profileRes.json();
-          const dbPoints = profileData.engagement_points || 0;
-          setEngagementPoints(dbPoints);
-          // Sync cache with DB value
-          await SecureStore.setItemAsync('totalEngagementPoints', dbPoints.toString());
-        }
-        const storiesData = await storiesRes.json();
-        const postsData = await postsRes.json();
-        
-        setStories(storiesData.map((s: any) => ({
-          ...s,
-          images: typeof s.images === 'string' ? JSON.parse(s.images) : s.images
-        })));
-        
-        setPosts(postsData.map((p: any) => ({
-          ...p,
-          images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images
-        })));
-
-        setIsLoading(false);
-      } catch (err) {
-        console.error("Error fetching explore data:", err);
-        // Keep showing skeleton and retry fetching after 5 seconds if a failure occurs
-        setTimeout(fetchData, 5000);
-      }
-    };
-
-    const loadDailyStats = async () => {
-      const today = new Date().toDateString();
-      const storedDate = await SecureStore.getItemAsync('dailyStatsDate');
-      
-      if (storedDate === today) {
-        const storedPostsLiked = await SecureStore.getItemAsync('postsLikedToday');
-        const storedStoriesViewed = await SecureStore.getItemAsync('storiesViewedToday');
-        const storedEpEarned = await SecureStore.getItemAsync('epEarnedToday');
-        const storedTotalEp = await SecureStore.getItemAsync('totalEngagementPoints');
-
-        if (storedPostsLiked) setPostsLikedToday(parseInt(storedPostsLiked));
-        if (storedStoriesViewed) setStoriesViewedToday(parseInt(storedStoriesViewed));
-        if (storedEpEarned) setEpEarnedToday(parseInt(storedEpEarned));
-        if (storedTotalEp) setEngagementPoints(parseInt(storedTotalEp));
-      } else {
-        // New day, reset daily stats
-        await SecureStore.setItemAsync('dailyStatsDate', today);
-        await SecureStore.setItemAsync('postsLikedToday', '0');
-        await SecureStore.setItemAsync('storiesViewedToday', '0');
-        await SecureStore.setItemAsync('epEarnedToday', '0');
-        setPostsLikedToday(0);
-        setStoriesViewedToday(0);
-        setEpEarnedToday(0);
-        // Total EP is not reset daily, it accumulates
-      }
-    };
-
-    fetchData();
-    loadDailyStats();
-  }, []);
+      initialize();
+    }, [initializeStats, syncFromDatabase])
+  );
 
   // Real-time updates for engagement settings and story duration
   useEffect(() => {
@@ -490,12 +445,6 @@ export default function ExploreScreen() {
       supabase.removeChannel(settingsChannel);
     };
   }, []);
-
-  // Effects to save stats whenever they change
-  useEffect(() => { SecureStore.setItemAsync('postsLikedToday', postsLikedToday.toString()); }, [postsLikedToday]);
-  useEffect(() => { SecureStore.setItemAsync('storiesViewedToday', storiesViewedToday.toString()); }, [storiesViewedToday]);
-  useEffect(() => { SecureStore.setItemAsync('epEarnedToday', epEarnedToday.toString()); }, [epEarnedToday]);
-  useEffect(() => { SecureStore.setItemAsync('totalEngagementPoints', engagementPoints.toString()); }, [engagementPoints]);
 
   const triggerWalletGraffiti = useCallback(() => {
     // Reset animations
@@ -537,7 +486,6 @@ export default function ExploreScreen() {
         useNativeDriver: true,
       })
     ]).start(() => {
-      setEngagementPoints(prev => prev + points);
       setRewardText('');
       triggerWalletGraffiti();
     });
@@ -702,11 +650,11 @@ export default function ExploreScreen() {
   }, []);
 
   // Memoize the handlePostImageNext callback to be used by the Post component
-  const handlePostImageNext = useCallback((post: any, index: number) => {
-    setEpEarnedToday(prev => prev + config.epPostView);
+  const handlePostImageNext = useCallback(async (post: any, index: number) => {
+    const updatedPoints = await addPoints(config.epPostView, 'post');
     triggerRewardAnimation(config.epPostView);
     recordInteraction('post-view', post.id, post.title, index);
-  }, [triggerRewardAnimation, recordInteraction, config.epPostView]);
+  }, [triggerRewardAnimation, recordInteraction, config.epPostView, addPoints]);
 
   // PanResponder for Swipe-to-dismiss
   const panResponder = useRef(
@@ -724,14 +672,14 @@ export default function ExploreScreen() {
     })
   ).current;
 
-  const handleMarkAsViewed = () => {
+  const handleMarkAsViewed = async () => {
     if (!selectedStory) return;
     const key = `${selectedStory.id}-${currentImageIndex}`;
     
     if (!viewedImages[key]) {
       const newViewed = { ...viewedImages, [key]: true };
       setViewedImages(newViewed);
-      setEpEarnedToday(prev => prev + config.epStoryView);
+      await addPoints(config.epStoryView, 'story');
       triggerRewardAnimation(config.epStoryView);
       recordInteraction('story-view', selectedStory.id, selectedStory.name, currentImageIndex);
       
@@ -801,10 +749,10 @@ export default function ExploreScreen() {
           onPress={() => router.push({
             pathname: '/wallet-details',
             params: { 
-              engagementPoints: engagementPoints.toString(), 
-              postsLikedToday: postsLikedToday.toString(), 
-              storiesViewedToday: storiesViewedToday.toString(), 
-              epEarnedToday: epEarnedToday.toString() 
+              engagementPoints: (engagementPoints || 0).toString(), 
+              postsLikedToday: (postsLikedToday || 0).toString(), 
+              storiesViewedToday: (storiesViewedToday || 0).toString(), 
+              epEarnedToday: (epEarnedToday || 0).toString() 
             }
           })}
         >{/* Multi-graffiti burst behind wallet */}{walletGraffitiAnimations.map((anim, i) => {
@@ -888,9 +836,8 @@ export default function ExploreScreen() {
                     return indices;
                   })()
                   }
-                  onLike={() => {
-                    setPostsLikedToday(prev => prev + 1);
-                    setEpEarnedToday(prev => prev + config.epPostLike);
+                  onLike={async () => {
+                    await addPoints(config.epPostLike, 'like');
                     triggerRewardAnimation(config.epPostLike);
                     // Like API is called inside Post component
                   }}

@@ -144,8 +144,9 @@ export default function ReviewsScreen() {
       if (res.ok) {
         const data = await res.json();
         if (data.fullname) {
-          setUserProfileName(data.fullname);
-          setName(data.fullname);
+          const formattedName = data.fullname.toUpperCase();
+          setUserProfileName(formattedName);
+          setName(formattedName);
         }
         if (data.id) setCurrentUserId(data.id);
       }
@@ -189,7 +190,7 @@ export default function ReviewsScreen() {
 
   const startEditReview = (review: any) => {
     setEditingReview(review);
-    setName(review.name);
+    setName((review.name || "").toUpperCase());
     setRating(Number(review.rating));
     setComment(review.comment);
     setModalVisible(true);
@@ -358,7 +359,7 @@ export default function ReviewsScreen() {
                     style={styles.input}
                     placeholder={t["your name"] || "Your Name"}
                     value={name}
-                    onChangeText={setName}
+                    editable={false}
                   />
 
                   <View style={styles.ratingInputRow}>

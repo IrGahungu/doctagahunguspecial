@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Animated, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import { API_BASE_URL } from "@/config";
@@ -49,7 +49,6 @@ const ProfileSkeleton = () => (
 export default function UpdateProfileScreen() {
   const router = useRouter();
   const [fullname, setFullname] = useState("");
-  const [whatsappNumber, setWhatsappNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -74,8 +73,7 @@ export default function UpdateProfileScreen() {
       if (!res.ok) throw new Error("Failed to fetch profile");
 
       const data = await res.json();
-      setFullname(data.fullname || "");
-      setWhatsappNumber(data.whatsapp_number || "");
+      setFullname((data.fullname || "").toUpperCase());
     } catch (err) {
       console.error(err);
       setHasError(true);
@@ -98,19 +96,9 @@ export default function UpdateProfileScreen() {
       });
       return;
     }
-
-    if (!whatsappNumber.trim() || !whatsappNumber.startsWith("+") || whatsappNumber.length < 10) {
-      Toast.show({
-        type: 'error',
-        text1: 'Validation Error',
-        text2: "Enter a valid WhatsApp number starting with '+'.",
-      });
-      return;
-    }
-
     Alert.alert(
-      "Confirm Update",
-      "Updating your profile information will log you out automatically. Do you wish to continue?",
+      t["confirm update"],
+      t["update profile logout message"],
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -136,7 +124,6 @@ export default function UpdateProfileScreen() {
                 },
                 body: JSON.stringify({
                   fullname,
-                  whatsapp_number: whatsappNumber,
                 }),
               });
 
@@ -146,8 +133,8 @@ export default function UpdateProfileScreen() {
               }
 
               Alert.alert(
-                "✅ Success",
-                "Profile updated successfully! For security reasons, you will now be logged out. Please log in again with your updated credentials.",
+                t.yes,
+                t["profile updated success message"],
                 [
                   {
                     text: "OK",
@@ -178,6 +165,7 @@ export default function UpdateProfileScreen() {
   };
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButtonHeader}>
@@ -203,14 +191,8 @@ export default function UpdateProfileScreen() {
         style={styles.input}
         placeholder={t["full name"]}
         value={fullname}
-        onChangeText={setFullname}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder={t["whatsapp number"]}
-        value={whatsappNumber}
-        onChangeText={setWhatsappNumber}
-        keyboardType="phone-pad"
+        onChangeText={(text) => setFullname(text.toUpperCase())}
+        autoCapitalize="characters"
       />
 
       <TouchableOpacity style={styles.button} onPress={handleUpdate} disabled={loading}>
@@ -223,6 +205,7 @@ export default function UpdateProfileScreen() {
       </View>
       )}
     </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 

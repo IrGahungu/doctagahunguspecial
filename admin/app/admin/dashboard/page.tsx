@@ -907,17 +907,18 @@ export default function AdminDashboard() {
   }
 
   async function handleCategoryDelete(id: string) {
-    if (!confirm("Delete this category?")) return;
+    if (!confirm("Are you sure you want to delete this category? This action cannot be undone.")) return;
     setLoadingId(id);
     try {
       const res = await fetch(`/api/categories?id=${id}`, { method: "DELETE" });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to delete category");
 
+      toast.success("Category deleted successfully");
       fetchCategories();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to delete category");
+      toast.error(err instanceof Error ? err.message : "Failed to delete category");
     } finally {
       setLoadingId(null);
     }
@@ -2249,7 +2250,7 @@ export default function AdminDashboard() {
                   <table className="w-full text-left text-sm border">
                     <thead className="bg-gray-100">
                       <tr>
-                        <th className="p-2">Emoji</th>
+                        <th className="p-2">Icon</th>
                         <th className="p-2">Name</th>
                         <th className="p-2">Medicines</th>
                         <th className="p-2">Actions</th>
@@ -2258,7 +2259,13 @@ export default function AdminDashboard() {
                     <tbody>
                       {categories.map((cat) => (
                         <tr key={cat.id || `category-${cat.name}`} className="border-t">
-                          <td className="p-2 text-xl">{cat.image}</td>
+                          <td className="p-2">
+                            {cat.image ? (
+                              <img src={cat.image} alt={cat.name} className="w-8 h-8 object-contain" />
+                            ) : (
+                              <span className="text-gray-400 text-xs italic">No Icon</span>
+                            )}
+                          </td>
                           <td className="p-2">{cat.name}</td>
                           <td className="p-2 text-xs text-gray-600">
                             {medicines.filter(m => m.category_id === cat.id).length} items

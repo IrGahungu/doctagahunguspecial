@@ -78,12 +78,9 @@ export default function AccountScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
-  const [engagementPoints, setEngagementPoints] = useState(0);
-  const [dailyStats, setDailyStats] = useState({
-    postsLikedToday: 0,
-    storiesViewedToday: 0,
-    epEarnedToday: 0,
-  });
+  
+  const { engagementPoints, postsLikedToday, storiesViewedToday, epEarnedToday, syncFromDatabase, initializeStats } = useAuthStore();
+
   const [showOrdersButton, setShowOrdersButton] = useState(false);
   const [showMyAppointmentsButton, setShowMyAppointmentsButton] = useState(false);
   const [showBookBusButton, setShowBookBusButton] = useState(false);
@@ -114,73 +111,55 @@ export default function AccountScreen() {
       setDisplayProgress(0);
       const fetchProfile = async () => {
         setIsLoading(true);
-
-        // 1. Load initial stats from local storage for immediate UI feedback
-        const points = await SecureStore.getItemAsync('totalEngagementPoints');
-        const pl = await SecureStore.getItemAsync('postsLikedToday');
-        const sv = await SecureStore.getItemAsync('storiesViewedToday');
-        const ep = await SecureStore.getItemAsync('epEarnedToday');
-
-        if (points) setEngagementPoints(parseInt(points));
-        setDailyStats({
-          postsLikedToday: parseInt(pl || '0'),
-          storiesViewedToday: parseInt(sv || '0'),
-          epEarnedToday: parseInt(ep || '0'),
-        });
-
-        const token = await SecureStore.getItemAsync("token");
-        if (!token) {
-          // If no token, redirect to login. This is a good safeguard.
-          router.replace("/auth");
-          return;
-        }
-
         try {
+          await initializeStats();
+          await syncFromDatabase();
+
+          const token = await SecureStore.getItemAsync("token");
+          if (!token) {
+            router.replace("/auth");
+            return;
+          }
+
+          // Fetch User Data
           const res = await fetch(`${API_BASE_URL}/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          const data = await res.json();
+          const userData = await res.json();
+
           if (res.ok) {
-            setProfile(data);
-            const dbPoints = data.engagement_points || 0;
-            setEngagementPoints(dbPoints);
-            
-            // 2. Sync local cache with the source of truth (Database)
-            await SecureStore.setItemAsync('totalEngagementPoints', dbPoints.toString());
-
-            // Fetch button visibility from correct config endpoint to stay in sync
-            const settingsRes = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
-            if (settingsRes.ok) {
-              const settingsData = await settingsRes.json();
-              // Update visibility states based on API config (force boolean conversion)
-              setShowOrdersButton(!!settingsData.show_orders_button);
-              setShowMyAppointmentsButton(!!settingsData.show_my_appointments_button);
-              setShowBookBusButton(!!settingsData.show_book_bus_button);
-              setShowMyBusTicketsButton(!!settingsData.show_my_bus_tickets_button);
-              setMonetizationGoal(settingsData.monetization_goal || 50000);
-            }
-
-            useAuthStore.getState().setUserId(data.id); // ✅ Save user ID to global store
+            setProfile(userData);
+            useAuthStore.getState().setUserId(userData.id);
 
             // Fetch active orders count
             const { count } = await supabase
               .from('orders')
               .select('*', { count: 'exact', head: true })
-              .eq('user_id', data.id)
+              .eq('user_id', userData.id)
               .in('status', ['pending', 'processing', 'confirmed', 'shipped']);
             setActiveOrdersCount(count || 0);
           } else {
-            console.error("Failed to fetch profile:", data.error);
+            console.error("Failed to fetch profile:", userData.error);
           }
-          
-          // Use the latest fetched points or the fallback
-          const currentPoints = res.ok ? (data.engagement_points || 0) : parseInt(points || '0');
-          const currentGoal = res.ok ? (data.monetization_goal || monetizationGoal) : monetizationGoal;
 
-          // Animate the progress bar after a short delay to allow screen transition to settle
+          // Fetch Config/Settings
+          const settingsRes = await fetch(`${API_BASE_URL}/api/config/engagement-settings`);
+          let currentGoal = monetizationGoal;
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json();
+            setShowOrdersButton(!!settingsData.show_orders_button);
+            setShowMyAppointmentsButton(!!settingsData.show_my_appointments_button);
+            setShowBookBusButton(!!settingsData.show_book_bus_button);
+            setShowMyBusTicketsButton(!!settingsData.show_my_bus_tickets_button);
+            currentGoal = settingsData.monetization_goal || 50000;
+            setMonetizationGoal(currentGoal);
+          }
+
+          // Animate progress
           setTimeout(() => {
-            setDisplayProgress(Math.min(currentPoints / currentGoal, 1));
+            setDisplayProgress(Math.min(engagementPoints / currentGoal, 1));
           }, 400);
+
         } catch (err) {
           console.error("Profile fetch error:", err);
         } finally {
@@ -189,7 +168,7 @@ export default function AccountScreen() {
       };
 
       fetchProfile();
-    }, [router])
+    }, [router, engagementPoints, monetizationGoal, initializeStats, syncFromDatabase])
   );
 
   // Real-time subscription for button visibility settings
@@ -259,9 +238,11 @@ export default function AccountScreen() {
             onPress={() => router.push({
               pathname: '/wallet-details',
               params: { 
-                engagementPoints: engagementPoints.toString(), 
-                monetizationGoal: monetizationGoal.toString(),
-                ...dailyStats 
+                engagementPoints: (engagementPoints || 0).toString(), 
+                monetizationGoal: (monetizationGoal || 0).toString(),
+                postsLikedToday: (postsLikedToday || 0).toString(),
+                storiesViewedToday: (storiesViewedToday || 0).toString(),
+                epEarnedToday: (epEarnedToday || 0).toString(),
               }
             })}
           >

@@ -760,8 +760,8 @@ export default function DoctorDetailScreen() {
                      <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
                        <Icon name="check-circle" size={80} color="#4CAF50" />
                      </Animated.View>
-                     <Text style={[styles.modalTitle, { marginTop: 20, marginBottom: 10 }]}>Payment Successful!</Text>
-                     <Text style={styles.modalText}>Redirecting to appointments...</Text>
+                     <Text style={[styles.modalTitle, { marginTop: 20, marginBottom: 10 }]}>{t["payment successful"]}</Text>
+                     <Text style={styles.modalText}>{t["redirecting to appointments"]}</Text>
                    </View>
                  ) : (
                    <>
@@ -769,15 +769,15 @@ export default function DoctorDetailScreen() {
                    <Icon name="close" size={24} color="#212121" />
                  </TouchableOpacity>
                  
-                 <Text style={styles.modalTitle}>Confirm Booking</Text>
+                 <Text style={styles.modalTitle}>{t["confirm booking"]}</Text>
                  
                  <View style={{ width: '100%', marginBottom: 20, backgroundColor: '#F5F5F5', padding: 12, borderRadius: 8 }}>
-                   <Text style={styles.modalText}>Doctor: <Text style={{ fontWeight: 'bold' }}>{doctor.name}</Text></Text>
-                   <Text style={styles.modalText}>Date: <Text style={{ fontWeight: 'bold' }}>{selectedDate}</Text></Text>
-                   <Text style={styles.modalText}>Time: <Text style={{ fontWeight: 'bold' }}>{selectedTime}</Text></Text>
-                   <Text style={styles.modalText}>Type: <Text style={{ fontWeight: 'bold', textTransform: 'capitalize' }}>{bookingType}</Text></Text>
+                   <Text style={styles.modalText}>{t.doctor}: <Text style={{ fontWeight: 'bold' }}>{doctor.name}</Text></Text>
+                   <Text style={styles.modalText}>{t.date}: <Text style={{ fontWeight: 'bold' }}>{selectedDate}</Text></Text>
+                   <Text style={styles.modalText}>{t.time}: <Text style={{ fontWeight: 'bold' }}>{selectedTime}</Text></Text>
+                   <Text style={styles.modalText}>{t.type}: <Text style={{ fontWeight: 'bold' }}>{bookingType === 'online' ? t.online : t["in-office"]}</Text></Text>
                    <View style={{ height: 1, backgroundColor: '#ddd', marginVertical: 8 }} />
-                   <Text style={styles.modalText}>Consultation Fee: <Text style={{ fontWeight: 'bold', color: '#4CAF50' }}>
+                   <Text style={styles.modalText}>{t["consultation fee"]}: <Text style={{ fontWeight: 'bold', color: '#4CAF50' }}>
                      {bookingType === 'online' 
                         ? getFee(selectedAvailability?.consultation_fee_online, doctor.consultation_fee_online)
                         : getFee(selectedAvailability?.consultation_fee_offline, doctor.consultation_fee_offline)

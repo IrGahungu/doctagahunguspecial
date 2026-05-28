@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextStyle, Image, ActivityIndicator, RefreshControl, Animated } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextStyle, Image, ActivityIndicator, RefreshControl, Animated, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -9,6 +9,7 @@ import QRCode from "react-native-qrcode-svg";
 import { supabase } from "@/lib/supabase";
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useLanguageStore, translations } from "@/stores/languageStore";
 
 const MEDICINE_URL_PREFIX = "https://sqwoawoyzicvbebpgweu.supabase.co/storage/v1/object/public/medicine-images/";
 
@@ -99,6 +100,8 @@ export default function OrderDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const fetchOrderDetails = useCallback(async (isSilent = false) => {
     if (!id) return;
@@ -273,21 +276,21 @@ export default function OrderDetailsScreen() {
         <body>
           <div class="header">
             <div class="title">Dr Gahungu App</div>
-            <div class="subtitle">Order #${String(order.id).substring(0, 8)}</div>
+            <div class="subtitle">${t["order hash"]}${String(order.id).substring(0, 8)}</div>
           </div>
           
           <div class="section">
-            <div class="row"><span class="label">Date:</span> <span>${new Date(order.created_at).toLocaleString()}</span></div>
+            <div class="row"><span class="label">${t.date}:</span> <span>${new Date(order.created_at).toLocaleString(language === 'rn' ? 'fr-FR' : language)}</span></div>
           </div>
 
           <div class="section">
-            <h3>Items</h3>
+            <h3>${t.items}</h3>
             <table class="items-table">
               <thead>
                 <tr>
-                  <th>Item</th>
+                  <th>${t.item}</th>
                   <th>Qty</th>
-                  <th>Price</th>
+                  <th>${t.price}</th>
                   <th>Total</th>
                 </tr>
               </thead>
@@ -295,12 +298,12 @@ export default function OrderDetailsScreen() {
                 ${order.items && order.items.length > 0 ? order.items.map(item => `
                   <tr>
                     <td>
-                      ${item.product_name || 'Item'}<br/>
-                      <small>${item.pharmacy ? `Sold by: ${item.pharmacy.name}` : ''}</small>
-                      <br/><small>Status: ${item.status || order.status || 'Pending'}</small>
+                      ${item.product_name || t.item}<br/>
+                      <small>${item.pharmacy ? `${t["sold by"]} ${item.pharmacy.name}` : ''}</small>
+                      <br/><small>${t.status} ${item.status || order.status || 'Pending'}</small>
                     </td>
                     <td>${item.quantity}</td>
-                    <td>BIF ${item.price}</td>
+                    <td>BIF ${item.price.toLocaleString()}</td>
                     <td>BIF ${(item.price * item.quantity).toFixed(2)}</td>
                   </tr>
                 `).join('') : ''}
@@ -309,13 +312,13 @@ export default function OrderDetailsScreen() {
           </div>
 
           <div class="section">
-            <div class="row"><span class="label">Subtotal:</span> <span>BIF ${Number(order.subtotal || 0).toFixed(2)}</span></div>
-            <div class="row"><span class="label">Service Fee:</span> <span>BIF ${Number(order.service_fee || 0).toFixed(2)}</span></div>
-            <div class="row total-row"><span class="label">Total Amount:</span> <span>BIF ${Number(order.total_amount || 0).toFixed(2)}</span></div>
+            <div class="row"><span class="label">${t.subtotal}:</span> <span>BIF ${Number(order.subtotal || 0).toLocaleString()}</span></div>
+            <div class="row"><span class="label">${t["medicine service fee"]}:</span> <span>BIF ${Number(order.service_fee || 0).toLocaleString()}</span></div>
+            <div class="row total-row"><span class="label">${t["total amount"]}:</span> <span>BIF ${Number(order.total_amount || 0).toLocaleString()}</span></div>
           </div>
 
           <div class="section" style="text-align: center; margin-top: 30px;">
-            <h3>Verification QR Code</h3>
+            <h3>QR Code</h3>
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${order.id}" alt="QR Code" />
           </div>
         </body>
@@ -327,7 +330,7 @@ export default function OrderDetailsScreen() {
     await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
   } catch (error) {
     console.error('Error downloading order details:', error);
-    alert('Failed to generate PDF');
+    Alert.alert(t.error, t["failed to generate pdf"]);
   }
 };
 
@@ -356,7 +359,7 @@ if (loading || (error && !order)) {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Details</Text>
+        <Text style={styles.headerTitle}>{t["order details"]}</Text>
       </View>
       <OrderDetailSkeleton />
     </SafeAreaView>
@@ -370,10 +373,10 @@ if (error || !order) {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Order Not Found</Text>
+        <Text style={styles.headerTitle}>{t["order not found"]}</Text>
       </View>
       <View style={styles.centered}>
-        <Text>{error || "Order details could not be found."}</Text>
+        <Text>{error || t["order details not found"]}</Text>
       </View>
     </SafeAreaView>
   );
@@ -385,40 +388,40 @@ return (
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <ArrowLeft size={24} color="#212121" />
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Order Details</Text>
+      <Text style={styles.headerTitle}>{t["order details"]}</Text>
     </View>
     <ScrollView
       contentContainerStyle={styles.scrollContainer}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Order Summary</Text>
+        <Text style={styles.cardTitle}>{t["order summary"]}</Text>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Order #</Text>
+          <Text style={styles.detailLabel}>{t["order hash"]}</Text>
           <Text style={styles.detailValue}>{String(order.id).substring(0, 8)}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Date:</Text>
+          <Text style={styles.detailLabel}>{t.date}:</Text>
           <Text style={styles.detailValue}>
-            {new Date(order.created_at).toLocaleDateString()}
+            {new Date(order.created_at).toLocaleDateString(language === 'rn' ? 'fr-FR' : language)}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Subtotal</Text>
-          <Text style={styles.detailValue}>BIF {Number(order.subtotal || 0).toFixed(2)}</Text>
+          <Text style={styles.detailLabel}>{t.subtotal}</Text>
+          <Text style={styles.detailValue}>BIF {Number(order.subtotal || 0).toLocaleString()}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Service Fee</Text>
-          <Text style={styles.detailValue}>BIF {Number(order.service_fee || 0).toFixed(2)}</Text>
+          <Text style={styles.detailLabel}>{t["medicine service fee"]}</Text>
+          <Text style={styles.detailValue}>BIF {Number(order.service_fee || 0).toLocaleString()}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={styles.totalLabel}>Total Amount</Text>
-          <Text style={styles.totalValue}>BIF {Number(order.total_amount || 0).toFixed(2)}</Text>
+          <Text style={styles.totalLabel}>{t["total amount"]}</Text>
+          <Text style={styles.totalValue}>BIF {Number(order.total_amount || 0).toLocaleString()}</Text>
         </View>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Items</Text>
+        <Text style={styles.cardTitle}>{t.items}</Text>
         {order.items && order.items[0] !== null ? (
           order.items.map((item) => (
             <View key={item.id} style={styles.itemRow}>
@@ -433,19 +436,19 @@ return (
               <View style={styles.itemDetails}>
                 <Text style={styles.itemName}>{item.product_name}</Text>
                 {item.pharmacy && (
-                  <Text style={styles.itemPharmacy}>Sold by: {item.pharmacy.name}</Text>
+                  <Text style={styles.itemPharmacy}>{t["sold by"]} {item.pharmacy.name}</Text>
                 )}
                 <Text style={[{ fontSize: 12, marginBottom: 2 }, getStatusStyle((item.status as OrderStatus) || order.status || 'Pending')]}>
-                  Status: {item.status || order.status || 'Pending'}
+                  {t.status} {item.status || order.status || 'Pending'}
                 </Text>
-                <Text style={styles.itemQuantity}>Quantity: {item.quantity}</Text>
+                <Text style={styles.itemQuantity}>{t.quantity} {item.quantity}</Text>
               </View>
               <Text style={styles.itemPrice}>
-                BIF {(Number(item.price || 0) * item.quantity).toFixed(2)}
+                BIF {(Number(item.price || 0) * item.quantity).toLocaleString()}
               </Text>
             </View>
           ))
-        ) : (<Text style={styles.detailValue}>No items found in this order.</Text>)}
+        ) : (<Text style={styles.detailValue}>{t["no items found"]}</Text>)}
       </View>
 
       {(order.status === 'Accepted' || order.status === 'On the way' || order.status === 'Delivered') && (
@@ -458,10 +461,10 @@ return (
               color="black"
               backgroundColor="white"
             />
-            <Text style={styles.qrHelpText}>Present this QR code at the pharmacy for verification.</Text>
+            <Text style={styles.qrHelpText}>{t["qr verification help"]}</Text>
           </View>
           <TouchableOpacity style={styles.downloadButton} onPress={downloadOrderDetails}>
-            <Text style={styles.downloadButtonText}>Download Invoice</Text>
+            <Text style={styles.downloadButtonText}>{t["download invoice"]}</Text>
           </TouchableOpacity>
         </View>
       )}

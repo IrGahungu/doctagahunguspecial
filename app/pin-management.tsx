@@ -111,9 +111,9 @@ const PinManagementScreen = () => {
 
       if (res.ok) {
         setIsPinVerified(true);
-        Alert.alert(t.yes || "Success", "PIN verified. You can now set a new one.");
+        Alert.alert(t.yes || "Success", t["change PIN"]);
       } else {
-        Alert.alert(t.error || "Error", data.error || t["incorrect pin"]);
+        Alert.alert(t.error || "Error", t["incorrect pin"]);
       }
     } catch (err) {
       Alert.alert(t.error || "Error", "Failed to verify PIN");
@@ -128,10 +128,10 @@ const PinManagementScreen = () => {
       return Alert.alert(t.error || "Error", t["fill all fields"]);
     }
     if (newPin !== confirmPin) {
-      return Alert.alert("Error", "PINs do not match.");
+      return Alert.alert(t.error || "Error", t["pin mismatch"]);
     }
     if (!/^\d{4}$/.test(newPin)) {
-      return Alert.alert("Error", "PIN must be a 4-digit number.");
+      return Alert.alert(t.error || "Error", t["pin must"]);
     }
 
     setLoading(true);

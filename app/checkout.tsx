@@ -87,8 +87,8 @@ export default function CheckoutScreen() {
         if (!total || !subtotal || !serviceFee) {
           Toast.show({
             type: 'error',
-            text1: 'Error',
-            text2: 'Missing order details.',
+            text1: t.error,
+            text2: t["missing order details"],
           });
           return;
         }
@@ -99,8 +99,8 @@ export default function CheckoutScreen() {
           if (!token) {
             Toast.show({
               type: 'error',
-              text1: 'Authentication Error',
-              text2: 'Please log in to complete your order.',
+              text1: t["authentication error"],
+              text2: t["please log in to book"],
             });
             router.replace('/auth');
             return;
@@ -120,8 +120,8 @@ export default function CheckoutScreen() {
             console.error('Failed to parse wallet JSON:', err);
             Toast.show({
               type: 'error',
-              text1: 'Wallet Error',
-              text2: 'Unexpected server response.',
+              text1: t["wallet error"],
+              text2: t["unexpected server response"],
             });
             return;
           }
@@ -129,8 +129,8 @@ export default function CheckoutScreen() {
           if (!walletRes.ok || walletData.wallet_balance === undefined) {
             Toast.show({
               type: 'error',
-              text1: 'Wallet Error',
-              text2: walletData.error || 'Failed to fetch wallet balance.',
+              text1: t["wallet error"],
+              text2: walletData.error || t["failed to fetch balance"],
             });
             return;
           }
@@ -141,8 +141,8 @@ export default function CheckoutScreen() {
           if (balance < orderTotal) {
             Toast.show({
               type: 'error',
-              text1: 'Insufficient Balance',
-              text2: 'Please add funds to your wallet before confirming.',
+              text1: t["insufficient balance"],
+              text2: t["please add funds to wallet"],
             });
             return;
           }
@@ -154,8 +154,8 @@ export default function CheckoutScreen() {
           console.error('Payment initiation error:', error);
           Toast.show({
             type: 'error',
-            text1: 'Error',
-            text2: 'Failed to verify wallet balance.',
+            text1: t.error,
+            text2: t["failed to verify wallet balance"],
           });
         } finally {
           setIsLoading(false);
@@ -220,8 +220,8 @@ export default function CheckoutScreen() {
             console.error('Failed to parse order JSON:', err);
             Toast.show({
               type: 'error',
-              text1: 'Order Error',
-              text2: 'Unexpected server response.',
+              text1: t["order failed"],
+              text2: t["unexpected server response"],
             });
             return;
           }
@@ -230,8 +230,8 @@ export default function CheckoutScreen() {
             // Use the error message from the server if available
             Toast.show({
               type: 'error',
-              text1: 'Order Failed',
-              text2: orderData.error || 'Failed to create order. Please try again.',
+              text1: t["order failed"],
+              text2: orderData.error || t["failed create order"],
             });
             return;
           }
@@ -242,8 +242,8 @@ export default function CheckoutScreen() {
     
           Toast.show({
             type: 'success',
-            text1: 'Payment Successful 🎉',
-            text2: `Your order #${orderData.order_id} has been placed!`,
+            text1: t["payment successful"],
+            text2: t["order placed message"].replace('{orderId}', `#${orderData.order_id}`),
           });
     
           setTimeout(() => router.replace('/orders'), 3000);
@@ -251,8 +251,8 @@ export default function CheckoutScreen() {
           console.error('Payment confirmation error:', error);
           Toast.show({
             type: 'error',
-            text1: 'Payment Failed',
-            text2: 'Please try again.',
+            text1: t["payment failed"],
+            text2: t["please try again"],
           });
         } finally {
           setIsLoading(false);
@@ -315,7 +315,7 @@ export default function CheckoutScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{t["enter wallet pin"]}</Text>
-            <Text style={styles.modalSubtitle}>Please enter your 4-digit PIN to confirm payment.</Text>
+            <Text style={styles.modalSubtitle}>{t["enter pin message"]}</Text>
             
             <TextInput
               style={styles.pinInput}
@@ -345,7 +345,7 @@ export default function CheckoutScreen() {
                 {isLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.verifyButtonText}>Verify & Pay</Text>
+                  <Text style={styles.verifyButtonText}>{t["verify and pay"]}</Text>
                 )}
               </TouchableOpacity>
             </View>

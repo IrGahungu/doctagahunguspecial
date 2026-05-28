@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableWithoutFeedback, Animated, Image } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as SecureStore from 'expo-secure-store';
@@ -43,9 +43,14 @@ const CategoryItem = ({ category }: { category: Category }) => {
     >
       <Animated.View style={[styles.categoryItem, { transform: [{ scale }] }]}>
         <View style={styles.iconCircle}>
-          <Text style={styles.categoryIcon}>
-            {category.icon ? String(category.icon) : '📦'}
-          </Text>
+          {category.icon ? (
+            <Image 
+              source={{ uri: category.icon }} 
+              style={styles.categoryIconImage} 
+            />
+          ) : (
+            <Text style={styles.categoryIcon}>📦</Text>
+          )}
         </View>
         <Text numberOfLines={1} style={styles.categoryName}>
           {category.name}
@@ -184,6 +189,11 @@ const styles = StyleSheet.create({
   categoryIcon: {
     fontSize: 24,
     color: '#333',
+  },
+  categoryIconImage: {
+    width: 30,
+    height: 30,
+    resizeMode: 'contain',
   },
   categoryName: {
     fontWeight: 'bold',

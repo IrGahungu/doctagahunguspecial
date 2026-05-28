@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Mail, Phone, Facebook, Instagram, MessageCircle } from 'lucide-react-native';
+import { ArrowLeft, Mail, Phone, Facebook, Instagram, MessageCircle, Twitter } from 'lucide-react-native';
 import { useLanguageStore, translations } from '@/stores/languageStore';
 
 export default function SupportScreen() {
@@ -17,6 +17,7 @@ export default function SupportScreen() {
       value: 'Contact the Admin on WhatsApp: +25777990118',
       action: 'https://wa.me/25777990118',
       needsAlert: true,
+      alertMessage: t["leave app whatsapp message"],
     },
     {
       icon: Mail,
@@ -24,6 +25,7 @@ export default function SupportScreen() {
       value: 'gahungujean12@gmail.com',
       action: 'mailto:gahungujean12@gmail.com',
       needsAlert: true,
+      alertMessage: t["leave app email message"],
     },
     {
       icon: Phone,
@@ -38,6 +40,7 @@ export default function SupportScreen() {
       action: 'fb://profile/100008327296325', // Facebook App URL
       fallback: 'https://www.facebook.com/GahunguJeanKevinLepetit', // Web URL
       needsAlert: true,
+      alertMessage: t["leave app facebook message"],
     },
     {
       icon: Instagram,
@@ -46,10 +49,20 @@ export default function SupportScreen() {
       action: 'instagram://user?username=d.lepetitkevin', // Instagram App URL
       fallback: 'https://www.instagram.com/d.lepetitkevin', // Web URL
       needsAlert: true,
+      alertMessage: t["leave app instagram message"],
+    },
+    {
+      icon: Twitter,
+      label: 'Twitter',
+      value: 'Kevin Lepetit',
+      action: 'twitter://user?screen_name=d_lepetitkevin', // Twitter App URL
+      fallback: 'https://twitter.com/d_lepetitkevin', // Web URL
+      needsAlert: true,
+      alertMessage: t["leave app twitter message"],
     },
   ];
 
-  const handlePress = async (action: string, fallback?: string, needsAlert?: boolean) => {
+  const handlePress = async (action: string, fallback?: string, needsAlert?: boolean, alertMessage?: string) => {
     const execute = async () => {
       const supported = await Linking.canOpenURL(action);
       if (supported) {
@@ -62,7 +75,7 @@ export default function SupportScreen() {
     };
 
     if (needsAlert) {
-      Alert.alert(t["leave app"], t["leave app whatsapp message"], [{ text: t.no, style: "cancel" }, { text: t.yes, onPress: execute }]);
+      Alert.alert(t["leave app"], alertMessage || t["leave app website message"], [{ text: t.no, style: "cancel" }, { text: t.yes, onPress: execute }]);
     } else {
       await execute();
     }
@@ -88,7 +101,7 @@ export default function SupportScreen() {
             <TouchableOpacity
               key={index}
               style={styles.supportItem}
-              onPress={() => handlePress(item.action, (item as any).fallback, (item as any).needsAlert)}
+              onPress={() => handlePress(item.action, (item as any).fallback, (item as any).needsAlert, (item as any).alertMessage)}
             >
               <View style={styles.iconContainer}>
                 <item.icon size={24} color="#4CAF50" />

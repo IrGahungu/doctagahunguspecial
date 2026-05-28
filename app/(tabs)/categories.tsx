@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions, Animated, Image } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 import Header from '@/components/Header';
 import { useRouter } from 'expo-router';
@@ -124,7 +124,14 @@ export default function CategoriesScreen() {
       style={styles.categoryCard}
       onPress={() => handleCategoryPress(item)}
     >
-      <Text style={styles.categoryIcon}>{item.icon}</Text>
+      {item.icon ? (
+        <Image 
+          source={{ uri: item.icon }} 
+          style={styles.categoryIconImage} 
+        />
+      ) : (
+        <Text style={styles.categoryIcon}>📦</Text>
+      )}
       <Text style={styles.categoryName}>{item.name}</Text>
     </TouchableOpacity>
   );
@@ -184,6 +191,12 @@ const styles = StyleSheet.create({
   categoryIcon: {
     fontSize: 36,
     marginBottom: 8
+  },
+  categoryIconImage: {
+    width: 48,
+    height: 48,
+    marginBottom: 8,
+    resizeMode: 'contain',
   },
   categoryName: {
     fontFamily: 'Roboto-Medium',

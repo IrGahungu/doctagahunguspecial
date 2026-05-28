@@ -490,6 +490,7 @@ export default function ProductDetailScreen() {
                         </View>
                       )}
                       <Text style={styles.pharmacyName}>{pharmacy.name}</Text>
+                      {/* Price hidden for now
                       <View style={{ alignItems: 'flex-end' }}>
                         {(pharmacy as any).price && (
                           <Text style={styles.pharmacyPrice}>
@@ -507,6 +508,7 @@ export default function ProductDetailScreen() {
                           </View>
                         )}
                       </View>
+                      */}
                     </View>
                     <View style={styles.pharmacyDetails}>
                       <View style={{ marginBottom: 8 }}>
@@ -559,9 +561,10 @@ export default function ProductDetailScreen() {
             <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
               <Text style={styles.addToCartText}>
                 Add to Cart
+                {/* Price hidden for now
                 {selectedPharmacyId && product?.pharmacies?.find(p => p.id === selectedPharmacyId)
                   ? ` - ${(product.pharmacies.find(p => p.id === selectedPharmacyId) as any).price.toLocaleString()} ${getCurrency(country)}`
-                  : ''}
+                  : ''} */}
               </Text>
             </TouchableOpacity>
           </View>

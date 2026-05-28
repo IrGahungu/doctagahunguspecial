@@ -19,6 +19,7 @@ import { API_BASE_URL } from '@/config';
 import * as SecureStore from 'expo-secure-store';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { useAuthStore } from '@/stores/authStore';
+import { useLanguageStore, translations } from '@/stores/languageStore';
 
 export default function BusCheckoutScreen() {
   const router = useRouter();
@@ -46,6 +47,8 @@ export default function BusCheckoutScreen() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const safeTotal = parseFloat(Array.isArray(total) ? total[0] : (total || '0'));
   const safeServiceFee = parseFloat(Array.isArray(serviceFee) ? serviceFee[0] : (serviceFee || '0'));
@@ -182,8 +185,8 @@ const BusCheckoutSkeleton = () => (
     if (engagementPoints < minEpRequired) {
       Toast.show({
         type: 'error',
-        text1: 'Insufficient Engagement Points',
-        text2: `You need ${minEpRequired.toLocaleString()} EP to book. Earn more by watching stories, viewing posts, and liking content!`,
+        text1: t["insufficient engagement points"],
+        text2: t["ep required to book message"].replace('{minEpRequired}', minEpRequired.toLocaleString()),
         visibilityTime: 5000,
       });
       return;
@@ -197,8 +200,8 @@ const BusCheckoutSkeleton = () => (
       if (!token) {
         Toast.show({
           type: 'error',
-          text1: 'Authentication Error',
-          text2: 'Please log in to book.',
+          text1: t["authentication error"],
+          text2: t["please log in to book"],
           visibilityTime: 3000,
         });
         router.replace('/auth');
@@ -216,9 +219,9 @@ const BusCheckoutSkeleton = () => (
       if (!walletRes.ok) {
         Toast.show({
           type: 'error',
-          text1: 'Wallet Error',
+          text1: t["wallet error"],
           visibilityTime: 3000,
-          text2: (walletData as any).error || 'Failed to fetch balance.',
+          text2: (walletData as any).error || t["failed to fetch balance"],
         });
         return;
       }
@@ -226,9 +229,9 @@ const BusCheckoutSkeleton = () => (
       if (Number(walletData.wallet_balance) < Number(safeTotal)) {
         Toast.show({
           type: 'error',
-          text1: 'Insufficient Balance',
+          text1: t["insufficient balance"],
           visibilityTime: 3000,
-          text2: 'Please add funds to your wallet.',
+          text2: t["please add funds to wallet"],
         });
         return;
       }
@@ -240,9 +243,9 @@ const BusCheckoutSkeleton = () => (
     } catch (error) {
       Toast.show({
         type: 'error',
-        text1: 'Error',
+        text1: t.error,
         visibilityTime: 3000,
-        text2: 'Failed to verify wallet balance.',
+        text2: t["failed to verify wallet balance"],
       });
     } finally {
       setIsLoading(false);
@@ -252,7 +255,7 @@ const BusCheckoutSkeleton = () => (
 
   const handleVerifyAndPay = async () => {
     if (!pin || pin.length !== 4) {
-      Alert.alert('Invalid PIN', 'Please enter a 4-digit PIN.');
+      Alert.alert(t["invalid pin"], t["please enter 4-digit pin"]);
       return;
     }
 
@@ -285,7 +288,7 @@ const BusCheckoutSkeleton = () => (
       if (!verifyRes.ok || !verifyData.success) {
         throw new Error(
           verifyData.error || 'The PIN you entered is incorrect.'
-        );
+        ); // This error message is already translated in login-payment-fee.tsx, but here it's a fallback.
       }
 
       /* ================================
@@ -320,9 +323,9 @@ const BusCheckoutSkeleton = () => (
       setShowConfetti(true);
 
       Toast.show({
-        type: 'success',
-        text1: 'Booking Confirmed 🎉',
-        text2: `Reserved ${seats.length} seats for your trip!`,
+        type: 'success', // No translation needed for icon
+        text1: t["booking confirmed"],
+        text2: t["reserved seats message"].replace('{seatsLength}', seats.length.toString()),
       });
 
       setTimeout(() => {
@@ -335,10 +338,9 @@ const BusCheckoutSkeleton = () => (
       setIsPinModalVisible(false);
 
       setTimeout(() => {
-        Alert.alert(
-          'Booking Failed',
-          error.message ||
-          'Something went wrong while reserving your seat.'
+        Alert.alert( // No translation needed for icon
+          t["booking failed"],
+          error.message || t["something went wrong booking"]
         );
       }, 500);
     } finally {
@@ -352,7 +354,7 @@ const BusCheckoutSkeleton = () => (
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={24} color="#212121" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Booking</Text>
+        <Text style={styles.headerTitle}>{t["confirm booking"]}</Text>
       </View>
 
       {(isLoading || isCheckingEligibility || error) ? (
@@ -365,13 +367,13 @@ const BusCheckoutSkeleton = () => (
         <View style={styles.ticketCard}>
           <View style={styles.busHeader}>
             <Bus size={24} color="#4CAF50" />
-            <Text style={styles.companyName}>{safeCompany}</Text>
+            <Text style={styles.companyName}>{safeCompany || 'N/A'}</Text>
           </View>
 
           <View style={styles.routeContainer}>
             <View style={styles.routeItem}>
-              <Text style={styles.routeLabel}>From</Text>
-              <Text style={styles.routeCity}>{safeFrom}</Text>
+              <Text style={styles.routeLabel}>{t.from}</Text>
+              <Text style={styles.routeCity}>{safeFrom || 'N/A'}</Text>
             </View>
             <View style={styles.routeDivider}>
               <View style={styles.dot} />
@@ -379,55 +381,55 @@ const BusCheckoutSkeleton = () => (
               <MapPin size={16} color="#F44336" />
             </View>
             <View style={[styles.routeItem, { alignItems: 'flex-end' }]}>
-              <Text style={styles.routeLabel}>To</Text>
-              <Text style={styles.routeCity}>{safeTo}</Text>
+              <Text style={styles.routeLabel}>{t.to}</Text>
+              <Text style={styles.routeCity}>{safeTo || 'N/A'}</Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
             <View style={styles.infoCol}>
               <Calendar size={16} color="#757575" />
-              <Text style={styles.infoText}>{safeDate ? new Date(safeDate).toLocaleDateString() : 'N/A'}</Text>
+              <Text style={styles.infoText}>{safeDate ? new Date(safeDate).toLocaleDateString(language) : t["not available"]}</Text>
             </View>
             <View style={styles.infoCol}>
-              <Text style={styles.seatLabel}>Seats: </Text>
+              <Text style={styles.seatLabel}>{t.seats}: </Text>
               <Text style={styles.seatValue}>{Array.isArray(seats) ? seats.join(', ') : ''}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Payment Summary</Text>
+          <Text style={styles.summaryTitle}>{t["payment summary"]}</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Seat Price x {seats.length}</Text>
+            <Text style={styles.summaryLabel}>{t["seat price"]} x {seats.length}</Text>
             <Text style={styles.summaryValue}>BIF {safeSubtotal.toLocaleString()}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Bus Service Fee</Text>
+            <Text style={styles.summaryLabel}>{t["bus service fee"]}</Text>
             <Text style={styles.summaryValue}>BIF {safeServiceFee.toLocaleString()}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalLabel}>{t["total amount"]}</Text>
             <Text style={styles.totalValue}>BIF {safeTotal.toLocaleString()}</Text>
           </View>
         </View>
 
         <View style={styles.paymentMethod}>
           <Wallet size={24} color="#4CAF50" />
-          <Text style={styles.paymentText}>Pay from Gahungu Wallet</Text>
+          <Text style={styles.paymentText}>{t["pay from gahungu wallet"]}</Text>
         </View>
 
         <View style={styles.epMessageContainer}>
           {isCheckingEligibility ? (
             <View style={styles.epMessageRow}>
               <ActivityIndicator size="small" color="#4CAF50" style={styles.epIcon} />
-              <Text style={styles.epCheckingText}>Checking your eligibility...</Text>
+              <Text style={styles.epCheckingText}>{t["checking eligibility"]}</Text>
             </View>
           ) : engagementPoints >= minEpRequired ? (
             <Animated.View style={[styles.epMessageRow, { opacity: fadeScale, transform: [{ scale: fadeScale }] }]}>
               <CheckCircle size={18} color="#4CAF50" style={styles.epIcon} />
               <Text style={styles.epEligibleText}>
-                Your current EP is {engagementPoints.toLocaleString()}, you are eligible to book.
+                {t["eligible to book message"].replace('{engagementPoints}', engagementPoints.toLocaleString())}
               </Text>
             </Animated.View>
           ) : (
@@ -435,14 +437,14 @@ const BusCheckoutSkeleton = () => (
               <View style={styles.epMessageRow}>
                 <AlertCircle size={18} color="#F44336" style={styles.epIcon} />
                 <Text style={styles.epWarningText}>
-                  Your current EP is less than {minEpRequired.toLocaleString()}.
+                  {t["ep less than required message"].replace('{minEpRequired}', minEpRequired.toLocaleString())}
                 </Text>
               </View>
               <TouchableOpacity
                 onPress={() => router.push('/(tabs)/explore')}
                 style={styles.earnEpLink}
               >
-                <Text style={styles.earnEpLinkText}>Click here to increase your EP by watching stories, viewing posts and liking posts.</Text>
+                <Text style={styles.earnEpLinkText}>{t["earn ep by engaging"]}</Text>
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -454,7 +456,7 @@ const BusCheckoutSkeleton = () => (
           onPress={handleInitiatePayment}
           disabled={isLoading || isCheckingEligibility || engagementPoints < minEpRequired}
         >
-          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payButtonText}>Confirm & Pay</Text>}
+          {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payButtonText}>{t["confirm and pay"]}</Text>}
         </TouchableOpacity>
       </ScrollView>
       </>
@@ -463,7 +465,7 @@ const BusCheckoutSkeleton = () => (
       <Modal visible={isPinModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Enter PIN</Text>
+            <Text style={styles.modalTitle}>{t["enter pin"]}</Text>
             <TextInput
               style={styles.pinInput}
               value={pin}
@@ -477,13 +479,13 @@ const BusCheckoutSkeleton = () => (
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setIsPinModalVisible(false)}>
-                <Text>Cancel</Text>
+                <Text>{t.cancel}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.verifyBtn} onPress={handleVerifyAndPay} disabled={isLoading}>
                 {isLoading ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={styles.verifyBtnText}>Verify & Pay</Text>
+                  <Text style={styles.verifyBtnText}>{t["verify and pay"]}</Text>
                 )}
               </TouchableOpacity>
             </View>
