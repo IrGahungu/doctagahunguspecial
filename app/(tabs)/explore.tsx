@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, FlatList, TouchableOpacity, Dimensions, TouchableWithoutFeedback, Animated, Modal, Share, BackHandler, Alert, Linking, PanResponder, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, X, Plus, Check, Play, Pause, ChevronRight, Wallet, Globe, Instagram, Twitter } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Image, FlatList, TouchableOpacity, Dimensions, TouchableWithoutFeedback, Animated, Modal, Share, BackHandler, Alert, Linking, PanResponder, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Ensure SafeAreaView is imported
+import { Heart, MessageCircle, Send, MoreHorizontal, X, Plus, Check, Play, Pause, ChevronRight, Wallet, Globe, Instagram, Twitter } from 'lucide-react-native';
 import { Video, ResizeMode } from 'expo-av';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as SecureStore from 'expo-secure-store';
@@ -65,21 +65,44 @@ const SkeletonPost = () => (
   </SkeletonPulse>
 );
 
-const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onNextImage }: { 
+const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onNextImage, onViewComments, refreshCommentsTrigger, userUsername }: { 
   item: any, 
   isLiked: boolean,
   initialViewedIndices: Record<number, boolean>,
-  onLike: () => void,
-  onNextImage: (index: number) => void 
+  onViewComments: (post: any, comments: any[]) => void,
+  onLike: () => void | Promise<void>,
+  onNextImage: (index: number) => void | Promise<void>,
+  refreshCommentsTrigger?: number,
+  userUsername: string | null
 }) => {
   const language = useLanguageStore(state => state.language);
   const t = translations[language];
   const [lastTap, setLastTap] = useState<number | null>(null);
   const [isLiked, setIsLiked] = useState(initialIsLiked);
-  const [likes, setLikes] = useState(item.likes);
+  const [likes, setLikes] = useState(item.likes || 0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Initialize viewedIndices with the prop, ensuring it's always an object
   const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>(() => initialViewedIndices || {});
+  const [comments, setComments] = useState<any[]>([]);
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [inlineComment, setInlineComment] = useState('');
+  const [isSubmittingInline, setIsSubmittingInline] = useState(false);
+
+  const fetchComments = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/posts/${item.id}/comments`);
+      if (response.ok) {
+        const data = await response.json();
+        setComments(data);
+      }
+    } catch (e) {
+      console.error(`[Post ${item.id}] Error fetching comments:`, e);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [item.id, refreshCommentsTrigger]);
   
   // Sync local viewedIndices with props when they change (e.g., after server data loads)
   useEffect(() => {
@@ -175,6 +198,40 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
       console.log(`[Post ${item.id}] New image view detected at index ${nextIndex}. Awarding EP...`);
       setViewedIndices(prev => ({ ...prev, [nextIndex]: true }));
       onNextImage(nextIndex);
+    }
+  };
+
+  const handleInlineSubmit = async () => {
+    if (!inlineComment.trim()) return;
+    if (!userUsername) {
+      // Trigger the username creation prompt handled in the parent ExploreScreen
+      onViewComments(item, comments); 
+      return;
+    }
+
+    setIsSubmittingInline(true);
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const response = await fetch(`${API_BASE_URL}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ 
+          post_id: item.id, 
+          comment_text: inlineComment, 
+          user_username: userUsername 
+        })
+      });
+      if (response.ok) {
+        setInlineComment('');
+        fetchComments();
+        Keyboard.dismiss();
+      } else {
+        Alert.alert(t.error || "Error", t["failed to submit comment"] || "Failed to submit comment.");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmittingInline(false);
     }
   };
 
@@ -293,16 +350,158 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
           <TouchableOpacity style={styles.actionIcon} onPress={handleShare}>
             <Send size={24} color="#333" />
           </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.commentBarContainer} 
+            onPress={() => onViewComments(item, comments)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.commentBarHint}>
+              {t["write your comment here..."] || "write your comment here..."}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.actionIcon, styles.commentActionBtn]} onPress={() => onViewComments(item, comments)}>
+            <MessageCircle size={24} color="#333" />
+            {comments.length > 0 && (
+              <Text style={styles.commentCountText}>{comments.length}</Text>
+            )}
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity>
-          <Bookmark size={24} color="#333" />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.postFooter}>
         <Text style={styles.likesText}>{likes} likes</Text>
+        {comments.length > 0 && (
+          <View style={styles.commentsPreviewSection}>
+            {(() => {
+              const c = comments[0];
+              const isExpanded = expandedComments[c.id];
+              const limit = 80;
+              const shouldTruncate = c.comment_text.length > limit && !isExpanded;
+              const displayText = shouldTruncate ? c.comment_text.substring(0, limit) + "..." : c.comment_text;
+
+              return (
+                <View key={c.id} style={styles.commentRow}>
+                  <Text style={styles.shortCommentText}>
+                    <Text style={styles.commentUser}>{c.user_username}</Text> {displayText}
+                    {shouldTruncate && (
+                      <Text style={styles.readMoreText} onPress={() => setExpandedComments(prev => ({...prev, [c.id]: true}))}> read more</Text>
+                    )}
+                  </Text>
+                </View>
+              );
+            })()}
+          </View>
+        )}
       </View>
     </View>
+  );
+};
+
+interface ViewAllCommentsModalProps {
+  isVisible: boolean;
+  onClose: () => void;
+  comments: any[];
+  postTitle: string;
+  t: any;
+  userUsername: string | null;
+  onSubmit: (text: string, username: string) => Promise<void>;
+}
+
+const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, onClose, comments, postTitle, t, userUsername, onSubmit }) => {
+  const [newComment, setNewComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
+
+  const handleModalSubmit = async () => {
+    if (!newComment.trim() || !userUsername) return;
+    setIsSubmitting(true);
+    await onSubmit(newComment, userUsername);
+    setNewComment('');
+    setIsSubmitting(false);
+  };
+
+  return (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={isVisible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.bottomSheetOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.bottomSheetContent}
+        >
+          <View style={styles.bottomSheetHeader}>
+            <View style={styles.bottomSheetKnob} />
+            <View style={styles.bottomSheetTitleRow}>
+              <Text style={styles.bottomSheetTitle}>{t["comments"] || "Comments"}</Text>
+              <TouchableOpacity onPress={onClose} style={styles.bottomSheetCloseBtn}>
+                <X size={22} color="#212121" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.bottomSheetSubtitle} numberOfLines={1}>{postTitle}</Text>
+          </View>
+          
+          <FlatList
+            data={comments}
+            keyExtractor={(item) => item.id.toString()}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <View style={styles.fullCommentItem}>
+                <View style={styles.fullCommentHeader}>
+                  <View style={styles.fullCommentUserRow}>
+                    <View style={styles.commentAvatarPlaceholder}>
+                      <Text style={styles.avatarInitial}>{item.user_username.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.fullCommentUser}>{item.user_username}</Text>
+                  </View>
+                  <Text style={styles.fullCommentDate}>
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+                <Text style={styles.fullCommentText}>{item.comment_text}</Text>
+              </View>
+            )}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyCommentsContainer}>
+                <MessageCircle size={48} color="#E0E0E0" />
+                <Text style={styles.emptyCommentsText}>{t["no reviews yet"] || "No comments yet."}</Text>
+              </View>
+            )}
+            contentContainerStyle={{ paddingBottom: 60 }}
+          />
+
+          <View style={styles.modalInputSection}>
+            {userUsername ? (
+              <View style={styles.modalInputWrapper}>
+                <TextInput
+                  style={styles.modalTextInput}
+                  placeholder={t["write your comment here..."]}
+                  value={newComment}
+                  onChangeText={setNewComment}
+                  multiline
+                  maxLength={200}
+                />
+                <TouchableOpacity 
+                  style={[styles.modalPostBtn, !newComment.trim() && { opacity: 0.5 }]} 
+                  onPress={handleModalSubmit}
+                  disabled={isSubmitting || !newComment.trim()}
+                >
+                  {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalPostBtnText}>{t.submit}</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.modalCreateUsernameBtn} onPress={() => { onClose(); router.push('/create-username'); }}>
+                <Text style={styles.modalCreateUsernameText}>{t["create username"]}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   );
 };
 
@@ -313,6 +512,12 @@ export default function ExploreScreen() {
   const router = useRouter();
   const [stories, setStories] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const [username, setUsername] = useState<string | null>(null); // New state for username
+  const [userFullname, setUserFullname] = useState<string | null>(null);
+  const [selectedPostForComment, setSelectedPostForComment] = useState<any | null>(null);
+  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
+  const [isViewAllCommentsVisible, setIsViewAllCommentsVisible] = useState(false);
+  const [activePostComments, setActivePostComments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedStory, setSelectedStory] = useState<any | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -324,6 +529,7 @@ export default function ExploreScreen() {
   const [viewedImages, setViewedImages] = useState<Record<string, boolean>>({});
   const [showConfetti, setShowConfetti] = useState(false);
   const { engagementPoints, postsLikedToday, storiesViewedToday, epEarnedToday, addPoints, syncFromDatabase, initializeStats } = useAuthStore();
+  const [commentRefreshKeys, setCommentRefreshKeys] = useState<Record<string, number>>({});
 
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [viewedPostImages, setViewedPostImages] = useState<Record<string, boolean>>({});
@@ -347,8 +553,25 @@ export default function ExploreScreen() {
   const rewardAnim = useRef(new Animated.Value(0)).current;
   const rewardPos = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const language = useLanguageStore(state => state.language);
-  const t = translations[language];
+  const t: any = translations[language];
   const walletGraffitiAnimations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
+
+  const fetchUserProfile = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) return;
+      const res = await fetch(`${API_BASE_URL}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserFullname(data.fullname);
+        setUsername(data.username);
+      }
+    } catch (err) {
+      console.error('Error fetching user profile in Explore:', err);
+    }
+  };
 
   // Effect to load/save daily stats and reset if new day
   useFocusEffect(
@@ -356,6 +579,7 @@ export default function ExploreScreen() {
       const initialize = async () => {
         await initializeStats();
         await syncFromDatabase();
+        await fetchUserProfile();
 
         // 2. Fetch fresh data from DB (Source of Truth)
         try {
@@ -363,14 +587,21 @@ export default function ExploreScreen() {
           const storedCountry = await SecureStore.getItemAsync('user_country') || 'Burundi';
           const headers = { Authorization: `Bearer ${token}` };
 
-          const [storiesRes, postsRes, interactionsRes, configRes] = await Promise.all([
+          const [storiesRes, postsRes, interactionsRes, configRes, profileRes] = await Promise.all([
             fetch(`${API_BASE_URL}/stories`, { headers }),
             fetch(`${API_BASE_URL}/posts`, { headers }),
             fetch(`${API_BASE_URL}/interactions/me`, { headers }),
-            fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers })
+            fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers }),
+            fetch(`${API_BASE_URL}/me`, { headers })
           ]);
 
           if (!storiesRes.ok || !postsRes.ok) throw new Error('Failed to fetch essential explore data');
+
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            setUserFullname(profileData.fullname);
+            setUsername(profileData.username);
+          }
 
           if (configRes.ok) {
             const cfg = await configRes.json();
@@ -715,6 +946,54 @@ export default function ExploreScreen() {
     console.log('Add post clicked');
   };
 
+  const ensureUsername = () => {
+    if (!username) {
+      Alert.alert(
+        t["create username title"] || "Create Username",
+        t["create username message"] || "You need to set a username in your profile before you can comment. Would you like to do that now?",
+        [
+          { text: t.cancel || "Cancel", style: "cancel" },
+          { text: t["create username"] || "Create Username", onPress: () => router.push('/create-username') } // Navigate to a new screen for username creation
+        ]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleViewComments = (post: any, comments: any[]) => {
+    setSelectedPostForComment(post);
+    setActivePostComments(comments);
+    setIsViewAllCommentsVisible(true);
+  };
+
+  const handleSubmitComment = async (commentText: string, userUsername: string) => { // Added userUsername parameter
+    try {
+      console.log(`[Explore] Submitting comment. Payload:`, { post_id: selectedPostForComment?.id, comment_text: commentText, user_username: userUsername });
+
+      const token = await SecureStore.getItemAsync('token');
+      const response = await fetch(`${API_BASE_URL}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ post_id: selectedPostForComment.id, comment_text: commentText, user_username: userUsername }) // Send user_username
+      });
+      if (response.ok) {
+        console.log('Comment submitted successfully');
+        Alert.alert(t["comment submitted"] || "Comment Submitted", t["comment submitted message"] || "Your comment has been posted!");
+        if (selectedPostForComment) {
+          setCommentRefreshKeys(prev => ({
+            ...prev,
+            [selectedPostForComment.id]: (prev[selectedPostForComment.id] || 0) + 1
+          }));
+        }
+        setIsCommentModalVisible(false);
+      } else {
+        Alert.alert(t.error || "Error", t["failed to submit comment"] || "Failed to submit comment. Please try again.");
+      }
+    } catch (err) { console.error('Error submitting comment:', err);
+      Alert.alert(t.error || "Error", t["connection error"] || "Connection error. Please try again."); }
+  };
+
   const renderStory = ({ item }: { item: any }) => {
     const isFullyViewed = item.images?.every((_: any, index: number) => viewedImages[`${item.id}-${index}`]);
 
@@ -742,8 +1021,22 @@ export default function ExploreScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t.explore}</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>{t.explore}</Text>
+          {username ? (
+            <Text style={styles.usernameDisplay}>@{username}</Text>
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/create-username')}>
+              <Text style={styles.createUsernamePrompt}>{t["create username"]}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <TouchableOpacity 
           style={styles.walletContainer} 
           onPress={() => router.push({
@@ -794,7 +1087,10 @@ export default function ExploreScreen() {
       )}
 
       {isLoading ? (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.storiesSection}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesList}>
               {[1, 2, 3, 4, 5].map(i => <SkeletonStory key={i} />)}
@@ -805,7 +1101,12 @@ export default function ExploreScreen() {
           </View>
         </ScrollView>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={{ paddingBottom: 120 }}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        >
           {/* Stories Section */}
           <View style={styles.storiesSection}>
             <FlatList
@@ -837,17 +1138,22 @@ export default function ExploreScreen() {
                   })()
                   }
                   onLike={async () => {
+                    if (!ensureUsername()) return;
                     await addPoints(config.epPostLike, 'like');
                     triggerRewardAnimation(config.epPostLike);
                     // Like API is called inside Post component
                   }}
                   onNextImage={(index) => handlePostImageNext(post, index)} // Use the memoized callback
+                  onViewComments={handleViewComments}
+                  refreshCommentsTrigger={commentRefreshKeys[post.id] || 0}
+                  userUsername={username}
                 />
               </View>
             ))}
           </View>
         </ScrollView>
       )}
+      </KeyboardAvoidingView>
 
       <Modal
         visible={selectedStory !== null}
@@ -981,6 +1287,16 @@ export default function ExploreScreen() {
           />
         )}
       </Modal>
+
+      <ViewAllCommentsModal
+        isVisible={isViewAllCommentsVisible}
+        onClose={() => setIsViewAllCommentsVisible(false)}
+        comments={activePostComments}
+        postTitle={selectedPostForComment?.title || ''}
+        t={t}
+        userUsername={username}
+        onSubmit={handleSubmitComment}
+      />
     </SafeAreaView>
   );
 }
@@ -1069,7 +1385,7 @@ const styles = StyleSheet.create({
   postTag: { fontSize: 12, fontWeight: '600', color: '#757575', fontStyle: 'italic' },
   postImage: { width: width - 24, height: width - 24, backgroundColor: '#f0f0f0', borderRadius: 16, alignSelf: 'center' },
   postActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
-  postActionsLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  postActionsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 },
   actionIcon: {},
   postFooter: { paddingHorizontal: 12 },
   likesText: { fontSize: 14, fontWeight: 'bold', color: '#212121', marginBottom: 4 },
@@ -1311,5 +1627,317 @@ const styles = StyleSheet.create({
   storyMediaWrapper: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
+  },
+  headerLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  usernameDisplay: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontFamily: 'Roboto-Medium',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  createUsernamePrompt: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontFamily: 'Roboto-Medium',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  commentModalContent: {
+    width: '85%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 24,
+    maxHeight: '80%',
+    elevation: 5,
+  },
+  commentModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  commentModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#212121',
+  },
+  commentingAs: {
+    fontSize: 14,
+    color: '#424242',
+    marginBottom: 5,
+  },
+  commentingOn: {
+    fontSize: 14,
+    color: '#424242',
+    marginBottom: 15,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    fontSize: 14,
+    textAlignVertical: 'top',
+    minHeight: 80,
+  },
+  charCounter: {
+    fontSize: 11,
+    color: '#9E9E9E',
+    textAlign: 'right',
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  submitCommentButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  submitCommentButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  boldText: {
+    fontWeight: 'bold',
+  },
+  commentsPreviewSection: {
+    marginTop: 4,
+    paddingHorizontal: 12,
+  },
+  commentRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  shortCommentText: {
+    fontSize: 13,
+    color: '#212121',
+    marginBottom: 2,
+  },
+  commentUser: {
+    fontWeight: 'bold',
+    color: '#212121',
+  },
+  readMoreText: {
+    color: '#757575',
+    fontSize: 12,
+    fontFamily: 'Roboto-Medium',
+  },
+  viewAllComments: {
+    fontSize: 13,
+    color: '#757575',
+    marginTop: 2,
+  },
+  commentActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentCountText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 4,
+  },
+  commentBarPreview: {
+    flex: 1,
+    backgroundColor: '#F0F2F5',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
+  commentBarHint: {
+    fontSize: 12,
+    color: '#757575',
+  },
+  commentBarContainer: {
+    flex: 1,
+    backgroundColor: '#F0F2F5',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    justifyContent: 'center',
+  },
+  modalInputSection: {
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    backgroundColor: '#fff',
+  },
+  modalInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F2F5',
+    borderRadius: 25,
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+  },
+  modalTextInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#212121',
+    maxHeight: 100,
+    paddingVertical: 8,
+  },
+  modalPostBtn: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginLeft: 10,
+  },
+  modalPostBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  modalCreateUsernameBtn: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalCreateUsernameText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  inlineSubmitBtn: {
+    marginLeft: 8,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineSubmitText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  bottomSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  bottomSheetContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    height: '75%',
+    width: '100%',
+  },
+  bottomSheetHeader: {
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  bottomSheetKnob: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#E0E0E0',
+    alignSelf: 'center',
+    marginBottom: 15,
+  },
+  bottomSheetTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bottomSheetTitle: {
+    fontSize: 18,
+    fontFamily: 'Roboto-Bold',
+    color: '#212121',
+  },
+  bottomSheetSubtitle: {
+    fontSize: 12,
+    color: '#757575',
+    marginTop: 4,
+  },
+  fullCommentItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FAFAFA',
+  },
+  fullCommentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  fullCommentUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  commentAvatarPlaceholder: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  avatarInitial: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  fullCommentUser: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#212121',
+  },
+  fullCommentDate: {
+    fontSize: 11,
+    color: '#BDBDBD',
+  },
+  fullCommentText: {
+    fontSize: 14,
+    color: '#424242',
+    lineHeight: 20,
+  },
+  emptyCommentsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 100,
+  },
+  emptyCommentsText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#BDBDBD',
+  },
+  bottomSheetCloseBtn: {
+    padding: 4,
   },
 });

@@ -111,6 +111,13 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="create-username"
+        options={{
+          href: null, // Hide from tab bar
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }
