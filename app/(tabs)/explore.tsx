@@ -104,6 +104,24 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
     fetchComments();
   }, [item.id, refreshCommentsTrigger]);
   
+  // Real-time subscription for comments on the main feed (updates count and preview)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`post-feed-comments-${item.id}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'post_comments', 
+          filter: `post_id=eq.${item.id}` 
+        },
+        () => fetchComments()
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [item.id]);
+
   // Sync local viewedIndices with props when they change (e.g., after server data loads)
   useEffect(() => {
     if (initialViewedIndices && Object.keys(initialViewedIndices).length > 0) {
@@ -406,21 +424,163 @@ interface ViewAllCommentsModalProps {
   postTitle: string;
   t: any;
   userUsername: string | null;
-  onSubmit: (text: string, username: string) => Promise<void>;
+  currentUserId: string | null;
+  onSubmit: (text: string, username: string, parentId?: string) => Promise<void>;
+  onDelete: (commentId: string) => Promise<void>;
+  onUpdate: (commentId: string, text: string) => Promise<void>;
+  typingUsers: string[];
+  onTyping: (isTyping: boolean) => void;
 }
 
-const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, onClose, comments, postTitle, t, userUsername, onSubmit }) => {
+const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, onClose, comments, postTitle, t, userUsername, currentUserId, onSubmit, onDelete, onUpdate, typingUsers, onTyping }) => {
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const router = useRouter();
+  const inputRef = useRef<TextInput>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const pan = useRef(new Animated.ValueXY()).current;
+
+  const handleReply = (targetUsername: string) => {
+    // Find the comment ID for the target username to help with positioning
+    const targetComment = comments.find(c => c.user_username === targetUsername);
+    if (targetComment) {
+      setReplyTargetId(targetComment.parent_id || targetComment.id);
+    }
+    
+    setNewComment(`@${targetUsername} `);
+    inputRef.current?.focus();
+  };
+
+  const handleMorePress = (comment: any) => {
+    Alert.alert(
+      t["options"] || "Options",
+      "",
+      [
+        { text: t["edit"] || "Edit", onPress: () => {
+          setEditingCommentId(comment.id);
+          setNewComment(comment.comment_text);
+          inputRef.current?.focus();
+        }},
+        { text: t["delete"] || "Delete", style: 'destructive', onPress: () => {
+          onDelete(comment.id);
+        }},
+        { text: t.cancel, style: 'cancel' }
+      ]
+    );
+  };
+
+  useEffect(() => {
+    if (newComment.trim().length > 0) {
+      onTyping(true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => onTyping(false), 3000);
+    } else {
+      onTyping(false);
+    }
+    return () => { if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current); };
+  }, [newComment]);
+
+  const toggleThread = (parentId: string) => {
+    setExpandedThreads(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) {
+        next.delete(parentId);
+      } else {
+        next.add(parentId);
+      }
+      return next;
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Capture if swiping down significantly more than horizontally
+        return gestureState.dy > 5 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          pan.y.setValue(gestureState.dy); 
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 80) { 
+          // Animate the sheet off-screen and close it
+          Animated.timing(pan, {
+            toValue: { x: 0, y: 600 },
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => {
+            onClose();
+            pan.setValue({ x: 0, y: 0 });
+          });
+        } else {
+          // Snap the sheet back to its original position
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (!isVisible) {
+      pan.setValue({ x: 0, y: 0 });
+      setReplyTargetId(null);
+      setEditingCommentId(null);
+      setExpandedThreads(new Set());
+    }
+  }, [isVisible]);
 
   const handleModalSubmit = async () => {
     if (!newComment.trim() || !userUsername) return;
     setIsSubmitting(true);
-    await onSubmit(newComment, userUsername);
+
+    if (editingCommentId) {
+      await onUpdate(editingCommentId, newComment);
+    } else {
+      await onSubmit(newComment, userUsername, replyTargetId || undefined);
+    }
+
+    // Auto-expand the thread so the user can see their new reply
+    if (replyTargetId) {
+      setExpandedThreads(prev => new Set(prev).add(replyTargetId));
+    }
+
     setNewComment('');
+    setReplyTargetId(null);
+    setEditingCommentId(null);
     setIsSubmitting(false);
   };
+
+  // Helper to render styled text inside TextInput
+  const renderStyledInput = (text: string) => {
+    const parts = text.split(/(@\w+)/g);
+    return parts.map((part, i) => (
+      <Text 
+        key={i} 
+        style={part.startsWith('@') 
+          ? { color: '#2874F0', fontWeight: 'bold' } 
+          : { color: '#212121' }
+        }
+      >
+        {part}
+      </Text>
+    ));
+  };
+
+  const visibleComments = comments.filter(c => {
+    if (!c.parent_id) return true;
+    return expandedThreads.has(c.parent_id);
+  });
 
   return (
     <Modal
@@ -432,25 +592,45 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
       <View style={styles.bottomSheetOverlay}>
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.bottomSheetContent}
+          style={{ width: '100%', justifyContent: 'flex-end' }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <View style={styles.bottomSheetHeader}>
-            <View style={styles.bottomSheetKnob} />
-            <View style={styles.bottomSheetTitleRow}>
-              <Text style={styles.bottomSheetTitle}>{t["comments"] || "Comments"}</Text>
-              <TouchableOpacity onPress={onClose} style={styles.bottomSheetCloseBtn}>
-                <X size={22} color="#212121" />
-              </TouchableOpacity>
+        <Animated.View 
+          style={[
+            styles.bottomSheetContent, 
+            { transform: [{ translateY: pan.y }] }
+          ]}
+        >
+            <View 
+              style={styles.bottomSheetHeader}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.bottomSheetKnob} />
+              <View style={styles.bottomSheetTitleRow}>
+                <Text style={styles.bottomSheetTitle}>{t["comments"] || "Comments"}</Text>
+                <TouchableOpacity onPress={onClose} style={styles.bottomSheetCloseBtn}>
+                  <X size={22} color="#212121" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.bottomSheetSubtitle} numberOfLines={1}>{postTitle}</Text>
             </View>
-            <Text style={styles.bottomSheetSubtitle} numberOfLines={1}>{postTitle}</Text>
-          </View>
           
           <FlatList
-            data={comments}
+            style={{ flex: 1 }}
+            data={visibleComments}
             keyExtractor={(item) => item.id.toString()}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <View style={styles.fullCommentItem}>
+            renderItem={({ item }) => {
+              const isReply = !!item.parent_id || item.comment_text.trim().startsWith('@');
+              const hasReplies = !item.parent_id && comments.some(c => c.parent_id === item.id);
+              const isExpanded = expandedThreads.has(item.id);
+              const replyCount = comments.filter(c => c.parent_id === item.id).length;
+
+              return (
+              <View style={[
+                styles.fullCommentItem,
+                isReply && styles.replyCommentItem
+              ]}>
                 <View style={styles.fullCommentHeader}>
                   <View style={styles.fullCommentUserRow}>
                     <View style={styles.commentAvatarPlaceholder}>
@@ -461,10 +641,30 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
                   <Text style={styles.fullCommentDate}>
                     {new Date(item.created_at).toLocaleDateString()}
                   </Text>
+                  {item.user_id === currentUserId && (
+                    <TouchableOpacity onPress={() => handleMorePress(item)} style={styles.moreOptionsBtn}>
+                      <MoreHorizontal size={18} color="#757575" />
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <Text style={styles.fullCommentText}>{item.comment_text}</Text>
+                
+                <View style={styles.commentActionsRow}>
+                  <TouchableOpacity onPress={() => handleReply(item.user_username)} style={styles.replyButton}>
+                    <Text style={styles.replyButtonText}>{t["reply"] || "Reply"}</Text>
+                  </TouchableOpacity>
+
+                  {hasReplies && (
+                    <TouchableOpacity onPress={() => toggleThread(item.id)} style={styles.showMoreButton}>
+                      <Text style={styles.showMoreText}>
+                        {isExpanded ? (t["hide replies"] || "Hide replies") : `${t["show replies"] || "Show replies"} (${replyCount})`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            )}
+              );
+            }}
             ListEmptyComponent={() => (
               <View style={styles.emptyCommentsContainer}>
                 <MessageCircle size={48} color="#E0E0E0" />
@@ -475,22 +675,31 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
           />
 
           <View style={styles.modalInputSection}>
+            {typingUsers.length > 0 && (
+              <Text style={styles.typingIndicatorText}>
+                {typingUsers.length === 1 
+                  ? `${typingUsers[0]} ${t["is typing..."] || "is typing..."}`
+                  : `${typingUsers.length} ${t["people are typing..."] || "people are typing..."}`}
+              </Text>
+            )}
             {userUsername ? (
               <View style={styles.modalInputWrapper}>
                 <TextInput
+                  ref={inputRef}
                   style={styles.modalTextInput}
                   placeholder={t["write your comment here..."]}
-                  value={newComment}
                   onChangeText={setNewComment}
                   multiline
                   maxLength={200}
-                />
+                >
+                  {renderStyledInput(newComment)}
+                </TextInput>
                 <TouchableOpacity 
                   style={[styles.modalPostBtn, !newComment.trim() && { opacity: 0.5 }]} 
                   onPress={handleModalSubmit}
                   disabled={isSubmitting || !newComment.trim()}
                 >
-                  {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalPostBtnText}>{t.submit}</Text>}
+                  {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalPostBtnText}>{editingCommentId ? t.update : t.submit}</Text>}
                 </TouchableOpacity>
               </View>
             ) : (
@@ -499,6 +708,7 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
               </TouchableOpacity>
             )}
           </View>
+        </Animated.View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
@@ -512,9 +722,11 @@ export default function ExploreScreen() {
   const router = useRouter();
   const [stories, setStories] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null); // New state for username
   const [userFullname, setUserFullname] = useState<string | null>(null);
   const [selectedPostForComment, setSelectedPostForComment] = useState<any | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [isViewAllCommentsVisible, setIsViewAllCommentsVisible] = useState(false);
   const [activePostComments, setActivePostComments] = useState<any[]>([]);
@@ -600,6 +812,7 @@ export default function ExploreScreen() {
           if (profileRes.ok) {
             const profileData = await profileRes.json();
             setUserFullname(profileData.fullname);
+            setUserId(profileData.id);
             setUsername(profileData.username);
           }
 
@@ -643,6 +856,109 @@ export default function ExploreScreen() {
       initialize();
     }, [initializeStats, syncFromDatabase])
   );
+
+  // Cleanup typing indicators periodically (if a user disconnects without sending 'false')
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingUsers(prev => {
+        const next = { ...prev };
+        let changed = false;
+        Object.keys(next).forEach(u => {
+          if (now - next[u] > 5000) {
+            delete next[u];
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const modalChannelRef = useRef<any>(null);
+
+  const broadcastTypingStatus = (isTyping: boolean) => {
+    if (modalChannelRef.current && username) {
+      modalChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { username, isTyping },
+      });
+    }
+  };
+
+  // Real-time subscription for the active comment modal
+  useEffect(() => {
+    if (!selectedPostForComment || !isViewAllCommentsVisible) return;
+
+    const channel = supabase
+      .channel(`active-modal-comments-${selectedPostForComment.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_comments',
+          filter: `post_id=eq.${selectedPostForComment.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newComment = payload.new;
+            setActivePostComments((prev) => {
+              // Prevent double-adding if the current user just posted
+              if (prev.some((c) => c.id === newComment.id)) return prev;
+              
+              if (newComment.parent_id) {
+                const targetIndex = prev.findIndex(c => c.id === newComment.parent_id);
+                if (targetIndex !== -1) {
+                  const newList = [...prev];
+                  // Find the end of the current sub-thread
+                  let insertIndex = targetIndex + 1;
+                  while (insertIndex < newList.length && newList[insertIndex].parent_id === newComment.parent_id) {
+                    insertIndex++;
+                  }
+                  newList.splice(insertIndex, 0, newComment);
+                  return newList;
+                }
+              }
+              return [newComment, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedComment = payload.new;
+            setActivePostComments((prev) => prev.map((c) => c.id === updatedComment.id ? updatedComment : c));
+          } else if (payload.eventType === 'DELETE') {
+            setActivePostComments((prev) => prev.filter((c) => c.id !== payload.old.id));
+            if (selectedPostForComment) {
+              setCommentRefreshKeys(prev => ({
+                ...prev,
+                [selectedPostForComment.id]: (prev[selectedPostForComment.id] || 0) + 1
+              }));
+            }
+          }
+        }
+      )
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload.username === username) return;
+        setTypingUsers(prev => {
+          const next = { ...prev };
+          if (payload.isTyping) next[payload.username] = Date.now();
+          else delete next[payload.username];
+          return next;
+        });
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          modalChannelRef.current = channel;
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+      modalChannelRef.current = null;
+      setTypingUsers({});
+    };
+  }, [selectedPostForComment?.id, isViewAllCommentsVisible]);
 
   // Real-time updates for engagement settings and story duration
   useEffect(() => {
@@ -967,7 +1283,7 @@ export default function ExploreScreen() {
     setIsViewAllCommentsVisible(true);
   };
 
-  const handleSubmitComment = async (commentText: string, userUsername: string) => { // Added userUsername parameter
+  const handleSubmitComment = async (commentText: string, userUsername: string, parentId?: string) => {
     try {
       console.log(`[Explore] Submitting comment. Payload:`, { post_id: selectedPostForComment?.id, comment_text: commentText, user_username: userUsername });
 
@@ -975,11 +1291,31 @@ export default function ExploreScreen() {
       const response = await fetch(`${API_BASE_URL}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ post_id: selectedPostForComment.id, comment_text: commentText, user_username: userUsername }) // Send user_username
+        body: JSON.stringify({ post_id: selectedPostForComment.id, comment_text: commentText, user_username: userUsername, parent_id: parentId })
       });
       if (response.ok) {
+        const newComment = await response.json();
         console.log('Comment submitted successfully');
         Alert.alert(t["comment submitted"] || "Comment Submitted", t["comment submitted message"] || "Your comment has been posted!");
+        
+        // Insert the reply under the target comment if it exists, otherwise at the top
+        setActivePostComments(prev => {
+          if (parentId) {
+            const targetIndex = prev.findIndex(c => c.id === parentId);
+            if (targetIndex !== -1) {
+              const newList = [...prev];
+              // Find the last reply in this specific thread to append the new reply at the bottom
+              let insertIndex = targetIndex + 1;
+              while (insertIndex < newList.length && newList[insertIndex].parent_id === parentId) {
+                insertIndex++;
+              }
+              newList.splice(insertIndex, 0, newComment);
+              return newList;
+            }
+          }
+          return [newComment, ...prev];
+        });
+
         if (selectedPostForComment) {
           setCommentRefreshKeys(prev => ({
             ...prev,
@@ -992,6 +1328,44 @@ export default function ExploreScreen() {
       }
     } catch (err) { console.error('Error submitting comment:', err);
       Alert.alert(t.error || "Error", t["connection error"] || "Connection error. Please try again."); }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const response = await fetch(`${API_BASE_URL}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setActivePostComments(prev => prev.filter(c => c.id !== commentId));
+        if (selectedPostForComment) {
+          setCommentRefreshKeys(prev => ({
+            ...prev,
+            [selectedPostForComment.id]: (prev[selectedPostForComment.id] || 0) + 1
+          }));
+        }
+      } else {
+        Alert.alert(t.error || "Error", t["failed to delete review"] || "Failed to delete comment.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateComment = async (commentId: string, text: string) => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      const response = await fetch(`${API_BASE_URL}/comments/${commentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ comment_text: text })
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setActivePostComments(prev => prev.map(c => c.id === commentId ? updated : c));
+      }
+    } catch (err) { console.error(err); }
   };
 
   const renderStory = ({ item }: { item: any }) => {
@@ -1294,8 +1668,13 @@ export default function ExploreScreen() {
         comments={activePostComments}
         postTitle={selectedPostForComment?.title || ''}
         t={t}
+        currentUserId={userId}
         userUsername={username}
         onSubmit={handleSubmitComment}
+        onDelete={handleDeleteComment}
+        onUpdate={handleUpdateComment}
+        typingUsers={Object.keys(typingUsers)}
+        onTyping={broadcastTypingStatus}
       />
     </SafeAreaView>
   );
@@ -1784,7 +2163,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalInputSection: {
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingTop: 15,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25, // Increased padding to lift the container up
     borderTopWidth: 1,
     borderTopColor: '#F0F0F0',
     backgroundColor: '#fff',
@@ -1796,6 +2177,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   modalTextInput: {
     flex: 1,
@@ -1803,6 +2186,7 @@ const styles = StyleSheet.create({
     color: '#212121',
     maxHeight: 100,
     paddingVertical: 8,
+
   },
   modalPostBtn: {
     backgroundColor: '#4CAF50',
@@ -1849,7 +2233,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
-    height: '75%',
+    height: '85%',
     width: '100%',
   },
   bottomSheetHeader: {
@@ -1931,6 +2315,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 100,
+    
   },
   emptyCommentsText: {
     marginTop: 15,
@@ -1938,6 +2323,51 @@ const styles = StyleSheet.create({
     color: '#BDBDBD',
   },
   bottomSheetCloseBtn: {
+    padding: 6,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  replyButton: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  replyButtonText: {
+    fontSize: 12,
+    color: '#757575',
+    fontWeight: '600',
+  },
+  replyCommentItem: {
+    marginLeft: 32,
+    borderLeftWidth: 2,
+    borderLeftColor: '#E0E0E0',
+    paddingLeft: 12,
+    backgroundColor: '#F9F9F9',
+    marginTop: 4,
+  },
+  commentActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 16,
+  },
+  showMoreButton: {
+    alignSelf: 'flex-start',
+  },
+  showMoreText: {
+    fontSize: 12,
+    color: '#2874F0',
+    fontWeight: '600',
+  },
+  moreOptionsBtn: {
     padding: 4,
+  },
+  typingIndicatorText: {
+    fontSize: 11,
+    color: '#757575',
+    fontStyle: 'italic',
+    marginBottom: 6,
+    marginLeft: 15,
   },
 });
