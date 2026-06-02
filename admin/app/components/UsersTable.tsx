@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { toast } from "react-hot-toast";
 
 type User = {
   id: string;
@@ -28,8 +29,15 @@ export default function UsersTable() {
   const [selectedRole, setSelectedRole] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [isBulkUpdateModalOpen, setIsBulkUpdateModalOpen] = useState(false);
+  const [bulkUpdateRole, setBulkUpdateRole] = useState<string>("user");
+  const [isBulkWalletModalOpen, setIsBulkWalletModalOpen] = useState(false);
+  const [bulkWalletAmount, setBulkWalletAmount] = useState<string>("0");
+  const [bulkWalletMode, setBulkWalletMode] = useState<"set" | "add" | "sub">("add");
   const [visibleQuestions, setVisibleQuestions] = useState<Set<string>>(new Set());
   const [visibleAnswers, setVisibleAnswers] = useState<Set<string>>(new Set());
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const togglePasswordVisibility = (userId: string) => {
     setVisiblePasswords((prev) => {
@@ -73,7 +81,7 @@ export default function UsersTable() {
     try {
       const res = await fetch("/api/admin/users");
       if (res.ok) {
-        const data = await res.json();
+        const data: User[] = await res.json();
         setUsers(data);
       } else {
         let errorMessage = res.statusText;
@@ -86,6 +94,7 @@ export default function UsersTable() {
         console.error("Failed to fetch users:", errorMessage);
         setError(`Failed to load users: ${errorMessage}. Please ensure you are logged in as an administrator.`);
         setUsers([]); // Ensure `users` is an array to prevent runtime errors.
+        setSelectedUserIds(new Set()); // Clear selections on fetch
       }
     } catch (err) {
       console.error("Error fetching users:", err);
@@ -95,6 +104,7 @@ export default function UsersTable() {
       setLoading(false);
     }
   }
+
 
   async function handleDelete(id: string) {
     if (!confirm("Are you sure you want to delete this user?")) return;
@@ -155,11 +165,11 @@ export default function UsersTable() {
       });
 
       if (res.ok) {
-        const updatedUser = await res.json();
+        const updatedUser: User = await res.json();
         setUsers((prev) =>
           prev.map((u) =>
             u.id === userId
-              ? { ...u, role: updatedUser.role, wallet_balance: updatedUser.wallet_balance }
+              ? { ...u, role: updatedUser.role, wallet_balance: Number(updatedUser.wallet_balance) }
               : u
           )
         );
@@ -176,6 +186,187 @@ export default function UsersTable() {
     } catch (err) {
       console.error("Error updating role:", err);
       setError(err instanceof Error ? err.message : "An unknown error occurred while updating.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Enable drag-to-scroll horizontally to make navigation easier in the middle of the table
+  useEffect(() => {
+    const slider = tableContainerRef.current;
+    if (!slider) return;
+
+    let isDown = false;
+    let startX: number;
+    let scrollLeft: number;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Avoid dragging if the user is clicking on a button, input, or toggle
+      if ((e.target as HTMLElement).closest('button, input, select, label, .cursor-pointer')) return;
+      isDown = true;
+      startX = e.pageX - slider.offsetLeft;
+      scrollLeft = slider.scrollLeft;
+    };
+
+    const handleMouseLeave = () => { isDown = false; };
+    const handleMouseUp = () => { isDown = false; };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - slider.offsetLeft;
+      const walk = (x - startX) * 1.5; 
+      slider.scrollLeft = scrollLeft - walk;
+    };
+
+    slider.addEventListener('mousedown', handleMouseDown);
+    slider.addEventListener('mouseleave', handleMouseLeave);
+    slider.addEventListener('mouseup', handleMouseUp);
+    slider.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      slider.removeEventListener('mousedown', handleMouseDown);
+      slider.removeEventListener('mouseleave', handleMouseLeave);
+      slider.removeEventListener('mouseup', handleMouseUp);
+      slider.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [loading]);
+
+  const toggleSelectAll = () => {
+    if (selectedUserIds.size === filteredUsers.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(filteredUsers.map(user => user.id)));
+    }
+  };
+
+  const toggleSelect = (userId: string) => {
+    const next = new Set(selectedUserIds);
+    if (next.has(userId)) {
+      next.delete(userId);
+    } else {
+      next.add(userId);
+    }
+    setSelectedUserIds(next);
+  };
+
+  async function handleBulkRoleUpdate() {
+    if (selectedUserIds.size === 0) return;
+    if (!confirm(`Are you sure you want to update the role of ${selectedUserIds.size} users to "${bulkUpdateRole}"?`)) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: Array.from(selectedUserIds),
+          role: bulkUpdateRole,
+        }),
+      });
+
+      if (res.ok) {
+        setUsers(prev =>
+          prev.map(user =>
+            selectedUserIds.has(user.id) ? { ...user, role: bulkUpdateRole } : user
+          )
+        );
+        setSelectedUserIds(new Set());
+        setIsBulkUpdateModalOpen(false);
+        toast.success(`Successfully updated role for ${selectedUserIds.size} users.`);
+      } else {
+        let errorMessage = "Failed to bulk update roles";
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorData.message || res.statusText;
+        } catch (e) { /* Ignore */ }
+        setError(errorMessage);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred during bulk update.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleBulkWalletUpdate() {
+    if (selectedUserIds.size === 0) return;
+    const amount = parseFloat(bulkWalletAmount);
+    if (isNaN(amount) || amount < 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to set the wallet balance of ${selectedUserIds.size} users to ${amount.toLocaleString()} BIF?`)) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: Array.from(selectedUserIds),
+          wallet_balance: amount,
+          wallet_mode: bulkWalletMode,
+        }),
+      });
+
+      if (res.ok) {
+        const updatedUsers: Array<Pick<User, 'id' | 'wallet_balance'>> = await res.json();
+        const balanceMap = new Map<string, number>(
+          updatedUsers.map((u) => [u.id, u.wallet_balance])
+        );
+
+        setUsers(prev =>
+          prev.map(user =>
+            selectedUserIds.has(user.id) 
+              ? { ...user, wallet_balance: Number(balanceMap.get(user.id) ?? user.wallet_balance) } 
+              : user
+          )
+        );
+        setSelectedUserIds(new Set());
+        setIsBulkWalletModalOpen(false);
+        toast.success(`Successfully updated wallet balance for ${selectedUserIds.size} users.`);
+      } else {
+        const errorData = await res.json();
+        setError(errorData.error || "Failed to bulk update wallet balance");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred during bulk update.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (selectedUserIds.size === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedUserIds.size} users? This action cannot be undone.`)) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      // Assuming the DELETE endpoint can handle an array of IDs
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedUserIds) }),
+      });
+      if (res.ok) {
+        setUsers(prev => prev.filter(user => !selectedUserIds.has(user.id)));
+        setSelectedUserIds(new Set());
+        toast.success(`Successfully deleted ${selectedUserIds.size} users.`);
+      } else {
+        let errorMessage = "Failed to bulk delete users";
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorData.message || res.statusText;
+        } catch (e) { /* Ignore */ }
+        setError(errorMessage);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred during bulk delete.");
     } finally {
       setIsSubmitting(false);
     }
@@ -246,6 +437,32 @@ export default function UsersTable() {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+        {selectedUserIds.size > 0 && (
+          <div className="flex items-center gap-3 ml-4">
+            <span className="text-sm text-gray-600">{selectedUserIds.size} selected</span>
+            <button
+              onClick={() => setIsBulkUpdateModalOpen(true)}
+              disabled={isSubmitting}
+              className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 disabled:opacity-50 cursor-pointer"
+            >
+              Bulk Update Role
+            </button>
+            <button
+              onClick={() => setIsBulkWalletModalOpen(true)}
+              disabled={isSubmitting}
+              className="px-3 py-1 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 disabled:opacity-50 cursor-pointer"
+            >
+              Bulk Update Wallet
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={isSubmitting}
+              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600 disabled:opacity-50 cursor-pointer"
+            >
+              Bulk Delete
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -258,11 +475,22 @@ export default function UsersTable() {
       {loading ? ( 
         <p>Loading users...</p>
       ) : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[70vh]">
+        <div 
+          ref={tableContainerRef}
+          className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200"
+        >
           <table className="w-full text-left min-w-[640px] border-collapse border border-gray-200">
-            <thead className="bg-gray-100 sticky top-0 z-10">
+            <thead className="bg-gray-100 sticky top-0 z-20">
               <tr>
-                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Full Name</th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200 sticky left-0 bg-gray-100 z-30">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
+                    checked={selectedUserIds.size === filteredUsers.length && filteredUsers.length > 0}
+                    onChange={toggleSelectAll}
+                  />
+                </th>
+                <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200 sticky left-[42px] bg-gray-100 z-30 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">Full Name</th>
                 <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">WhatsApp Number</th>
                 <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Country</th>
                 <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200">Gender</th>
@@ -279,8 +507,17 @@ export default function UsersTable() {
             </thead>
             <tbody>
               {filteredUsers.map((u) => (
+                // Ensure u.id is always a string for key and Set operations
                 <tr key={u.id} className="align-top">
-                  <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.fullname || "—"}</td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200 sticky left-0 bg-white z-10">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
+                      checked={selectedUserIds.has(u.id)}
+                      onChange={() => toggleSelect(u.id)}
+                    />
+                  </td>
+                  <td className="p-3 text-sm text-gray-800 border border-gray-200 sticky left-[42px] bg-white z-10 font-medium shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">{u.fullname || "—"}</td>
                   <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.whatsapp_number || "—"}</td>
                   <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.country || "—"}</td>
                   <td className="p-3 text-sm text-gray-800 border border-gray-200">{u.gender || "—"}</td>
@@ -362,7 +599,7 @@ export default function UsersTable() {
                       </span>
                     )}
                   </td>
-                  <td className="p-3 text-sm text-gray-800 border border-gray-200 font-bold text-green-600">
+                  <td className="p-3 text-sm border border-gray-200 font-bold text-green-600">
                     {(u.engagement_points || 0).toLocaleString()}
                   </td>
                   <td className="p-3 text-sm text-gray-800 border border-gray-200">
@@ -415,13 +652,116 @@ export default function UsersTable() {
               ))}
               {filteredUsers.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="p-6 text-center text-gray-500" role="status">
+                  <td colSpan={14} className="p-6 text-center text-gray-500" role="status">
                     No users found
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Bulk Update Modals - Inlined to prevent focus loss during typing */}
+      {isBulkUpdateModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md cursor-pointer">
+            <h3 className="text-lg font-bold mb-4">Bulk Update Role</h3>
+            <p className="mb-4">Selected {selectedUserIds.size} users. Choose a new role:</p>
+            <select
+              value={bulkUpdateRole}
+              onChange={(e) => setBulkUpdateRole(e.target.value)}
+              className="w-full p-2 border rounded-md mb-4"
+            >
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsBulkUpdateModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkRoleUpdate}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? "Updating..." : "Update Roles"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBulkWalletModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4">Bulk Update Wallet Balance</h3>
+            <p className="mb-4 text-sm text-gray-600">Apply to {selectedUserIds.size} selected users:</p>
+            
+            <div className="flex gap-2 mb-4 bg-gray-100 p-1 rounded-lg">
+              {(['set', 'add', 'sub'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setBulkWalletMode(mode)}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                    bulkWalletMode === mode 
+                      ? 'bg-white text-blue-600 shadow-sm' 
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {mode === 'set' ? 'Set To' : mode === 'add' ? 'Add' : 'Subtract'}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative mb-6">
+              <input
+                type="number"
+                value={bulkWalletAmount}
+                onChange={(e) => setBulkWalletAmount(e.target.value)}
+                className={`w-full p-3 border rounded-md focus:ring-2 outline-none font-bold text-lg ${
+                  bulkWalletMode === 'sub' ? 'focus:ring-red-500' : 'focus:ring-blue-500'
+                }`}
+                placeholder="0"
+                min="0"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                 {bulkWalletMode !== 'set' && (
+                   <span className={`text-xl font-bold ${bulkWalletMode === 'add' ? 'text-green-500' : 'text-red-500'}`}>
+                     {bulkWalletMode === 'add' ? '+' : '-'}
+                   </span>
+                 )}
+                 <span className="text-gray-400 font-bold">BIF</span>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-gray-400 mb-6 italic">
+              {bulkWalletMode === 'set' ? '* This will overwrite existing balances.' : 
+               bulkWalletMode === 'add' ? '* This will be added to the current balance of each user.' : 
+               '* This will be deducted from the current balance (cannot go below 0).'}
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setIsBulkWalletModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkWalletUpdate}
+                disabled={isSubmitting}
+                className={`px-4 py-2 text-white rounded-md disabled:opacity-50 transition-colors text-sm font-bold cursor-pointer ${
+                  bulkWalletMode === 'sub' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {isSubmitting ? "Updating..." : "Apply Changes"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

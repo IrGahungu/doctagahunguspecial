@@ -514,11 +514,11 @@ export default function HospitalPage() {
           <div className="pt-4">
             {formError && <p className="text-red-500 text-sm text-center mb-4">{formError}</p>}
             <div className="flex justify-center gap-3">
-              <button type="button" onClick={() => setFormError(null)} className="px-4 py-2 rounded-md border border-slate-200 text-sm hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={() => setFormError(null)} className="px-4 py-2 rounded-md border border-slate-200 text-sm hover:bg-slate-50 cursor-pointer">Cancel</button>
               <button
                 type="submit"
                 form="hospital-form"
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-linear-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-linear-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md hover:scale-[1.01] transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 disabled={isSubmitting || isUploading || !agreedToTerms}
               >
                 {isSubmitting ? "Submitting..." : "Submit Form"}

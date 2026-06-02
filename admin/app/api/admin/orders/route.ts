@@ -69,17 +69,25 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, ids, status } = body;
 
-    if (!id || !status) {
-      return NextResponse.json({ error: "Order ID and status are required" }, { status: 400 });
+    if (!id && (!ids || !Array.isArray(ids) || ids.length === 0)) {
+      return NextResponse.json({ error: "Order ID or IDs are required" }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("order_items")
-      .update({ status })
-      .eq("order_id", id)
-      .select();
+    if (!status) {
+      return NextResponse.json({ error: "Status is required" }, { status: 400 });
+    }
+
+    let query = supabaseAdmin.from("order_items").update({ status });
+
+    if (ids) {
+      query = query.in("order_id", ids);
+    } else {
+      query = query.eq("order_id", id);
+    }
+
+    const { data, error } = await query.select();
 
     if (error) {
       console.error("Error updating order status:", error);

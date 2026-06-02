@@ -54,10 +54,20 @@ export default function LoginPage() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        minHeight: "80vh",
-        padding: 20
+        minHeight: "100vh",
+        padding: 20,
+        backgroundImage: "url('/assets/labo.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat"
       }}>
-        <h1 style={{ textAlign: "center", marginBottom: 40, fontWeight: "bold" }}>
+        <h1 style={{ 
+          textAlign: "center", 
+          marginBottom: 40, 
+          fontWeight: "bold",
+          color: "#fff",
+          textShadow: "2px 2px 8px rgba(0,0,0,0.7)"
+        }}>
           WELCOME ONBOARD M.SC. I.T JEAN KEVIN GAHUNGU
         </h1>
         <form
@@ -67,14 +77,18 @@ export default function LoginPage() {
             flexDirection: "column",
             width: "100%",
             maxWidth: 400,
-            gap: 16
+            gap: 16,
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            padding: "40px",
+            borderRadius: "12px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.2)"
           }}
         >
           <input
             placeholder="WhatsApp Number"
             value={whatsappNumber}
             onChange={(e) => setWhatsappNumber(e.target.value)}
-            style={{ padding: 10, fontSize: 16, border: "1px solid black"}}
+            style={{ padding: 10, fontSize: 16, border: "1px solid black", borderRadius: 20 }}
           />
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <input
@@ -82,7 +96,7 @@ export default function LoginPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ padding: 10, fontSize: 16, width: '100%', border: "1px solid black" }}
+              style={{ padding: 10, fontSize: 16, width: '100%', border: "1px solid black", borderRadius: 20 }}
             />
             <button
               type="button"

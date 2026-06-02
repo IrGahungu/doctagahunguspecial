@@ -285,7 +285,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
     setFormError(null);
 
     if (!validateForm()) {
-      setFormError("Please fill out all required fields.");
+      toast.error("Please fill out all required fields.");
       return;
     }
 
@@ -340,7 +340,8 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
         } catch (textError) {
           // Could not read the response body, stick with the status code.
         }
-        throw new Error(errorMessage);
+        toast.error(errorMessage);
+        return;
       }
 
       toast.success(
@@ -351,9 +352,8 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
         router.push("/login");
       }, 2000);
     } catch (err) {
-      setFormError(
-        err instanceof Error ? err.message : "Unexpected error"
-      );
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Unexpected error");
     } finally {
       setIsSubmitting(false);
     }
@@ -633,7 +633,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
                 // optional cancel behaviour: reset or navigate away
                 setFormError(null);
               }}
-              className="px-4 py-2 rounded-md border border-slate-200 text-sm hover:bg-slate-50"
+              className="px-4 py-2 rounded-md border border-slate-200 text-sm hover:bg-slate-50 cursor-pointer"
             >
               Cancel
             </button>
@@ -642,7 +642,7 @@ export default function DoctorPage({ editingDoctor }: DoctorPageProps) {
               type="submit"
               form="doctor-form"
               disabled={isSubmitting || !agreedToTerms}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-md hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-md hover:bg-indigo-700 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>

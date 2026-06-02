@@ -1,99 +1,117 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { v4 as uuidv4 } from "uuid";
 
 export async function GET(
-  request: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
-  if (!id) {
-    return NextResponse.json({ error: "Missing application ID" }, { status: 400 });
-  }
-
   try {
+    const { id } = await params;
     const { data, error } = await supabaseAdmin
       .from("doctor_applications")
       .select("*")
       .eq("id", id)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 404 });
-    }
+    if (error) throw error;
+    if (!data) return NextResponse.json({ error: "Application not found" }, { status: 404 });
 
     return NextResponse.json(data);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Fetch doctor application failed:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
 export async function PUT(
-  request: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
   try {
-    const json = await request.json();
-    const { password, confirmPassword, ...body } = json;
+    const { id } = await params;
+    const formData = await req.formData();
+ 
+    // Extract form data
+    const name = formData.get("name")?.toString();
+    const specialty = formData.get("specialty")?.toString();
+    const bio = formData.get("bio")?.toString();
+    const booking_type = formData.get("booking_type")?.toString();
+    const country = formData.get("country")?.toString();
+    const whatsapp_number = formData.get("whatsapp_number")?.toString();
+    const consultation_fee_online = formData.get("consultation_fee_online") ? Number(formData.get("consultation_fee_online")?.toString()) : undefined;
+    const consultation_fee_offline = formData.get("consultation_fee_offline") ? Number(formData.get("consultation_fee_offline")?.toString()) : undefined;
+    const location = formData.get("location")?.toString();
+    const originCountry = formData.get("originCountry")?.toString();
 
-    const { data, error } = await supabaseAdmin
-      .from("doctor_applications")
-      .update(body)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    const availabilityRaw = formData.get("availability")?.toString();
+    let availability = undefined;
+    if (availabilityRaw && availabilityRaw !== "undefined" && availabilityRaw !== "") {
+      try {
+        availability = JSON.parse(availabilityRaw);
+      } catch (e) {
+        console.error("Failed to parse availability JSON:", e);
+      }
     }
 
-    // Sync updates to doctor_users table if relevant fields are present
-    if (data?.email) {
-      const userUpdates: Record<string, any> = {};
-      if (body.name !== undefined) userUpdates.name = body.name;
-      if (body.image !== undefined) userUpdates.image = body.image;
-      if (body.bio !== undefined) userUpdates.bio = body.bio;
-      if (body.status !== undefined) userUpdates.status = body.status;
-      if (body.specialty !== undefined) userUpdates.specialty = body.specialty;
-      if (body.whatsapp_number !== undefined) userUpdates.whatsapp_number = body.whatsapp_number;
-      if (body.country !== undefined) userUpdates.country = body.country;
-      if (body.payment_id !== undefined) userUpdates.payment_id = body.payment_id;
-      if (body.consultation_fee_online !== undefined) userUpdates.consultation_fee_online = body.consultation_fee_online;
-      if (body.consultation_fee_offline !== undefined) userUpdates.consultation_fee_offline = body.consultation_fee_offline;
-      if (body.location !== undefined) userUpdates.location = body.location;
-      if (body.booking_type !== undefined) userUpdates.booking_type = body.booking_type;
-      if (body.availability !== undefined) userUpdates.availability = body.availability;
-      if (body.origin_country !== undefined) userUpdates.origin_country = body.origin_country;
-      if (body.work_schedule !== undefined) userUpdates.work_schedule = body.work_schedule;
+    // Handle image update
+    const imageFile = formData.get("image") as File | null;
+    let imagePath = formData.get("existingImage")?.toString();
+
+    if (imageFile && typeof imageFile !== "string" && imageFile.size > 0) {
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      const fileName = `profiles/${uuidv4()}-${imageFile.name}`;
       
-      // Handle password update if provided
-      if (password && password.trim() !== "") {
-        userUpdates.password_hash = password;
-      }
-
-      if (Object.keys(userUpdates).length > 0) {
-        console.log(`Syncing doctor_users for ${data.email}:`, userUpdates);
+      const { data, error: uploadError } = await supabaseAdmin.storage
+        .from("doctor-images")
+        .upload(fileName, buffer, { contentType: imageFile.type, upsert: true });
         
-        const { data: updatedUsers, error: userError } = await supabaseAdmin
-          .from("doctor_users")
-          .update(userUpdates)
-          .eq("email", data.email)
-          .select();
-          
-        if (userError) {
-          console.error("Error syncing doctor_users:", userError);
-        } else if (!updatedUsers || updatedUsers.length === 0) {
-          console.warn(`WARNING: Sync successful but NO rows updated in doctor_users. Check if email '${data.email}' exists in doctor_users table.`);
-        } else {
-          console.log(`doctor_users synced successfully. Updated ${updatedUsers.length} row(s).`);
-        }
-      }
+      if (uploadError) throw uploadError;
+      imagePath = data.path;
     }
 
-    return NextResponse.json(data);
+    // Build update object
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (specialty !== undefined) updateData.specialty = specialty;
+    if (bio !== undefined) updateData.bio = bio;
+    if (booking_type !== undefined) updateData.booking_type = booking_type;
+    if (country !== undefined) updateData.country = country;
+    if (whatsapp_number !== undefined) updateData.whatsapp_number = whatsapp_number;
+    if (consultation_fee_online !== undefined && !isNaN(consultation_fee_online)) updateData.consultation_fee_online = consultation_fee_online;
+    if (consultation_fee_offline !== undefined && !isNaN(consultation_fee_offline)) updateData.consultation_fee_offline = consultation_fee_offline;
+    if (location !== undefined) updateData.location = location;
+    if (availability !== undefined) updateData.availability = availability;
+    if (imagePath !== undefined) updateData.image = imagePath;
+    if (originCountry !== undefined) updateData.origin_country = originCountry;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ message: "No data provided for update" }, { status: 400 });
+    }
+
+    // Update doctor_users (keeping sync with registration table)
+    const { error: userUpdateError } = await supabaseAdmin
+      .from("doctor_users")
+      .update(updateData)
+      .eq("id", id);
+
+    if (userUpdateError) throw userUpdateError;
+
+    // Update doctor_applications (keeping sync with application table)
+    const { error: appUpdateError } = await supabaseAdmin
+      .from("doctor_applications")
+      .update(updateData)
+      .eq("id", id);
+
+    if (appUpdateError) throw appUpdateError;
+
+    return NextResponse.json({ message: "Profile updated successfully" }, { status: 200 });
+
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Profile update failed:", error);
+    return NextResponse.json(
+      { error: error.message || "Server error" },
+      { status: 500 }
+    );
   }
 }

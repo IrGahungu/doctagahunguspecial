@@ -143,6 +143,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loadingTab, setLoadingTab] = useState("");
   const [chartData, setChartData] = useState<{ date: string; revenue: number; orders: number; views: number }[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
@@ -207,7 +208,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed to update password");
+        if (!res.ok) {
+          toast.error(data.error || "Failed to update password");
+          return;
+        }
         toast.success("Password updated successfully");
         setIsEditingPassword(false);
         setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
@@ -228,7 +232,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       setRefreshKey((prev) => prev + 1);
     }
     setActiveTab(tab);
-    if (tab === "status") setShowStatus(true);
+    setLoadingTab(tab);
+
+    setTimeout(() => {
+      if (tab === "status") setShowStatus(true);
+      // Reset loading state after a short delay to allow UI to update
+      setLoadingTab("");
+    }, 500);
   };
 
   const fetchOrders = async () => {
@@ -461,7 +471,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Failed to update");
+        toast.error(err.error || "Failed to update");
+        return;
       }
 
       setOrders((prev) =>
@@ -550,7 +561,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         method: "PUT",
         body: formData,
       });
-      if (!res.ok) throw new Error("Failed to update profile");
+      if (!res.ok) {
+        toast.error("Failed to update profile");
+        return;
+      }
       toast.success("Profile updated successfully!");
       router.refresh();
       setIsEditingProfile(false);
@@ -899,14 +913,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("dashboard")}
+            disabled={loadingTab === "dashboard"}
             className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition disabled:bg-blue-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'dashboard' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
+            {loadingTab === "dashboard" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
                 <span className="hidden md:block">Dashboard</span>
               </>
+            )}
           </button>
           {activeTab === "dashboard" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-blue-600 rounded-full"></div>}
         </div>
@@ -914,14 +936,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("availability")}
+            disabled={loadingTab === "availability"}
             className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-orange-600 text-white rounded-2xl hover:bg-orange-700 transition disabled:bg-orange-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'availability' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
+            {loadingTab === "availability" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="hidden md:block">My Stock</span>
               </>
+            )}
           </button>
           {activeTab === "availability" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-orange-600 rounded-full"></div>}
         </div>
@@ -929,8 +959,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("bookings")}
+            disabled={loadingTab === "bookings"}
             className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-green-600 text-white rounded-2xl hover:bg-green-700 transition disabled:bg-green-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'bookings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
+            {loadingTab === "bookings" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -940,6 +977,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   {pendingOrdersCount}
                 </span>
               </>
+            )}
           </button>
           {activeTab === "bookings" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-green-600 rounded-full"></div>}
         </div>
@@ -947,14 +985,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("profile")}
+            disabled={loadingTab === "profile"}
             className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition disabled:bg-indigo-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'profile' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
+            {loadingTab === "profile" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
                 <span className="hidden md:block">My pharmacy</span>
               </>
+            )}
           </button>
           {activeTab === "profile" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-indigo-600 rounded-full"></div>}
         </div>
@@ -962,8 +1008,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("settings")}
+            disabled={loadingTab === "settings"}
             className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-gray-600 text-white rounded-2xl hover:bg-gray-700 transition disabled:bg-gray-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'settings' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
+            {loadingTab === "settings" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -971,6 +1024,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 </svg>
                 <span className="hidden md:block">Settings</span>
               </>
+            )}
           </button>
           {activeTab === "settings" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-gray-600 rounded-full"></div>}
         </div>
@@ -978,14 +1032,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         <div className="relative">
           <button
             onClick={() => handleNavClick("status")}
+            disabled={loadingTab === "status"}
             className={`relative w-full flex items-center justify-center md:justify-start px-2 md:px-4 py-3 bg-purple-600 text-white rounded-2xl hover:bg-purple-700 disabled:bg-purple-400 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black ${activeTab === 'status' ? 'ring-2 ring-offset-2 ring-black' : ''}`}
           >
+            {loadingTab === "status" ? (
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="hidden md:block">Status</span>
               </>
+            )}
           </button>
           {activeTab === "status" && <div className="absolute top-1/2 -right-4 -translate-y-1/2 w-3 h-3 bg-purple-600 rounded-full"></div>}
         </div>

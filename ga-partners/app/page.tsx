@@ -7,52 +7,65 @@ export default function HomePage() {
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
 
   return (
-      <main className="max-w-4xl mx-auto text-center py-12 px-4">
-        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900">
-          Dr. Gahungu's Partner Portal
-        </h1>
-        <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
-          Apply to join as a Doctor, Pharmacy, Hospital or Insurance provider.
-        </p>
+    <main className="min-h-screen w-full relative">
+      {/* Full-screen Background Image */}
+      <div 
+        className="fixed inset-0 w-full h-full bg-cover bg-center bg-no-repeat -z-10" 
+        style={{ 
+          backgroundImage: "url('/assets/labo.jpg')",
+          backgroundColor: "#f8fafc" 
+        }}
+      />
 
-        <PartnerLinks loadingHref={loadingHref} setLoadingHref={setLoadingHref} />
+      {/* Semi-transparent Overlay and Content */}
+      <div className="min-h-screen w-full flex items-center justify-center px-4 py-12">
+        <div className="max-w-4xl w-full text-center py-12">
+          <h1 className="text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+            Dr. Gahungu's Partner Portal
+          </h1>
+          <p className="text-white mt-3 max-w-2xl mx-auto font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">
+            Apply to join as a Doctor, Pharmacy, Hospital or Insurance provider.
+          </p>
 
-        <div className="relative mt-12 max-w-sm mx-auto">
-          <div className="absolute inset-0 flex items-center" aria-hidden="true">
-            <div className="w-full border-t border-slate-300" />
+          <PartnerLinks loadingHref={loadingHref} setLoadingHref={setLoadingHref} />
+
+          <div className="relative mt-12 max-w-sm mx-auto">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-slate-300" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-4 py-1 rounded-full text-sm font-bold text-slate-700 border border-slate-200">OR</span>
+            </div>
           </div>
-          <div className="relative flex justify-center">
-            <span className="bg-white px-2 text-sm text-slate-500">OR</span>
+
+          {/* Login button */}
+          <div className="mt-8">
+            {(() => {
+              const href = "/login";
+              const isAnyLoading = loadingHref !== null;
+              const isThisLoading = loadingHref === href;
+              const isDisabled = isAnyLoading && !isThisLoading;
+
+              return (
+                <Link
+                  href={href}
+                  onClick={(e) => {
+                    if (isAnyLoading) {
+                      e.preventDefault();
+                    } else {
+                      setLoadingHref(href);
+                    }
+                  }}
+                  className={`inline-flex items-center justify-center px-10 py-3 rounded-lg text-white text-lg font-medium bg-green-700 transition-colors duration-300 shadow-lg ${isThisLoading ? 'opacity-75 cursor-wait' : 'hover:bg-green-800 hover:scale-[1.02]'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {isThisLoading ? <Spinner /> : "Login"}
+                </Link>
+              );
+            })()}
           </div>
         </div>
-
-
-        {/* Login button */}
-        <div className="mt-8">
-          {(() => {
-            const href = "/login";
-            const isAnyLoading = loadingHref !== null;
-            const isThisLoading = loadingHref === href;
-            const isDisabled = isAnyLoading && !isThisLoading;
-
-            return (
-              <Link
-                href={href}
-                onClick={(e) => {
-                  if (isAnyLoading) {
-                    e.preventDefault();
-                  } else {
-                    setLoadingHref(href);
-                  }
-                }}
-                className={`inline-flex items-center justify-center px-10 py-3 rounded-lg text-white text-lg font-medium bg-green-700 transition-colors duration-300 ${isThisLoading ? 'opacity-75 cursor-wait' : 'hover:bg-green-800'} ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {isThisLoading ? <Spinner /> : "Login"}
-              </Link>
-            );
-          })()}
-        </div>
-      </main>
+      </div>
+    </main>
   );
 }
 

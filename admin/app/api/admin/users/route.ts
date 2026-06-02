@@ -54,10 +54,20 @@ export async function DELETE(request: NextRequest) {
   const { isAdmin, error, status } = await checkAdmin(request);
   if (!isAdmin) return NextResponse.json({ error }, { status });
 
-  const { id } = await request.json();
-  if (!id) return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+  const { id, ids } = await request.json();
+  
+  if (!id && (!ids || !Array.isArray(ids) || ids.length === 0)) {
+    return NextResponse.json({ error: "User ID or IDs are required" }, { status: 400 });
+  }
 
-  const { error: dbError } = await supabaseAdmin.from("users").delete().eq("id", id);
+  let query = supabaseAdmin.from("users").delete();
+  if (ids) {
+    query = query.in("id", ids);
+  } else {
+    query = query.eq("id", id);
+  }
+
+  const { error: dbError } = await query;
 
   if (dbError) {
     console.error("Error deleting user:", dbError);
@@ -72,12 +82,13 @@ export async function PUT(request: NextRequest) {
   const { isAdmin, error, status } = await checkAdmin(request);
   if (!isAdmin) return NextResponse.json({ error }, { status });
 
-  const { id, role, is_verified, wallet_balance } = await request.json();
+  const { id, ids, role, is_verified, wallet_balance, wallet_mode = "set" } = await request.json();
 
-  if (!id) {
-    return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+  if (!id && (!ids || !Array.isArray(ids) || ids.length === 0)) {
+    return NextResponse.json({ error: "User ID or IDs are required" }, { status: 400 });
   }
 
+  const targetIds: string[] = ids || (id ? [id] : []);
   const updates: { role?: string; is_verified?: boolean; wallet_balance?: number } = {};
 
   // Update role if provided
@@ -95,28 +106,69 @@ export async function PUT(request: NextRequest) {
 
   // Update wallet balance if provided
   if (wallet_balance !== undefined) {
-    if (typeof wallet_balance !== "number" || wallet_balance < 0) {
+    if (typeof wallet_balance !== "number" || (wallet_mode === "set" && wallet_balance < 0)) {
       return NextResponse.json({ error: "Invalid wallet balance" }, { status: 400 });
     }
-    updates.wallet_balance = wallet_balance;
+    if (wallet_mode === "set") {
+      updates.wallet_balance = wallet_balance;
+    }
   }
 
-  if (Object.keys(updates).length === 0) {
+  const isSomethingToUpdate = Object.keys(updates).length > 0 || (wallet_balance !== undefined && (wallet_mode === "add" || wallet_mode === "sub"));
+
+  if (!isSomethingToUpdate) {
     return NextResponse.json({ error: "No valid fields provided to update" }, { status: 400 });
   }
 
-  // Perform the update in Supabase
+  if (wallet_balance !== undefined && (wallet_mode === "add" || wallet_mode === "sub")) {
+    // Fetch current balances to perform relative updates
+    const { data: currentUsers, error: fetchError } = await supabaseAdmin
+      .from("users")
+      .select("id, wallet_balance")
+      .in("id", targetIds);
+
+    if (fetchError) {
+      console.error("Error fetching users for wallet update:", fetchError);
+      return NextResponse.json({ error: "Failed to fetch user data for relative update" }, { status: 500 });
+    }
+
+    const updatePromises = (currentUsers || []).map((user) =>
+      supabaseAdmin
+        .from("users")
+        .update({
+          ...updates,
+          wallet_balance:
+            wallet_mode === "add"
+              ? Number(user.wallet_balance || 0) + wallet_balance
+              : Math.max(0, Number(user.wallet_balance || 0) - wallet_balance),
+        })
+        .eq("id", user.id)
+        .select("id, role, is_verified, wallet_balance")
+        .single()
+    );
+
+    const results = await Promise.all(updatePromises);
+    const hasError = results.some((r) => r.error);
+
+    if (hasError) {
+      return NextResponse.json({ error: "Failed to update one or more users" }, { status: 500 });
+    }
+
+    const updatedData = results.map((r) => r.data);
+    return NextResponse.json(ids ? updatedData : updatedData[0]);
+  }
+
+  // Standard update (overwrite mode or role/verification changes)
   const { data, error: dbError } = await supabaseAdmin
     .from("users")
     .update(updates)
-    .eq("id", id)
-    .select("id, role, is_verified, wallet_balance")
-    .single();
+    .in("id", targetIds)
+    .select("id, role, is_verified, wallet_balance");
 
   if (dbError) {
     console.error("Error updating user:", dbError);
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  return NextResponse.json(ids ? data : data?.[0] || null);
 }

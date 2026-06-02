@@ -203,12 +203,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         fetch(`/api/doctor-applications/${app.id}`)
           .then(async (res) => {
             if (!res.ok) {
-              const text = await res.text();
-              throw new Error(`Failed to fetch data: ${res.status} ${text}`);
+              toast.error("Failed to load availability data");
+              return null;
             }
             return res.json();
           })
           .then((data) => {
+            if (!data) return;
             let parsedLocations: any[] = [];
             try {
               if (data.location) {
@@ -236,12 +237,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         fetch(`/api/doctor-applications/${app.id}`)
           .then(async (res) => {
             if (!res.ok) {
-              const text = await res.text();
-              throw new Error(`Failed to fetch data: ${res.status} ${text}`);
+              toast.error("Failed to load profile data");
+              return null;
             }
             return res.json();
           })
           .then((data) => {
+            if (!data) return;
             setProfileForm({
               name: data.name || "",
               email: data.email || "",
@@ -313,10 +315,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             ]);
 
             const { data: bookingsData, error: bookingsError } = bookingsResult;
-            if (bookingsError) throw bookingsError;
+            if (bookingsError) {
+              toast.error("Failed to load bookings");
+              return;
+            }
 
             if (!doctorRes.ok) {
-              throw new Error(`Failed to fetch doctor data: ${doctorRes.statusText}`);
+              toast.error("Failed to load doctor data");
+              return;
             }
             const doctorData = await doctorRes.json();
 
@@ -385,10 +391,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         setIsScheduleLoading(true);
         fetch(`/api/doctor-applications/${app.id}`)
           .then(async (res) => {
-            if (!res.ok) throw new Error("Failed to fetch schedule");
+            if (!res.ok) {
+              toast.error("Failed to load schedule");
+              return null;
+            }
             return res.json();
           })
           .then((data) => {
+            if (!data) return;
             let schedule = [];
             try {
               schedule = typeof data.work_schedule === 'string' ? JSON.parse(data.work_schedule) : data.work_schedule || [];
@@ -593,7 +603,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ work_schedule: JSON.stringify(scheduleToSave) }),
       });
-      if (!res.ok) throw new Error("Failed to update schedule");
+      if (!res.ok) {
+        toast.error("Failed to update schedule");
+        return;
+      }
       toast.success("Schedule updated successfully!");
       setIsEditingSchedule(false);
     } catch (e) {
@@ -624,7 +637,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || "Failed to update");
+        toast.error(errorData.error || errorData.message || "Failed to update");
+        return;
       }
       toast.success("Availability updated successfully!");
       setIsEditingAvailability(false);
@@ -667,7 +681,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         method: "PUT",
         body: formData,
       });
-      if (!res.ok) throw new Error("Failed to update profile");
+      if (!res.ok) {
+        toast.error("Failed to update profile");
+        return;
+      }
       toast.success("Profile updated successfully!");
       router.refresh();
       setIsEditingProfile(false);
@@ -705,7 +722,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update password");
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update password");
+        return;
+      }
       toast.success("Password updated successfully");
       setIsEditingPassword(false);
       setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
