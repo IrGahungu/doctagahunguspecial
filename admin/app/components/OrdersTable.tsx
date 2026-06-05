@@ -37,6 +37,7 @@ export default function OrdersTable() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [isBulkStatusModalOpen, setIsBulkStatusModalOpen] = useState(false);
   const [bulkUpdateStatus, setBulkUpdateStatus] = useState<Order['status']>("Accepted");
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -142,11 +143,19 @@ export default function OrdersTable() {
     }
   }
 
-  async function handleBulkStatusUpdate() {
+  function handleBulkStatusUpdate() {
     if (selectedOrderIds.size === 0) return;
-    if (!confirm(`Are you sure you want to update the status of ${selectedOrderIds.size} orders to "${bulkUpdateStatus}"?`)) return;
+    setIsBulkStatusModalOpen(false);
+    setConfirmModal({
+      title: "Confirm Bulk Update",
+      message: `Are you sure you want to update the status of ${selectedOrderIds.size} orders to "${bulkUpdateStatus}"?`,
+      onConfirm: executeBulkUpdate
+    });
+  }
 
+  async function executeBulkUpdate() {
     setIsSubmitting(true);
+    setConfirmModal(null);
     setError(null);
     try {
       const res = await fetch("/api/admin/orders", {
@@ -416,6 +425,23 @@ export default function OrdersTable() {
                 className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-bold disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-200"
               >
                 {isSubmitting ? "Updating..." : "Update Orders"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+            <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmModal(null)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={confirmModal.onConfirm} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-bold cursor-pointer shadow-lg shadow-indigo-100">
+                Confirm
               </button>
             </div>
           </div>

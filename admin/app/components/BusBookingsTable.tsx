@@ -38,6 +38,10 @@ export default function BusBookingsTable() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [isBulkStatusModalOpen, setIsBulkStatusModalOpen] = useState(false);
+  const [bulkUpdateStatus, setBulkUpdateStatus] = useState<BusBooking["status"]>("confirmed");
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; type: 'delete' | 'update' } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<string>(
     new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]
@@ -81,31 +85,41 @@ export default function BusBookingsTable() {
     }
   };
 
-  const handleBulkStatusUpdate = async (status: BusBooking["status"]) => {
+  function handleBulkStatusUpdate() {
+    if (selectedIds.size === 0) return;
+    setIsBulkStatusModalOpen(false);
+    setConfirmModal({
+      title: "Confirm Bulk Status Update",
+      message: `Are you sure you want to update the status of ${selectedIds.size} bookings to "${bulkUpdateStatus}"?`,
+      onConfirm: executeBulkUpdate,
+      type: 'update'
+    });
+  }
+
+  async function executeBulkUpdate() {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
-    
+    setConfirmModal(null);
     setUpdatingId('bulk');
     try {
       const res = await fetch("/api/admin/bookings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids, status, type: 'bus' }),
+        body: JSON.stringify({ ids, status: bulkUpdateStatus, type: 'bus' }),
       });
       if (!res.ok) throw new Error();
       
       setBookings(prev => prev.map(b => 
-        ids.includes(b.id) ? { ...b, status } : b
+        ids.includes(b.id) ? { ...b, status: bulkUpdateStatus } : b
       ));
       
-      toast.success(`Successfully ${status} ${ids.length} bookings`);
+      toast.success(`Successfully updated status for ${ids.length} bookings`);
       setSelectedIds(new Set());
     } catch (err) {
       toast.error("Bulk update failed");
     } finally {
       setUpdatingId(null);
     }
-  };
+  }
 
   const handleDownloadTicket = (b: BusBooking) => {
     const printWindow = window.open('', '_blank');
@@ -155,11 +169,15 @@ export default function BusBookingsTable() {
     printWindow.document.close();
   };
 
-  const filtered = bookings.filter(b => 
-    b.users?.fullname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.ticket_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    b.buses?.destination?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = bookings.filter(b => {
+    const query = searchQuery.toLowerCase();
+    const passengerName = b.users?.fullname?.toLowerCase() || "";
+    const ticketRef = b.ticket_number?.toLowerCase() || "";
+    const destination = b.buses?.destination?.toLowerCase() || "";
+    const matchesSearch = passengerName.includes(query) || ticketRef.includes(query) || destination.includes(query);
+    const matchesStatus = statusFilter === "All" || b.status.toLowerCase() === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
+  });
 
   const toggleSelectAll = () => {
     if (selectedIds.size === filtered.length) {
@@ -259,13 +277,24 @@ export default function BusBookingsTable() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           {selectedIds.size > 0 && (
             <button 
-              onClick={() => handleBulkStatusUpdate('confirmed')}
+              onClick={() => setIsBulkStatusModalOpen(true)}
               disabled={updatingId === 'bulk'}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition-all animate-in fade-in zoom-in cursor-pointer"
+              className="bg-zinc-700 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-zinc-800 flex items-center gap-2 transition-all animate-in fade-in zoom-in cursor-pointer"
             >
-              {updatingId === 'bulk' ? <Spinner /> : `Confirm ${selectedIds.size} Tickets`}
+              {updatingId === 'bulk' ? <Spinner /> : `Update ${selectedIds.size} Statuses`}
             </button>
           )}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-500 text-sm bg-white cursor-pointer"
+          >
+            <option value="All">All Statuses</option>
+            <option value="holding">Holding</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
           <input
             type="text"
             placeholder="Search passenger or ticket..."
@@ -276,10 +305,10 @@ export default function BusBookingsTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead>
-            <tr className="bg-gray-50 text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-320px)] scrollbar-thin scrollbar-thumb-zinc-200">
+        <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
+          <thead className="sticky top-0 z-20 bg-gray-50 border-b border-gray-100 shadow-sm">
+            <tr className="text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
               <th className="p-4 border-b">
                 <input 
                   type="checkbox" 
@@ -369,6 +398,63 @@ export default function BusBookingsTable() {
         </table>
       </div>
     </div>
+
+      {/* Bulk Status Update Modal */}
+      {isBulkStatusModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Bulk Update Status</h3>
+            <p className="text-sm text-gray-500 mb-6">Choose a new status for the {selectedIds.size} selected bookings.</p>
+            
+            <div className="space-y-1 mb-6">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select New Status</label>
+              <select
+                value={bulkUpdateStatus}
+                onChange={(e) => setBulkUpdateStatus(e.target.value as BusBooking['status'])}
+                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-zinc-500 outline-none cursor-pointer text-sm font-medium"
+              >
+                {["holding", "pending", "confirmed", "cancelled"].map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setIsBulkStatusModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkStatusUpdate}
+                disabled={updatingId === 'bulk'}
+                className="px-6 py-2 bg-zinc-700 text-white rounded-lg hover:bg-zinc-800 transition-colors text-sm font-bold disabled:opacity-50 cursor-pointer shadow-lg shadow-zinc-200"
+              >
+                {updatingId === 'bulk' ? "Updating..." : "Update Bookings"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+            <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmModal(null)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={confirmModal.onConfirm} className={`px-6 py-2 text-white rounded-lg transition-colors text-sm font-bold cursor-pointer shadow-lg ${confirmModal.type === 'delete' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-zinc-700 hover:bg-zinc-800 shadow-zinc-100'}`}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

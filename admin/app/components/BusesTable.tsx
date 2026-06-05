@@ -23,6 +23,7 @@ export default function BusesTable() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingBus, setEditingBus] = useState<Bus | null>(null);
+  const [busToDelete, setBusToDelete] = useState<string | null>(null);
 
   const fetchBuses = async () => {
     setLoading(true);
@@ -41,15 +42,17 @@ export default function BusesTable() {
     fetchBuses();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this bus schedule?")) return;
+  const executeDelete = async () => {
+    if (!busToDelete) return;
     try {
-      const res = await fetch(`/api/admin/buses?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/buses?id=${busToDelete}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      setBuses(prev => prev.filter(b => b.id !== id));
+      setBuses(prev => prev.filter(b => b.id !== busToDelete));
       toast.success("Bus deleted");
     } catch (err) {
       toast.error("Failed to delete bus");
+    } finally {
+      setBusToDelete(null);
     }
   };
 
@@ -75,10 +78,10 @@ export default function BusesTable() {
         </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead className="bg-gray-50 text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
-            <tr>
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)]">
+        <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
+          <thead className="sticky top-0 z-20 bg-gray-50 border-b border-gray-100 shadow-sm">
+            <tr className="text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
               <th className="p-4 border-b">Company</th>
               <th className="p-4 border-b">Route</th>
               <th className="p-4 border-b">Departure</th>
@@ -113,7 +116,7 @@ export default function BusesTable() {
                 <td className="p-4 font-bold text-green-600">BIF {bus.price.toLocaleString()}</td>
                 <td className="p-4 text-center space-x-3">
                   <button onClick={() => openEdit(bus)} className="btn-edit cursor-pointer">Edit</button>
-                  <button onClick={() => handleDelete(bus.id)} className="btn-delete cursor-pointer">Delete</button>
+                  <button onClick={() => setBusToDelete(bus.id)} className="btn-delete cursor-pointer">Delete</button>
                 </td>
               </tr>
             ))}
@@ -121,6 +124,23 @@ export default function BusesTable() {
         </table>
       </div>
       <BusModal isOpen={modalOpen} onClose={() => setModalOpen(false)} editingBus={editingBus} onSuccess={fetchBuses} />
+
+      {busToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Delete</h3>
+            <p className="text-sm text-gray-500 mb-6">Are you sure you want to delete this bus schedule? This action cannot be undone.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setBusToDelete(null)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={executeDelete} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-bold cursor-pointer shadow-lg shadow-red-100">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

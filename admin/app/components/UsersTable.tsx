@@ -35,6 +35,7 @@ export default function UsersTable() {
   const [isBulkWalletModalOpen, setIsBulkWalletModalOpen] = useState(false);
   const [bulkWalletAmount, setBulkWalletAmount] = useState<string>("0");
   const [bulkWalletMode, setBulkWalletMode] = useState<"set" | "add" | "sub">("add");
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; type: 'delete' | 'update' } | null>(null);
   const [visibleQuestions, setVisibleQuestions] = useState<Set<string>>(new Set());
   const [visibleAnswers, setVisibleAnswers] = useState<Set<string>>(new Set());
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -106,10 +107,18 @@ export default function UsersTable() {
   }
 
 
-  async function handleDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+  const handleDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete User",
+      message: "Are you sure you want to delete this user? This action cannot be undone and all their data will be permanently removed.",
+      type: 'delete',
+      onConfirm: () => executeDelete(id)
+    });
+  };
 
+  async function executeDelete(id: string) {
     setIsSubmitting(true);
+    setConfirmModal(null);
     setError(null);
     try {
       const res = await fetch("/api/admin/users", {
@@ -117,21 +126,14 @@ export default function UsersTable() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
-
       if (res.ok) {
         setUsers((prev) => prev.filter((u) => u.id !== id));
+        toast.success("User deleted successfully");
       } else {
-        let errorMessage = "Failed to delete user";
-        try {
-          const errorData = await res.json();
-          errorMessage = errorData.error || errorData.message || res.statusText;
-        } catch (e) { /* Ignore */ }
-        console.error("Failed to delete user:", errorMessage);
-        setError(errorMessage);
+        toast.error("Failed to delete user");
       }
     } catch (err) {
-      console.error("Error deleting user:", err);
-      setError(err instanceof Error ? err.message : "An unknown error occurred while deleting.");
+      toast.error("An error occurred while deleting.");
     } finally {
       setIsSubmitting(false);
     }
@@ -252,9 +254,17 @@ export default function UsersTable() {
 
   async function handleBulkRoleUpdate() {
     if (selectedUserIds.size === 0) return;
-    if (!confirm(`Are you sure you want to update the role of ${selectedUserIds.size} users to "${bulkUpdateRole}"?`)) return;
+    setConfirmModal({
+      title: "Confirm Bulk Role Update",
+      message: `Are you sure you want to update the role of ${selectedUserIds.size} users to "${bulkUpdateRole}"?`,
+      type: 'update',
+      onConfirm: executeBulkRoleUpdate
+    });
+  }
 
+  async function executeBulkRoleUpdate() {
     setIsSubmitting(true);
+    setConfirmModal(null);
     setError(null);
     try {
       const res = await fetch("/api/admin/users", {
@@ -297,11 +307,19 @@ export default function UsersTable() {
       toast.error("Please enter a valid amount.");
       return;
     }
+    setConfirmModal({
+      title: "Confirm Bulk Wallet Update",
+      message: `Are you sure you want to ${bulkWalletMode === 'set' ? 'set' : bulkWalletMode === 'add' ? 'add to' : 'subtract from'} the wallet balance of ${selectedUserIds.size} users?`,
+      type: 'update',
+      onConfirm: executeBulkWalletUpdate
+    });
+  }
 
-    if (!confirm(`Are you sure you want to set the wallet balance of ${selectedUserIds.size} users to ${amount.toLocaleString()} BIF?`)) return;
-
+  async function executeBulkWalletUpdate() {
     setIsSubmitting(true);
+    setConfirmModal(null);
     setError(null);
+    const amount = parseFloat(bulkWalletAmount);
     try {
       const res = await fetch("/api/admin/users", {
         method: "PUT",
@@ -342,9 +360,17 @@ export default function UsersTable() {
 
   async function handleBulkDelete() {
     if (selectedUserIds.size === 0) return;
-    if (!confirm(`Are you sure you want to delete ${selectedUserIds.size} users? This action cannot be undone.`)) return;
+    setConfirmModal({
+      title: "Confirm Bulk Deletion",
+      message: `Are you sure you want to delete ${selectedUserIds.size} users? This action cannot be undone and will remove all their data.`,
+      type: 'delete',
+      onConfirm: executeBulkDelete
+    });
+  }
 
+  async function executeBulkDelete() {
     setIsSubmitting(true);
+    setConfirmModal(null);
     setError(null);
     try {
       // Assuming the DELETE endpoint can handle an array of IDs
@@ -418,51 +444,57 @@ export default function UsersTable() {
   const filteredUserCount = filteredUsers.length;
 
   return (
-    <div>
-      <div className="mb-4 flex justify-between items-center">
-        <div className="flex items-baseline gap-3">
-          <h2 className="text-2xl font-bold text-gray-800">Users Overview</h2>
-          {!loading && totalUserCount > 0 && (
-            <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
-              {searchQuery ? `${filteredUserCount}/${totalUserCount}` : totalUserCount}
-            </span>
+    <div className="space-y-4">
+      <div className="flex justify-between items-start pt-2 px-1">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-2xl font-bold text-gray-800">Users Overview</h2>
+            {!loading && totalUserCount > 0 && (
+              <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                {searchQuery ? `${filteredUserCount}/${totalUserCount}` : totalUserCount}
+              </span>
+            )}
+          </div>
+
+          {selectedUserIds.size > 0 && (
+            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+              <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                {selectedUserIds.size} selected
+              </span>
+              <button
+                onClick={() => setIsBulkUpdateModalOpen(true)}
+                disabled={isSubmitting}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 cursor-pointer shadow-sm transition-colors"
+              >
+                Bulk Update Role
+              </button>
+              <button
+                onClick={() => setIsBulkWalletModalOpen(true)}
+                disabled={isSubmitting}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700 disabled:opacity-50 cursor-pointer shadow-sm transition-colors"
+              >
+                Bulk Update Wallet
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={isSubmitting}
+                className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 disabled:opacity-50 cursor-pointer shadow-sm transition-colors"
+              >
+                Bulk Delete
+              </button>
+            </div>
           )}
         </div>
+
         <div className="w-full max-w-xs">
           <input
             type="text"
             placeholder="Search by name or WhatsApp..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
         </div>
-        {selectedUserIds.size > 0 && (
-          <div className="flex items-center gap-3 ml-4">
-            <span className="text-sm text-gray-600">{selectedUserIds.size} selected</span>
-            <button
-              onClick={() => setIsBulkUpdateModalOpen(true)}
-              disabled={isSubmitting}
-              className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 disabled:opacity-50 cursor-pointer"
-            >
-              Bulk Update Role
-            </button>
-            <button
-              onClick={() => setIsBulkWalletModalOpen(true)}
-              disabled={isSubmitting}
-              className="px-3 py-1 bg-green-500 text-white rounded-md text-sm hover:bg-green-600 disabled:opacity-50 cursor-pointer"
-            >
-              Bulk Update Wallet
-            </button>
-            <button
-              onClick={handleBulkDelete}
-              disabled={isSubmitting}
-              className="px-3 py-1 bg-red-500 text-white rounded-md text-sm hover:bg-red-600 disabled:opacity-50 cursor-pointer"
-            >
-              Bulk Delete
-            </button>
-          </div>
-        )}
       </div>
 
       {error && (
@@ -722,13 +754,13 @@ export default function UsersTable() {
                 type="number"
                 value={bulkWalletAmount}
                 onChange={(e) => setBulkWalletAmount(e.target.value)}
-                className={`w-full p-3 border rounded-md focus:ring-2 outline-none font-bold text-lg ${
+                className={`w-full p-3 pr-24 border rounded-md focus:ring-2 outline-none font-bold text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                   bulkWalletMode === 'sub' ? 'focus:ring-red-500' : 'focus:ring-blue-500'
                 }`}
                 placeholder="0"
                 min="0"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                  {bulkWalletMode !== 'set' && (
                    <span className={`text-xl font-bold ${bulkWalletMode === 'add' ? 'text-green-500' : 'text-red-500'}`}>
                      {bulkWalletMode === 'add' ? '+' : '-'}
@@ -759,6 +791,31 @@ export default function UsersTable() {
                 }`}
               >
                 {isSubmitting ? "Updating..." : "Apply Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+            <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className={`px-6 py-2 text-white rounded-lg transition-colors text-sm font-bold cursor-pointer shadow-lg ${
+                  confirmModal.type === 'delete' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
+                }`}
+              >
+                Confirm
               </button>
             </div>
           </div>

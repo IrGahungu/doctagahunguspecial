@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
 import { toast, Toaster } from "react-hot-toast";
+import { useLanguage } from "../../../context/LanguageContext";
 import { updateBookingStatus } from "./actions"
 
 type DoctorApplication = {
@@ -70,6 +71,7 @@ function sortSchedule(schedule: WorkSchedule[]) {
 }
 
 export default function DashboardClient({ app }: DashboardClientProps) {
+  const { t } = useLanguage();
   const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
@@ -914,7 +916,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                <span className="hidden md:block">Dashboard</span>
+                <span className="hidden md:block">{t.dashboard}</span>
               </>
             )}
           </button>
@@ -1072,7 +1074,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          <span className="hidden md:block">Logout</span>
+          <span className="hidden md:block">{t.logout}</span>
         </button>
       </div>
 

@@ -128,7 +128,7 @@ export default function CategoryModal({
             className="w-full border p-2 rounded"
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category Icon (Flaticon)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category Image</label>
             <input
               type="file"
               accept="image/*"
@@ -136,12 +136,12 @@ export default function CategoryModal({
               className="w-full border p-2 rounded text-sm"
               disabled={isUploading}
             />
-            {isUploading && <p className="text-sm text-blue-600 mt-1">Uploading icon...</p>}
+            {isUploading && <p className="text-sm text-blue-600 mt-1">Uploading image...</p>}
           </div>
           {categoryForm.image && (
             <div className="flex items-center space-x-3 p-2 bg-gray-50 rounded border border-dashed">
               <img src={categoryForm.image} alt="Preview" className="w-12 h-12 object-contain" />
-              <p className="text-xs text-gray-500">Icon Preview</p>
+              <p className="text-xs text-gray-500">Image Preview</p>
             </div>
           )}
         </form>

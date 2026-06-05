@@ -215,6 +215,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [selectedAppIds, setSelectedAppIds] = useState<Set<string>>(new Set());
 
   const togglePasswordVisibility = (appId: string) => {
     setVisiblePasswords((prev) => {
@@ -231,6 +232,7 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
   const [applicationToApprove, setApplicationToApprove] = useState<string | null>(null);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionError, setRejectionError] = useState<string | null>(null);
   const [applicationToReject, setApplicationToReject] = useState<string | null>(null);
   const [viewModal, setViewModal] = useState<{ isOpen: boolean; title: string; content: any; extra?: string } | null>(null);
   const [docsModal, setDocsModal] = useState<{ 
@@ -261,37 +263,20 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
     fetchApplications();
   }, []);
 
-  const updateApplicationStatus = async (
-    id: string,
-    status: "approved" | "rejected",
-    reason?: string
-  ) => {
+  const updateApplicationStatus = async (id: string, status: "approved" | "rejected", reason?: string) => {
     setUpdatingId(id);
     try {
-      setError(null); // Clear previous errors
-      const bodyPayload: any = { id, status, type };
-      if (status === 'rejected' && reason) {
-        bodyPayload.rejection_reason = reason;
-      }
       const res = await fetch(`/api/admin/applications`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload),
+        body: JSON.stringify({ id, status, type, rejection_reason: reason }),
       });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(`Failed to update status: ${res.status} - ${JSON.stringify(errorData)}`);
-      }
-
-      setApplications(prev =>
-        prev.map(app => (app.id === id ? { ...app, status } : app))
-      );
-      toast.success(`Application ${status} successfully!`);
+      if (!res.ok) throw new Error();
+      setApplications(prev => prev.map(app => (app.id === id ? { ...app, status, rejection_reason: reason } : app)));
+      return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : `An unknown error occurred while updating the application.`);
-      // Optional: Re-fetch to sync with server state in case of error
-      fetchApplications();
+      console.error(`Failed to update application ${id}:`, err);
+      return false;
     } finally {
       setUpdatingId(null);
     }
@@ -302,6 +287,72 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
     setIsApproveModalOpen(true);
   };
 
+  const toggleSelectAll = () => {
+    if (selectedAppIds.size === filteredApplications.length) {
+      setSelectedAppIds(new Set());
+    } else {
+      setSelectedAppIds(new Set(filteredApplications.map(app => app.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedAppIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedAppIds(next);
+  };
+
+  const handleBulkExport = () => {
+    if (selectedAppIds.size === 0) return;
+
+    const selectedApps = applications.filter(app => selectedAppIds.has(app.id));
+
+    const headers = [
+      "Name",
+      "Email",
+      "WhatsApp",
+      "Status",
+      "Country",
+      "Submitted On"
+    ];
+
+    const rows = selectedApps.map(app => [
+      app.name || app.doctor_users?.name || app.doctor_users?.fullname || app.pharmacy_users?.name || app.hospital_users?.name || app.insurance_users?.name || "—",
+      app.email || app.doctor_users?.email || app.pharmacy_users?.email || app.hospital_users?.email || app.insurance_users?.email || "—",
+      app.whatsapp_number || app.doctor_users?.whatsapp_number || app.pharmacy_users?.whatsapp_number || app.hospital_users?.whatsapp_number || app.insurance_users?.whatsapp_number || "—",
+      app.status,
+      app.country || app.doctor_users?.country || app.pharmacy_users?.country || app.hospital_users?.country || app.insurance_users?.country || app.origin_country || "—",
+      new Date(app.created_at).toLocaleDateString()
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `applications_${type}_export.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleBulkApprove = () => {
+    if (selectedAppIds.size === 0) return;
+    setApplicationToApprove('bulk');
+    setIsApproveModalOpen(true);
+  };
+
+  const handleBulkReject = () => {
+    if (selectedAppIds.size === 0) return;
+    setApplicationToReject('bulk');
+    setIsRejectModalOpen(true);
+  };
+
   const handleReject = async (id: string) => {
     setApplicationToReject(id);
     setIsRejectModalOpen(true);
@@ -309,20 +360,55 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
 
   const submitApproval = async () => {
     if (!applicationToApprove) return;
-    await updateApplicationStatus(applicationToApprove, 'approved');
+
+    const ids = applicationToApprove === 'bulk' ? Array.from(selectedAppIds) : [applicationToApprove];
     setIsApproveModalOpen(false);
+    setUpdatingId('bulk');
+
+    let successCount = 0;
+    for (const id of ids) {
+      const success = await updateApplicationStatus(id, 'approved');
+      if (success) successCount++;
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully approved ${successCount} application(s)`);
+      if (applicationToApprove === 'bulk') setSelectedAppIds(new Set());
+    } else {
+      toast.error("Failed to approve selected applications");
+    }
+
+    setUpdatingId(null);
+    setApplicationToApprove(null);
   };
 
   const submitRejection = async () => {
     if (!applicationToReject) return;
     if (!rejectionReason.trim()) {
-      alert("Please provide a reason for rejection.");
+      setRejectionError("Please provide a reason for rejection.");
       return;
     }
-    await updateApplicationStatus(applicationToReject, 'rejected', rejectionReason);
-    // Close modal and reset state
+
+    const ids = applicationToReject === 'bulk' ? Array.from(selectedAppIds) : [applicationToReject];
     setIsRejectModalOpen(false);
+    setUpdatingId('bulk');
+
+    let successCount = 0;
+    for (const id of ids) {
+      const success = await updateApplicationStatus(id, 'rejected', rejectionReason);
+      if (success) successCount++;
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully rejected ${successCount} application(s)`);
+      if (applicationToReject === 'bulk') setSelectedAppIds(new Set());
+    } else {
+      toast.error("Failed to reject selected applications");
+    }
+
+    setUpdatingId(null);
     setRejectionReason("");
+    setRejectionError(null);
     setApplicationToReject(null);
   };
 
@@ -520,23 +606,67 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
   if (loading) return <div className="text-center p-8">Loading applications...</div>;
   if (error) return <div className="text-center p-8 text-red-500">Error: {error}</div>;
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-        <h2 className="text-2xl font-bold">Manage Applications</h2>
-        <div className="w-full max-w-sm">
+    <div className="space-y-4">
+      <div className="flex justify-between items-start pt-2 px-1">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-2xl font-bold text-gray-800">Manage Applications</h2>
+            {!loading && applications.length > 0 && (
+              <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                {searchQuery ? `${filteredApplications.length}/${applications.length}` : applications.length}
+              </span>
+            )}
+          </div>
+
+          {selectedAppIds.size > 0 && (
+            <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+              <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                {selectedAppIds.size} selected
+              </span>
+              <button
+                onClick={handleBulkApprove}
+                className="px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700 cursor-pointer shadow-sm transition-colors"
+              >
+                Bulk Approve
+              </button>
+              <button
+                onClick={handleBulkReject}
+                className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 cursor-pointer shadow-sm transition-colors"
+              >
+                Bulk Reject
+              </button>
+              <button
+                onClick={handleBulkExport}
+                className="px-3 py-1.5 bg-gray-700 text-white rounded-md text-sm font-semibold hover:bg-gray-800 cursor-pointer shadow-sm transition-colors"
+              >
+                Export Excel
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="w-full max-w-xs">
           <input
             type="text"
             placeholder="Search by name or specialty..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm border whitespace-nowrap">
-          <thead className="bg-gray-100">
+      <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200">
+        <table className="w-full text-left min-w-[800px] border-collapse border border-gray-200">
+          <thead className="bg-gray-100 sticky top-0 z-20">
             <tr>
+              <th className="p-2 text-sm font-semibold text-gray-600 whitespace-nowrap border border-gray-200 sticky left-0 bg-gray-100 z-30">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                  checked={selectedAppIds.size === filteredApplications.length && filteredApplications.length > 0}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th className="p-2">{type === "doctor" ? "Doctor Name" : type === "pharmacy" ? "Pharmacy Name" : type === "hospital" ? "Hospital Name" : type === "insurance" ? "Insurance Name" : "Name"}</th>
               <th className="p-2">Email</th>
               <th className="p-2">WhatsApp</th>
@@ -556,7 +686,15 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
           </thead>
           <tbody>
             {filteredApplications.map((app) => (
-              <tr key={app.id} className="border-t">
+              <tr key={app.id} className="align-top border-t">
+                <td className="p-3 text-sm text-gray-800 border border-gray-200 sticky left-0 bg-white z-10">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                    checked={selectedAppIds.has(app.id)}
+                    onChange={() => toggleSelect(app.id)}
+                  />
+                </td>
                 <td className="p-2">
                   {app.name || app.doctor_users?.name || app.doctor_users?.fullname || 
                    app.pharmacy_users?.name || app.hospital_users?.name || app.insurance_users?.name || "—"}
@@ -774,9 +912,15 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
 
       {isApproveModalOpen && (
         <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-2xl border w-full max-w-md">
-            <h3 className="text-lg font-bold mb-2">Confirm Approval</h3>
-            <p className="text-gray-600 mb-6">Are you sure you want to approve this doctor's application? They will gain access to the platform immediately.</p>
+          <div className="bg-white p-6 rounded-lg shadow-2xl border w-full max-w-sm">
+            <h3 className="text-lg font-bold mb-2">
+              {applicationToApprove === 'bulk' ? 'Confirm Bulk Approval' : 'Confirm Approval'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {applicationToApprove === 'bulk' 
+                ? `Are you sure you want to approve all ${selectedAppIds.size} selected applications at once? All of them will gain access to the platform immediately.` 
+                : "Are you sure you want to approve this application? They will gain access to the platform immediately."}
+            </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setIsApproveModalOpen(false)} className="btn-cancel cursor-pointer">
                 Cancel
@@ -791,16 +935,25 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
 
       {isRejectModalOpen && (
         <div className="fixed inset-0 bg-white/30 backdrop-blur-md flex justify-center items-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-2xl border w-full max-w-md">
-                <h3 className="text-lg font-bold mb-4">Reason for Rejection</h3>
+            <div className="bg-white p-6 rounded-lg shadow-2xl border w-full max-w-sm">
+                <h3 className="text-lg font-bold mb-2">
+                  {applicationToReject === 'bulk' ? `Bulk Reject (${selectedAppIds.size} items)` : "Reason for Rejection"}
+                </h3>
+                <p className="text-xs text-gray-500 mb-4 font-medium italic">Please provide a clear reason for the applicant.</p>
                 <textarea
                     value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    className="w-full p-2 border rounded-md min-h-[120px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    onChange={(e) => {
+                      setRejectionReason(e.target.value);
+                      if (rejectionError) setRejectionError(null);
+                    }}
+                    className={`w-full p-2 border rounded-md min-h-[120px] focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all ${rejectionError ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}
                     placeholder="Explain why the application is being rejected..."
                 />
+                {rejectionError && (
+                  <p className="text-red-500 text-[10px] mt-1 font-bold uppercase tracking-wider animate-pulse">{rejectionError}</p>
+                )}
                 <div className="flex justify-end gap-4 mt-4">
-                    <button onClick={() => setIsRejectModalOpen(false)} className="btn-cancel cursor-pointer">
+                    <button onClick={() => { setIsRejectModalOpen(false); setRejectionError(null); }} className="btn-cancel cursor-pointer">
                         Cancel
                     </button>
                     <button onClick={submitRejection} className="btn-reject cursor-pointer" disabled={updatingId === applicationToReject}>

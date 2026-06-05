@@ -154,8 +154,8 @@ export default function DealModal({
         <div className="p-6 border-t shrink-0">
           {formError && <p className="text-red-500 text-sm mb-4">{formError}</p>}
           <div className="flex justify-end space-x-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-500 text-white rounded disabled:opacity-50" disabled={isSubmitting || isUploading}>Cancel</button>
-            <button type="submit" form="deal-form" className="px-4 py-2 bg-orange-600 text-white rounded disabled:bg-gray-400" disabled={isSubmitting || isUploading}>
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-500 text-white cursor-pointer rounded disabled:opacity-50" disabled={isSubmitting || isUploading}>Cancel</button>
+            <button type="submit" form="deal-form" className="px-4 py-2 bg-orange-600 text-white cursor-pointer rounded disabled:bg-gray-400" disabled={isSubmitting || isUploading}>
               {isSubmitting ? "Saving..." : "Save"}
             </button>
           </div>

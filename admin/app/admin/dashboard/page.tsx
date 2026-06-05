@@ -247,6 +247,7 @@ export default function AdminDashboard() {
   const [serviceFees, setServiceFees] = useState<ServiceFee[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [stockSearchQuery, setStockSearchQuery] = useState("");
+  const [statsSearchQuery, setStatsSearchQuery] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activeView, setActiveView] = useState<string | null>(null);
   const [applicationType, setApplicationType] = useState<"doctor" | "pharmacy" | "hospital" | "insurance" | null>(null);
@@ -257,6 +258,12 @@ export default function AdminDashboard() {
     pharmacies: [],
     admin: { serviceFees: 0, loginFees: 0, busFees: 0, total: 0 }
   });
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
+  const [selectedBannerIds, setSelectedBannerIds] = useState<Set<string>>(new Set());
+  const [selectedDealIds, setSelectedDealIds] = useState<Set<string>>(new Set());
+  const [selectedStoryIds, setSelectedStoryIds] = useState<Set<string>>(new Set());
+  const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; type: 'delete' | 'update' | 'logout' } | null>(null);
   const [epRewards, setEpRewards] = useState({
     ep_story_view: "500",
     ep_post_view: "300",
@@ -311,7 +318,7 @@ export default function AdminDashboard() {
   const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
   const [tempFeeValue, setTempFeeValue] = useState<string>("");
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [statsModal, setStatsModal] = useState<{ isOpen: boolean; title: string; data: any[] }>({ isOpen: false, title: "", data: [] });
+  const [statsModal, setStatsModal] = useState<{ isOpen: boolean; title: string; data: any[]; extraInfo?: string }>({ isOpen: false, title: "", data: [] });
   const [minEpThreshold, setMinEpThreshold] = useState<number | null>(null);
   const [newThresholdInput, setNewThresholdInput] = useState("");
   const [previewMedia, setPreviewMedia] = useState<string | null>(null);
@@ -679,6 +686,11 @@ export default function AdminDashboard() {
       }
 
       setActiveView(view);
+      setSelectedCategoryIds(new Set());
+      setSelectedBannerIds(new Set());
+      setSelectedDealIds(new Set());
+      setSelectedStoryIds(new Set());
+      setSelectedPostIds(new Set());
       setApplicationType(type);
 
       const refreshTasks = [];
@@ -825,8 +837,8 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  async function handleSignOut() {
-    if (!confirm("Are you sure you want to sign out?")) return;
+  async function executeSignOut() {
+    setConfirmModal(null);
     setIsSigningOut(true);
     try {
       await fetch("/api/auth/logout");
@@ -834,7 +846,17 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error("Failed to sign out", error);
       setIsSigningOut(false);
+      toast.error("Failed to sign out");
     }
+  }
+
+  function handleSignOut() {
+    setConfirmModal({
+      title: "Confirm Sign Out",
+      message: "Are you sure you want to sign out? You will be redirected to the login page.",
+      type: 'logout',
+      onConfirm: executeSignOut
+    });
   }
 
   async function handleCreateServiceFee() {
@@ -902,27 +924,83 @@ export default function AdminDashboard() {
   }
 
   function handleCategorySaveSuccess() {
+    if (editingCategory) {
+      toast.success("Category updated");
+    } else {
+      toast.success("Category added");
+    }
     fetchCategories();
     closeAllModals();
   }
 
-  async function handleCategoryDelete(id: string) {
-    if (!confirm("Are you sure you want to delete this category? This action cannot be undone.")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/categories?id=${id}`, { method: "DELETE" });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to delete category");
+  const handleCategoryDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Category",
+      message: "Are you sure you want to delete this category? This action cannot be undone.",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/categories?id=${id}`, { method: "DELETE" });
+          if (res.ok) {
+            toast.success("Category deleted");
+            fetchCategories();
+          } else throw new Error();
+        } catch (err) {
+          toast.error("Failed to delete category");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
-      toast.success("Category deleted successfully");
-      fetchCategories();
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to delete category");
-    } finally {
-      setLoadingId(null);
+  const toggleSelectCategory = (id: string) => {
+    setSelectedCategoryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllCategories = () => {
+    if (selectedCategoryIds.size === categories.length) {
+      setSelectedCategoryIds(new Set());
+    } else {
+      setSelectedCategoryIds(new Set(categories.map(c => c.id)));
     }
-  }
+  };
+
+  const handleBulkCategoryDelete = () => {
+    if (selectedCategoryIds.size === 0) return;
+    setConfirmModal({
+      title: "Bulk Delete Categories",
+      message: `Are you sure you want to delete ${selectedCategoryIds.size} categories? This action cannot be undone.`,
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsRefreshing(true);
+        const ids = Array.from(selectedCategoryIds);
+        let successCount = 0;
+        for (const id of ids) {
+          try {
+            const res = await fetch(`/api/categories?id=${id}`, { method: "DELETE" });
+            if (res.ok) successCount++;
+          } catch (e) {}
+        }
+        if (successCount > 0) {
+          toast.success(`Deleted ${successCount} categories`);
+          fetchCategories();
+          setSelectedCategoryIds(new Set());
+        } else {
+          toast.error("Failed to delete categories");
+        }
+        setIsRefreshing(false);
+      }
+    });
+  };
 
   /** ----------------------
    * Pharmacy CRUD (RLS-compatible)
@@ -938,26 +1016,38 @@ export default function AdminDashboard() {
   }
 
   function handlePharmacySaveSuccess() {
+    if (editingPharmacy) {
+      toast.success("Pharmacy updated");
+    } else {
+      toast.success("Pharmacy added");
+    }
     fetchPharmacies();
     closeAllModals();
   }
 
-  async function handlePharmacyDelete(id: string) {
-    if (!confirm("Delete this pharmacy?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/pharmacies?id=${id}`, { method: "DELETE" });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to delete pharmacy");
-
-      fetchPharmacies();
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to delete pharmacy");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handlePharmacyDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Pharmacy",
+      message: "Are you sure you want to delete this pharmacy? This action cannot be undone.",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/pharmacies?id=${id}`, { method: "DELETE" });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to delete pharmacy");
+          toast.success("Pharmacy deleted");
+          fetchPharmacies();
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Failed to delete pharmacy");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Hospital CRUD
@@ -973,25 +1063,38 @@ export default function AdminDashboard() {
   }
 
   function handleHospitalSaveSuccess() {
+    if (editingHospital) {
+      toast.success("Hospital updated");
+    } else {
+      toast.success("Hospital added");
+    }
     fetchHospitals();
     closeAllModals();
   }
 
-  async function handleHospitalDelete(id: string) {
-    if (!confirm("Delete this hospital?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/hospitals?id=${id}`, { method: "DELETE" });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to delete hospital");
-      fetchHospitals();
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to delete hospital");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handleHospitalDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Hospital",
+      message: "Are you sure you want to delete this hospital? This action cannot be undone.",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/hospitals?id=${id}`, { method: "DELETE" });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to delete hospital");
+          toast.success("Hospital deleted");
+          fetchHospitals();
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Failed to delete hospital");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Insurance CRUD
@@ -1007,30 +1110,40 @@ export default function AdminDashboard() {
   }
 
   function handleInsuranceSaveSuccess() {
+    if (editingInsurance) {
+      toast.success("Insurance updated");
+    } else {
+      toast.success("Insurance added");
+    }
     fetchInsurances();
     closeAllModals();
   }
 
-  async function handleInsuranceDelete(id: string) {
-    if (!confirm("Delete this insurance?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/insurances?id=${id}`, {
-        method: "DELETE",
-      });
-      const result = await res.json();
-      if (!res.ok)
-        throw new Error(result.error || "Failed to delete insurance");
-      fetchInsurances();
-    } catch (err) {
-      console.error(err);
-      alert(
-        err instanceof Error ? err.message : "Failed to delete insurance"
-      );
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handleInsuranceDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Insurance",
+      message: "Are you sure you want to delete this insurance? This action cannot be undone.",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/insurances?id=${id}`, {
+            method: "DELETE",
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to delete insurance");
+          toast.success("Insurance deleted");
+          fetchInsurances();
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Failed to delete insurance");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Banner CRUD
@@ -1052,30 +1165,83 @@ export default function AdminDashboard() {
   }
 
   function handleBannerSaveSuccess() {
+    if (editingBanner) {
+      toast.success("Banner updated");
+    } else {
+      toast.success("Banner added");
+    }
     fetchBanners();
     closeAllModals();
   }
 
-  async function handleBannerDelete(id: string) {
-    if (!confirm("Delete this banner?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/banners?id=${id}`, {
-        method: "DELETE",
-      });
-      const result = await res.json();
-      if (!res.ok)
-        throw new Error(result.error || "Failed to delete banner");
-      fetchBanners();
-    } catch (err) {
-      console.error(err);
-      alert(
-        err instanceof Error ? err.message : "Failed to delete banner"
-      );
-    } finally {
-      setLoadingId(null);
+  const handleBannerDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Banner",
+      message: "Are you sure you want to delete this banner? This action cannot be undone.",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/banners?id=${id}`, { method: "DELETE" });
+          if (res.ok) {
+            toast.success("Banner deleted");
+            fetchBanners();
+          } else throw new Error();
+        } catch (err) {
+          toast.error("Failed to delete banner");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
+
+  const toggleSelectBanner = (id: string) => {
+    setSelectedBannerIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllBanners = () => {
+    if (selectedBannerIds.size === banners.length) {
+      setSelectedBannerIds(new Set());
+    } else {
+      setSelectedBannerIds(new Set(banners.map(b => b.id)));
     }
-  }
+  };
+
+  const handleBulkBannerDelete = () => {
+    if (selectedBannerIds.size === 0) return;
+    setConfirmModal({
+      title: "Bulk Delete Banners",
+      message: `Are you sure you want to delete ${selectedBannerIds.size} banners? This action cannot be undone.`,
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsRefreshing(true);
+        const ids = Array.from(selectedBannerIds);
+        let successCount = 0;
+        for (const id of ids) {
+          try {
+            const res = await fetch(`/api/banners?id=${id}`, { method: "DELETE" });
+            if (res.ok) successCount++;
+          } catch (e) {}
+        }
+        if (successCount > 0) {
+          toast.success(`Deleted ${successCount} banners`);
+          fetchBanners();
+          setSelectedBannerIds(new Set());
+        } else {
+          toast.error("Failed to delete banners");
+        }
+        setIsRefreshing(false);
+      }
+    });
+  };
 
   /** ----------------------
    * Deal CRUD
@@ -1096,31 +1262,179 @@ export default function AdminDashboard() {
     setDealModalOpen(true);
   }
 
+  const toggleSelectDeal = (id: string) => {
+    setSelectedDealIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllDeals = () => {
+    if (selectedDealIds.size === deals.length) {
+      setSelectedDealIds(new Set());
+    } else {
+      setSelectedDealIds(new Set(deals.map(d => d.id)));
+    }
+  };
+
+  const handleBulkDealDelete = () => {
+    if (selectedDealIds.size === 0) return;
+    setConfirmModal({
+      title: "Bulk Delete Deals",
+      message: `Are you sure you want to delete ${selectedDealIds.size} deals? This action cannot be undone.`,
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsRefreshing(true);
+        const ids = Array.from(selectedDealIds);
+        let successCount = 0;
+        for (const id of ids) {
+          try {
+            const res = await fetch(`/api/deals?id=${id}`, { method: "DELETE" });
+            if (res.ok) successCount++;
+          } catch (e) {}
+        }
+        if (successCount > 0) {
+          toast.success(`Deleted ${successCount} deals`);
+          fetchDeals();
+          setSelectedDealIds(new Set());
+        } else {
+          toast.error("Failed to delete deals");
+        }
+        setIsRefreshing(false);
+      }
+    });
+  };
+
+  const toggleSelectStory = (id: string) => {
+    setSelectedStoryIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllStories = () => {
+    if (selectedStoryIds.size === stories.length) {
+      setSelectedStoryIds(new Set());
+    } else {
+      setSelectedStoryIds(new Set(stories.map(s => s.id)));
+    }
+  };
+
+  const handleBulkStoryDelete = () => {
+    if (selectedStoryIds.size === 0) return;
+    setConfirmModal({
+      title: "Bulk Delete Stories",
+      message: `Are you sure you want to delete ${selectedStoryIds.size} stories? This action cannot be undone.`,
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsRefreshing(true);
+        const ids = Array.from(selectedStoryIds);
+        let successCount = 0;
+        for (const id of ids) {
+          try {
+            const res = await fetch(`/api/stories?id=${id}`, { method: "DELETE" });
+            if (res.ok) successCount++;
+          } catch (e) {}
+        }
+        if (successCount > 0) {
+          toast.success(`Deleted ${successCount} stories`);
+          fetchStories();
+          setSelectedStoryIds(new Set());
+        } else {
+          toast.error("Failed to delete stories");
+        }
+        setIsRefreshing(false);
+      }
+    });
+  };
+
+  const toggleSelectPost = (id: string) => {
+    setSelectedPostIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllPosts = () => {
+    if (selectedPostIds.size === posts.length) {
+      setSelectedPostIds(new Set());
+    } else {
+      setSelectedPostIds(new Set(posts.map(p => p.id)));
+    }
+  };
+
+  const handleBulkPostDelete = () => {
+    if (selectedPostIds.size === 0) return;
+    setConfirmModal({
+      title: "Bulk Delete Posts",
+      message: `Are you sure you want to delete ${selectedPostIds.size} posts? This action cannot be undone.`,
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setIsRefreshing(true);
+        const ids = Array.from(selectedPostIds);
+        let successCount = 0;
+        for (const id of ids) {
+          try {
+            const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
+            if (res.ok) successCount++;
+          } catch (e) {}
+        }
+        if (successCount > 0) {
+          toast.success(`Deleted ${successCount} posts`);
+          fetchPosts();
+          setSelectedPostIds(new Set());
+        } else {
+          toast.error("Failed to delete posts");
+        }
+        setIsRefreshing(false);
+      }
+    });
+  };
+
   function handleDealSaveSuccess() {
+    if (editingDeal) {
+      toast.success("Deal updated");
+    } else {
+      toast.success("Deal added");
+    }
     fetchDeals();
     closeAllModals();
   }
 
-  async function handleDealDelete(id: string) {
-    if (!confirm("Delete this deal?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/deals?id=${id}`, {
-        method: "DELETE",
-      });
-      const result = await res.json();
-      if (!res.ok)
-        throw new Error(result.error || "Failed to delete deal");
-      fetchDeals();
-    } catch (err) {
-      console.error(err);
-      alert(
-        err instanceof Error ? err.message : "Failed to delete deal"
-      );
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handleDealDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Deal",
+      message: "Are you sure you want to delete this deal?",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/deals?id=${id}`, {
+            method: "DELETE",
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to delete deal");
+          toast.success("Deal deleted");
+          fetchDeals();
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Failed to delete deal");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Doctor CRUD
@@ -1136,28 +1450,40 @@ export default function AdminDashboard() {
   }
 
   function handleDoctorSaveSuccess() {
+    if (editingDoctor) {
+      toast.success("Doctor updated");
+    } else {
+      toast.success("Doctor added");
+    }
     fetchDoctors();
     closeAllModals();
   }
 
-  async function handleDoctorDelete(id: string) {
-    if (!confirm("Delete this doctor?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/doctors?id=${id}`, {
-        method: "DELETE",
-      });
-      const result = await res.json();
-      if (!res.ok)
-        throw new Error(result.error || "Failed to delete doctor");
-      fetchDoctors();
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to delete doctor");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handleDoctorDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Doctor",
+      message: "Are you sure you want to delete this doctor?",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/doctors?id=${id}`, {
+            method: "DELETE",
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to delete doctor");
+          toast.success("Doctor deleted");
+          fetchDoctors();
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Failed to delete doctor");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Medicine CRUD
@@ -1173,28 +1499,40 @@ export default function AdminDashboard() {
   }
 
   function handleMedicineSaveSuccess() {
+    if (editingMedicine) {
+      toast.success("Medicine updated");
+    } else {
+      toast.success("Medicine added");
+    }
     fetchMedicines();
     closeAllModals();
   }
 
-  async function handleMedicineDelete(id: string) {
-    if (!confirm("Delete this medicine?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/medicines?id=${id}`, {
-        method: "DELETE",
-      });
-      const result = await res.json();
-      if (!res.ok)
-        throw new Error(result.error || "Failed to delete medicine");
-      fetchMedicines();
-    } catch (err) {
-      console.error(err);
-      alert(err instanceof Error ? err.message : "Failed to delete medicine");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handleMedicineDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Medicine",
+      message: "Are you sure you want to delete this medicine?",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/medicines?id=${id}`, {
+            method: "DELETE",
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Failed to delete medicine");
+          toast.success("Medicine deleted");
+          fetchMedicines();
+        } catch (err) {
+          console.error(err);
+          toast.error(err instanceof Error ? err.message : "Failed to delete medicine");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Story CRUD
@@ -1210,24 +1548,37 @@ export default function AdminDashboard() {
   }
 
   function handleStorySaveSuccess() {
+    if (editingStory) {
+      toast.success("Story updated");
+    } else {
+      toast.success("Story added");
+    }
     fetchStories();
     closeAllModals();
   }
 
-  async function handleStoryDelete(id: string) {
-    if (!confirm("Delete this story?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/stories?id=${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete story");
-      fetchStories();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete story");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handleStoryDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Story",
+      message: "Are you sure you want to delete this story?",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/stories?id=${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error("Failed to delete story");
+          toast.success("Story deleted");
+          fetchStories();
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to delete story");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Post CRUD
@@ -1243,24 +1594,37 @@ export default function AdminDashboard() {
   }
 
   function handlePostSaveSuccess() {
+    if (editingPost) {
+      toast.success("Post updated");
+    } else {
+      toast.success("Post added");
+    }
     fetchPosts();
     closeAllModals();
   }
 
-  async function handlePostDelete(id: string) {
-    if (!confirm("Delete this post?")) return;
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete post");
-      fetchPosts();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete post");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+  const handlePostDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Post",
+      message: "Are you sure you want to delete this post?",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
+          if (!res.ok) throw new Error("Failed to delete post");
+          toast.success("Post deleted");
+          fetchPosts();
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to delete post");
+        } finally {
+          setLoadingId(null);
+        }
+      }
+    });
+  };
 
   /** ----------------------
    * Review CRUD
@@ -1311,34 +1675,41 @@ export default function AdminDashboard() {
   /** ----------------------
    * Review CRUD
    -----------------------*/
-  async function handleReviewDelete(id: string) {
-    if (!confirm("Delete this review?")) return;
-    console.log(`[DEBUG] DELETING REVIEW - ID: ${id}`);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const handleReviewDelete = (id: string) => {
+    setConfirmModal({
+      title: "Delete Review",
+      message: "Are you sure you want to delete this review?",
+      type: 'delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        console.log(`[DEBUG] DELETING REVIEW - ID: ${id}`);
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-    setLoadingId(id);
-    try {
-      const res = await fetch(`/api/admin/reviews/${id}`, {
-        method: "DELETE",
-        headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
-      });
+        setLoadingId(id);
+        try {
+          const res = await fetch(`/api/admin/reviews/${id}`, {
+            method: "DELETE",
+            headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
+          });
 
-      console.log(`[DEBUG] Delete response: ${res.status} ${res.statusText}`);
-      if (!res.ok) {
-        const resText = await res.text();
-        console.error(`[DEBUG] Delete failed:`, resText.substring(0, 100));
-        throw new Error("Failed to delete review");
+          console.log(`[DEBUG] Delete response: ${res.status} ${res.statusText}`);
+          if (!res.ok) {
+            const resText = await res.text();
+            console.error(`[DEBUG] Delete failed:`, resText.substring(0, 100));
+            throw new Error("Failed to delete review");
+          }
+
+          fetchReviews();
+          toast.success("Review deleted");
+        } catch (err) {
+          console.error(err);
+          toast.error("Failed to delete review");
+        } finally {
+          setLoadingId(null);
+        }
       }
-
-      fetchReviews();
-      toast.success("Review deleted");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to delete review");
-    } finally {
-      setLoadingId(null);
-    }
-  }
+    });
+  };
 
   /** ----------------------
    * Quick Visibility Toggles
@@ -1378,6 +1749,8 @@ export default function AdminDashboard() {
   }
 
   async function viewStats(type: 'story' | 'post-likes' | 'post-views', id: string, title: string, extra?: any) {
+    setLoadingId(id + type);
+
     let url = "";
     if (type === 'story') url = `/api/admin/stats/story/${id}`;
     else if (type === 'post-likes') url = `/api/admin/stats/post/${id}/likes`;
@@ -1386,15 +1759,46 @@ export default function AdminDashboard() {
     try {
       const res = await fetch(url);
       const data = await res.json();
-      setStatsModal({
-        isOpen: true,
-        title: `Interactions: ${title}`,
-        data: Array.isArray(data) ? data : []
-      });
+      let extraInfo;
+      if (type === 'story') {
+        const uniqueUserIds = new Set(data.map((item: any) => item.user_id));
+        extraInfo = `Total Unique Viewers: ${uniqueUserIds.size}`;
+      } else if (type === 'post-likes') {
+        const uniqueUserIds = new Set(data.map((item: any) => item.user_id));
+        extraInfo = `Total Likes: ${data.length}, Unique Likers: ${uniqueUserIds.size}`;
+      } else if (type === 'post-views') {
+        const uniqueUserIds = new Set(data.map((item: any) => item.user_id));
+        extraInfo = `Total Views: ${data.length}, Unique Viewers: ${uniqueUserIds.size}`;
+      }
+      setStatsModal({ isOpen: true, title: `Interactions: ${title}`, data: Array.isArray(data) ? data : [], extraInfo });
     } catch (e) {
       toast.error("Failed to fetch stats");
+    } finally {
+      setLoadingId(null);
     }
   }
+
+  // Function to export stats to CSV
+  const exportStatsToCSV = (data: any[], filename: string) => {
+    if (data.length === 0) {
+      toast.error("No data to export.");
+      return;
+    }
+
+    const headers = Object.keys(data[0]);
+    const csv = [
+      headers.join(','),
+      ...data.map(row => headers.map(fieldName => JSON.stringify(row[fieldName])).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${filename}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -1756,6 +2160,15 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeView === "hospital-bookings" && (
+          <div className="bg-white rounded-lg shadow p-10 text-center animate-in fade-in duration-500">
+            <div className="text-6xl mb-4">🏥</div>
+            <h2 className="text-2xl font-bold text-gray-800">Hospital Bookings Management</h2>
+            <p className="text-gray-500 mt-2">This feature is currently under development.</p>
+            <div className="mt-6 inline-block px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full font-bold text-sm">Coming Soon</div>
           </div>
         )}
 
@@ -2235,22 +2648,53 @@ export default function AdminDashboard() {
 
             {/* Categories */}
             {activeView === "categories" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Categories</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start pt-2 px-1">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-2xl font-bold text-gray-800">Manage Categories</h2>
+                      {!isRefreshing && categories.length > 0 && (
+                        <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                          {categories.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedCategoryIds.size > 0 && (
+                      <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                        <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                          {selectedCategoryIds.size} selected
+                        </span>
+                        <button
+                          onClick={handleBulkCategoryDelete}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 cursor-pointer shadow-sm transition-colors"
+                        >
+                          Bulk Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={openAddCategoryModal}
-                    className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-700 cursor-pointer"
+                    className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-semibold shadow-sm cursor-pointer"
                   >
                     + Add Category
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border">
-                    <thead className="bg-gray-100">
+                <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200">
+                  <table className="w-full text-left border-collapse border border-gray-200">
+                    <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
-                        <th className="p-2">Icon</th>
+                        <th className="p-2 border border-gray-200">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                            checked={selectedCategoryIds.size === categories.length && categories.length > 0}
+                            onChange={toggleSelectAllCategories}
+                          />
+                        </th>
+                        <th className="p-2">Image</th>
                         <th className="p-2">Name</th>
                         <th className="p-2">Medicines</th>
                         <th className="p-2">Actions</th>
@@ -2258,12 +2702,20 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {categories.map((cat) => (
-                        <tr key={cat.id || `category-${cat.name}`} className="border-t">
+                        <tr key={cat.id || `category-${cat.name}`} className="border-t hover:bg-gray-50/50 transition-colors">
+                          <td className="p-2 border border-gray-200">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                              checked={selectedCategoryIds.has(cat.id)}
+                              onChange={() => toggleSelectCategory(cat.id)}
+                            />
+                          </td>
                           <td className="p-2">
                             {cat.image ? (
                               <img src={cat.image} alt={cat.name} className="w-8 h-8 object-contain" />
                             ) : (
-                              <span className="text-gray-400 text-xs italic">No Icon</span>
+                              <span className="text-gray-400 text-xs italic">No Image</span>
                             )}
                           </td>
                           <td className="p-2">{cat.name}</td>
@@ -2292,10 +2744,7 @@ export default function AdminDashboard() {
                       ))}
                       {categories.length === 0 && (
                         <tr key="no-categories">
-                          <td
-                            colSpan={3}
-                            className="p-4 text-center text-gray-500"
-                          >
+                          <td colSpan={5} className="p-4 text-center text-gray-500">
                             No categories found
                           </td>
                         </tr>
@@ -2689,21 +3138,52 @@ export default function AdminDashboard() {
 
             {/* Banners */}
             {activeView === "banners" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Banners</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start pt-2 px-1">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-2xl font-bold text-gray-800">Banners</h2>
+                      {!isRefreshing && banners.length > 0 && (
+                        <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                          {banners.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedBannerIds.size > 0 && (
+                      <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                        <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                          {selectedBannerIds.size} selected
+                        </span>
+                        <button
+                          onClick={handleBulkBannerDelete}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 cursor-pointer shadow-sm transition-colors"
+                        >
+                          Bulk Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={openAddBannerModal}
-                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-700 cursor-pointer"
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold shadow-sm cursor-pointer"
                   >
                     + Add Banner
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border">
-                    <thead className="bg-gray-100">
+                <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200">
+                  <table className="w-full text-left border-collapse border border-gray-200">
+                    <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
+                        <th className="p-2 border border-gray-200">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                            checked={selectedBannerIds.size === banners.length && banners.length > 0}
+                            onChange={toggleSelectAllBanners}
+                          />
+                        </th>
                         <th className="p-2">Image</th>
                         <th className="p-2">Link</th>
                         <th className="p-2">Actions</th>
@@ -2711,7 +3191,15 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {banners.map((banner) => (
-                        <tr key={banner.id || `banner-${banner.link}`} className="border-t">
+                        <tr key={banner.id || `banner-${banner.link}`} className="border-t hover:bg-gray-50/50 transition-colors">
+                          <td className="p-2 border border-gray-200">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                              checked={selectedBannerIds.has(banner.id)}
+                              onChange={() => toggleSelectBanner(banner.id)}
+                            />
+                          </td>
                           <td className="p-2">
                             {banner.image ? (
                               <img src={banner.image.startsWith("http") ? banner.image : `${BANNER_URL_PREFIX}${banner.image}`} alt={'Banner image'} className="w-48 h-auto object-contain rounded" />
@@ -2730,9 +3218,7 @@ export default function AdminDashboard() {
                       ))}
                       {banners.length === 0 && (
                         <tr key="no-banners">
-                          <td colSpan={3} className="p-4 text-center text-gray-500">
-                            No banners found
-                          </td>
+                          <td colSpan={4} className="p-4 text-center text-gray-500">No banners found</td>
                         </tr>
                       )}
                     </tbody>
@@ -2750,21 +3236,52 @@ export default function AdminDashboard() {
 
             {/* Deals */}
             {activeView === "deals" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Deals of the Day</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start pt-2 px-1">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-2xl font-bold text-gray-800">Deals of the Day</h2>
+                      {!isRefreshing && deals.length > 0 && (
+                        <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                          {deals.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedDealIds.size > 0 && (
+                      <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                        <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                          {selectedDealIds.size} selected
+                        </span>
+                        <button
+                          onClick={handleBulkDealDelete}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 cursor-pointer shadow-sm transition-colors"
+                        >
+                          Bulk Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={openAddDealModal}
-                    className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-700 cursor-pointer"
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-semibold shadow-sm cursor-pointer"
                   >
                     + Add Deal
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border">
-                    <thead className="bg-gray-100">
+                <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200">
+                  <table className="w-full text-left border-collapse border border-gray-200">
+                    <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
+                        <th className="p-2 border border-gray-200">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                            checked={selectedDealIds.size === deals.length && deals.length > 0}
+                            onChange={toggleSelectAllDeals}
+                          />
+                        </th>
                         <th className="p-2">Image</th>
                         <th className="p-2">Title</th>
                         <th className="p-2">Discount</th>
@@ -2774,7 +3291,15 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {deals.map((deal) => (
-                        <tr key={deal.id || `deal-${deal.title}`} className="border-t">
+                        <tr key={deal.id || `deal-${deal.title}`} className="border-t hover:bg-gray-50/50 transition-colors">
+                          <td className="p-2 border border-gray-200">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                              checked={selectedDealIds.has(deal.id)}
+                              onChange={() => toggleSelectDeal(deal.id)}
+                            />
+                          </td>
                           <td className="p-2">
                             {deal.image ? (
                               <img src={deal.image.startsWith("http") ? deal.image : `${DEAL_URL_PREFIX}${deal.image}`} alt={'Deal image'} className="w-24 h-auto object-contain rounded" />
@@ -2785,7 +3310,7 @@ export default function AdminDashboard() {
                           <td className="p-2">{deal.title}</td>
                           <td className="p-2">{deal.discount}</td>
                           <td className="p-2">{deal.tagline}</td>
-                          <td className="p-2 space-x-2">
+                          <td className="p-2 space-x-2 whitespace-nowrap">
                             <button onClick={() => openEditDealModal(deal)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
                             <button onClick={() => handleDealDelete(deal.id)} disabled={loadingId === deal.id} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">
                               {loadingId === deal.id ? <Spinner className="h-4 w-4" /> : "Delete"}
@@ -2795,7 +3320,7 @@ export default function AdminDashboard() {
                       ))}
                       {deals.length === 0 && (
                         <tr key="no-deals">
-                          <td colSpan={5} className="p-4 text-center text-gray-500">
+                          <td colSpan={6} className="p-4 text-center text-gray-500">
                             No deals found
                           </td>
                         </tr>
@@ -2886,15 +3411,46 @@ export default function AdminDashboard() {
 
             {/* Stories */}
             {activeView === "stories" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Manage Stories</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start pt-2 px-1">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-2xl font-bold text-gray-800">Manage Stories</h2>
+                      {!isRefreshing && stories.length > 0 && (
+                        <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                          {stories.length}
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedStoryIds.size > 0 && (
+                      <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                        <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                          {selectedStoryIds.size} selected
+                        </span>
+                        <button
+                          onClick={handleBulkStoryDelete}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 cursor-pointer shadow-sm transition-colors"
+                        >
+                          Bulk Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button onClick={openAddStoryModal} className="px-4 py-2 bg-rose-500 text-white rounded hover:bg-rose-700 cursor-pointer">+ Add Story</button>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border">
-                    <thead className="bg-gray-100">
+                <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200">
+                  <table className="w-full text-left border-collapse border border-gray-200">
+                    <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
+                        <th className="p-2 border border-gray-200">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                            checked={selectedStoryIds.size === stories.length && stories.length > 0}
+                            onChange={toggleSelectAllStories}
+                          />
+                        </th>
                         <th className="p-2">Avatar</th>
                         <th className="p-2">Name</th>
                         <th className="p-2">Tag & Status</th>
@@ -2904,7 +3460,15 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {stories.map((story) => (
-                        <tr key={story.id || `story-${story.name}`} className="border-t">
+                        <tr key={story.id || `story-${story.name}`} className="border-t hover:bg-gray-50/50 transition-colors">
+                          <td className="p-2 border border-gray-200">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                              checked={selectedStoryIds.has(story.id)}
+                              onChange={() => toggleSelectStory(story.id)}
+                            />
+                          </td>
                           <td className="p-2"><img src={story.avatar} className="w-10 h-10 rounded-full object-cover" /></td>
                           <td className="p-2">{story.name}</td>
                           <td className="p-2">
@@ -2954,7 +3518,13 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="p-2 space-x-2">
-                            <button onClick={() => viewStats('story', story.id, story.name)} className="text-green-600 hover:underline cursor-pointer">Stats</button>
+                            <button 
+                              onClick={() => viewStats('story', story.id, story.name)} 
+                              disabled={loadingId === story.id + 'story'}
+                              className="bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black inline-flex items-center gap-1 disabled:opacity-50"
+                            >
+                              {loadingId === story.id + 'story' ? <Spinner className="h-3 w-3" /> : "Stats"}
+                            </button>
                             <button onClick={() => openEditStoryModal(story)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
                             <button onClick={() => handleStoryDelete(story.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Delete</button>
                           </td>
@@ -2981,15 +3551,45 @@ export default function AdminDashboard() {
 
             {/* Posts */}
             {activeView === "posts" && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Manage Posts</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-start pt-2 px-1">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-baseline gap-3">
+                      <h2 className="text-2xl font-bold text-gray-800">Manage Posts</h2>
+                      {!isRefreshing && posts.length > 0 && (
+                        <span className="px-3 py-1 text-sm font-bold text-white bg-blue-500 rounded-full">
+                          {posts.length}
+                        </span>
+                      )}
+                    </div>
+                    {selectedPostIds.size > 0 && (
+                      <div className="flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                        <span className="text-sm font-medium text-indigo-700 bg-indigo-50 px-2 py-1 rounded border border-indigo-100">
+                          {selectedPostIds.size} selected
+                        </span>
+                        <button
+                          onClick={handleBulkPostDelete}
+                          className="px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-semibold hover:bg-red-700 cursor-pointer shadow-sm transition-colors"
+                        >
+                          Bulk Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button onClick={openAddPostModal} className="px-4 py-2 bg-sky-500 text-white rounded hover:bg-sky-700 cursor-pointer">+ Add Post</button>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm border">
-                    <thead className="bg-gray-100">
+                <div className="bg-white rounded-lg shadow overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] border border-gray-200">
+                  <table className="w-full text-left border-collapse border border-gray-200">
+                    <thead className="bg-gray-100 sticky top-0 z-20">
                       <tr>
+                        <th className="p-2 border border-gray-200">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                            checked={selectedPostIds.size === posts.length && posts.length > 0}
+                            onChange={toggleSelectAllPosts}
+                          />
+                        </th>
                         <th className="p-2">Image</th>
                         <th className="p-2">Title</th>
                         <th className="p-2">Links Visibility</th>
@@ -3000,7 +3600,15 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody>
                       {posts.map((post) => (
-                        <tr key={post.id || `post-${post.title}`} className="border-t">
+                        <tr key={post.id || `post-${post.title}`} className="border-t hover:bg-gray-50/50 transition-colors">
+                          <td className="p-2 border border-gray-200">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                              checked={selectedPostIds.has(post.id)}
+                              onChange={() => toggleSelectPost(post.id)}
+                            />
+                          </td>
                           <td className="p-2">
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
                               {post.images?.map((url, i) => {
@@ -3073,9 +3681,21 @@ export default function AdminDashboard() {
                           </td>
                           <td className="p-2 truncate max-w-xs">{post.caption}</td>
                           <td className="p-2">{post.likes}</td>
-                          <td className="p-2 space-x-2">
-                            <button onClick={() => viewStats('post-likes', post.id, post.title)} className="text-green-600 hover:underline cursor-pointer">Likes</button>
-                            <button onClick={() => viewStats('post-views', post.id, post.title)} className="text-purple-600 hover:underline cursor-pointer">Views</button>
+                          <td className="p-2 space-x-2 whitespace-nowrap">
+                            <button 
+                              onClick={() => viewStats('post-likes', post.id, post.title)} 
+                              disabled={loadingId === post.id + 'post-likes'}
+                              className="bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black inline-flex items-center gap-1 disabled:opacity-50"
+                            >
+                              {loadingId === post.id + 'post-likes' ? <Spinner className="h-3 w-3" /> : "Likes"}
+                            </button>
+                            <button 
+                              onClick={() => viewStats('post-views', post.id, post.title)} 
+                              disabled={loadingId === post.id + 'post-views'}
+                              className="bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black inline-flex items-center gap-1 disabled:opacity-50"
+                            >
+                              {loadingId === post.id + 'post-views' ? <Spinner className="h-3 w-3" /> : "Views"}
+                            </button>
                             <button onClick={() => openEditPostModal(post)} className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Edit</button>
                             <button onClick={() => handlePostDelete(post.id)} className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-black">Delete</button>
                           </td>
@@ -3101,15 +3721,75 @@ export default function AdminDashboard() {
             )}
           </>
         )}
+
+        {/* Confirm Modal (App-wide) */}
+        {confirmModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[150] p-4">
+            <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs animate-in zoom-in-95 duration-200">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+              <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setConfirmModal(null)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmModal.onConfirm}
+                  className={`px-6 py-2 text-white rounded-lg transition-colors text-sm font-bold cursor-pointer shadow-lg ${
+                  confirmModal.type === 'delete' || confirmModal.type === 'logout' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'
+                  }`}
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Stats Modal */}
       {statsModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-110" onClick={() => setStatsModal(p => ({ ...p, isOpen: false }))}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-110" onClick={() => { setStatsModal(p => ({ ...p, isOpen: false })); setStatsSearchQuery(""); }}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b flex justify-between items-center">
               <h2 className="font-bold text-lg">{statsModal.title}</h2>
-              <button onClick={() => setStatsModal(p => ({ ...p, isOpen: false }))} className="text-2xl">&times;</button>
+              <button 
+                onClick={() => { setStatsModal(p => ({ ...p, isOpen: false })); setStatsSearchQuery(""); }} 
+                className="text-2xl bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded-lg cursor-pointer transition-colors"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-4 bg-gray-50 border-b flex flex-col gap-4">
+              <div className="flex justify-between items-center">
+                {statsModal.extraInfo && (
+                  <p className="text-sm font-semibold text-gray-700">{statsModal.extraInfo}</p>
+                )}
+                <button
+                  onClick={() => exportStatsToCSV(
+                    statsModal.data.filter(row => 
+                      (row.fullname || "").toLowerCase().includes(statsSearchQuery.toLowerCase()) ||
+                      (row.whatsapp_number || "").toLowerCase().includes(statsSearchQuery.toLowerCase())
+                    ),
+                    statsModal.title
+                  )}
+                  className="bg-green-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-green-700 transition-colors shadow-sm cursor-pointer"
+                >
+                  📥 Export to CSV
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by username or phone number..."
+                  value={statsSearchQuery}
+                  onChange={(e) => setStatsSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <table className="w-full text-sm">
@@ -3117,11 +3797,16 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="p-2 text-left">User</th>
                     <th className="p-2 text-left">WhatsApp</th>
-                    <th className="p-2 text-left">Interaction</th>
+                    <th className="p-2 text-left">Interaction & Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {statsModal.data.map((row, i) => (
+                  {statsModal.data
+                    .filter(row => 
+                      (row.fullname || "").toLowerCase().includes(statsSearchQuery.toLowerCase()) ||
+                      (row.whatsapp_number || "").toLowerCase().includes(statsSearchQuery.toLowerCase())
+                    )
+                    .map((row, i) => (
                     <tr key={row.id || `stat-${i}`} className="border-t">
                       <td className="p-2">{row.fullname}</td>
                       <td className="p-2">{row.whatsapp_number}</td>
@@ -3131,8 +3816,15 @@ export default function AdminDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {statsModal.data.length === 0 && (
+                  {statsModal.data.length === 0 ? (
                     <tr key="no-stats"><td colSpan={3} className="p-10 text-center text-gray-400">No interactions yet</td></tr>
+                  ) : statsModal.data.filter(row => 
+                      (row.fullname || "").toLowerCase().includes(statsSearchQuery.toLowerCase()) ||
+                      (row.whatsapp_number || "").toLowerCase().includes(statsSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                    <tr key="no-results">
+                      <td colSpan={3} className="p-10 text-center text-gray-400">No results matching "{statsSearchQuery}"</td>
+                    </tr>
                   )}
                 </tbody>
               </table>

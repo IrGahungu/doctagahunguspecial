@@ -34,6 +34,11 @@ export default function DoctorBookingsTable() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [selectedBookingIds, setSelectedBookingIds] = useState<Set<string>>(new Set());
+  const [isBulkStatusModalOpen, setIsBulkStatusModalOpen] = useState(false);
+  const [bulkUpdateStatus, setBulkUpdateStatus] = useState<Booking['status']>("confirmed");
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void; type: 'delete' | 'update' } | null>(null);
 
   async function fetchBookings() {
     setLoading(true);
@@ -83,12 +88,77 @@ export default function DoctorBookingsTable() {
     }
   };
 
+  const toggleSelectAll = () => {
+    if (selectedBookingIds.size === filteredBookings.length) {
+      setSelectedBookingIds(new Set());
+    } else {
+      setSelectedBookingIds(new Set(filteredBookings.map(booking => booking.id)));
+    }
+  };
+
+  const toggleSelect = (bookingId: string) => {
+    const next = new Set(selectedBookingIds);
+    if (next.has(bookingId)) {
+      next.delete(bookingId);
+    } else {
+      next.add(bookingId);
+    }
+    setSelectedBookingIds(next);
+  };
+
+  function handleBulkStatusUpdate() {
+    if (selectedBookingIds.size === 0) return;
+    setIsBulkStatusModalOpen(false); // Close the status selection modal
+    // Using the existing confirmModal state pattern
+    // Assuming a confirmModal state is defined in this component, if not, it needs to be added.
+    // For now, I'll add it to the component's state.
+    setConfirmModal({
+      title: "Confirm Bulk Status Update",
+      message: `Are you sure you want to update the status of ${selectedBookingIds.size} bookings to "${bulkUpdateStatus}"?`,
+      onConfirm: executeBulkUpdate,
+      type: 'update' // Add type for styling if needed
+    });
+  }
+
+  async function executeBulkUpdate() {
+    setUpdatingId('bulk'); // Indicate a bulk update is in progress
+    setConfirmModal(null); // Close confirmation modal
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: Array.from(selectedBookingIds),
+          status: bulkUpdateStatus,
+          type: 'doctor'
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to bulk update booking statuses");
+
+      setBookings(prev =>
+        prev.map(booking =>
+          selectedBookingIds.has(booking.id) ? { ...booking, status: bulkUpdateStatus } : booking
+        )
+      );
+      setSelectedBookingIds(new Set());
+      toast.success(`Successfully updated status for ${selectedBookingIds.size} bookings.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An unknown error occurred during bulk update.");
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   const filteredBookings = bookings.filter((b) => {
     const query = searchQuery.toLowerCase();
     const patientName = b.users?.fullname?.toLowerCase() || "";
     const doctorName = b.doctor_name?.toLowerCase() || "";
     const ticket = b.ticket_number?.toLowerCase() || "";
-    return patientName.includes(query) || doctorName.includes(query) || ticket.includes(query);
+    const matchesSearch = patientName.includes(query) || doctorName.includes(query) || ticket.includes(query);
+    const matchesStatus = statusFilter === "All" || b.status.toLowerCase() === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
   });
 
   const getStatusColor = (status: string) => {
@@ -111,7 +181,7 @@ export default function DoctorBookingsTable() {
           <h2 className="text-xl font-bold text-gray-800">Doctor Appointments</h2>
           <p className="text-xs text-gray-500 mt-1">Manage scheduled consultations and statuses</p>
         </div>
-        <div className="w-full max-w-sm">
+        <div className="flex gap-2 w-full max-w-md">
           <input
             type="text"
             placeholder="Search by doctor, patient, or ticket..."
@@ -119,14 +189,49 @@ export default function DoctorBookingsTable() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-fuchsia-500 transition-all text-sm"
           />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fuchsia-500 text-sm bg-white cursor-pointer"
+          >
+            <option value="All">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm whitespace-nowrap">
-          <thead>
-            <tr className="bg-gray-50 text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
-              <th className="p-4 border-b">Ref</th>
+      {selectedBookingIds.size > 0 && (
+        <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+          <span className="text-sm font-medium text-indigo-700">{selectedBookingIds.size} bookings selected</span>
+          <button
+            onClick={() => setIsBulkStatusModalOpen(true)}
+            disabled={updatingId === 'bulk'} // Use updatingId to disable during bulk operation
+            className="px-4 py-1.5 bg-indigo-600 text-white rounded-md text-sm font-bold hover:bg-indigo-700 transition-colors cursor-pointer"
+          >
+            {updatingId === 'bulk' ? (
+              <Spinner />
+            ) : (
+              'Update Status in Bulk'
+            )}
+          </button>
+        </div>
+      )}
+
+      <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)]">
+        <table className="w-full text-left text-sm whitespace-nowrap border-collapse">
+          <thead className="sticky top-0 z-20 bg-gray-50 border-b border-gray-100 shadow-sm">
+            <tr className="text-gray-600 font-semibold uppercase text-[10px] tracking-wider">
+              <th className="p-4 border-b">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                  checked={selectedBookingIds.size === filteredBookings.length && filteredBookings.length > 0}
+                  onChange={toggleSelectAll}
+                />
+              </th>
               <th className="p-4 border-b">Patient</th>
               <th className="p-4 border-b">Doctor</th>
               <th className="p-4 border-b">Schedule</th>
@@ -140,7 +245,14 @@ export default function DoctorBookingsTable() {
           <tbody className="divide-y divide-gray-100">
             {filteredBookings.map((b) => (
               <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="p-4 font-mono text-[10px] text-gray-400">#{b.id.substring(0, 8)}</td>
+                <td className="p-4">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 cursor-pointer"
+                    checked={selectedBookingIds.has(b.id)}
+                    onChange={() => toggleSelect(b.id)}
+                  />
+                </td>
                 <td className="p-4">
                   <div className="font-semibold text-gray-900">{b.users?.fullname || "Guest"}</div>
                   <div className="text-[10px] text-gray-500">{b.users?.whatsapp_number || "No contact"}</div>
@@ -197,6 +309,63 @@ export default function DoctorBookingsTable() {
           </div>
         )}
       </div>
+
+      {/* Bulk Status Update Modal */}
+      {isBulkStatusModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Bulk Update Status</h3>
+            <p className="text-sm text-gray-500 mb-6">Choose a new status for the {selectedBookingIds.size} selected bookings.</p>
+            
+            <div className="space-y-1 mb-6">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select New Status</label>
+              <select
+                value={bulkUpdateStatus}
+                onChange={(e) => setBulkUpdateStatus(e.target.value as Booking['status'])}
+                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer text-sm font-medium"
+              >
+                {["pending", "confirmed", "completed", "cancelled"].map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setIsBulkStatusModalOpen(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkStatusUpdate}
+                disabled={updatingId === 'bulk'}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-bold disabled:opacity-50 cursor-pointer shadow-lg shadow-indigo-200"
+              >
+                {updatingId === 'bulk' ? "Updating..." : "Update Bookings"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal (reusing the pattern from other tables) */}
+      {confirmModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-full max-w-xs animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{confirmModal.title}</h3>
+            <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmModal(null)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-semibold cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={confirmModal.onConfirm} className={`px-6 py-2 text-white rounded-lg transition-colors text-sm font-bold cursor-pointer shadow-lg ${confirmModal.type === 'delete' ? 'bg-red-600 hover:bg-red-700 shadow-red-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'}`}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

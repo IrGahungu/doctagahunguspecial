@@ -32,11 +32,40 @@ export async function GET() {
 
     const busFees = busWalletData?.reduce((sum, t) => sum + (Number(t.amount) || 0), 0) || 0;
 
-    // 3. Approved Doctors
-    const { data: doctors } = await supabaseAdmin
+    // 3. Approved Doctors + Revenue from paid bookings
+    const { data: doctorsRaw, error: docError } = await supabaseAdmin
       .from("doctor_applications")
-      .select("id, name, image")
+      .select(`
+        id, 
+        name, 
+        image,
+        bookings (
+          amount,
+          payment_status
+        )
+      `)
       .eq("status", "approved");
+
+    if (docError) {
+      console.error("DEBUG: Supabase error fetching doctors:", docError);
+    }
+    console.log("DEBUG: [Next.js API] Raw doctors with bookings count:", doctorsRaw?.length || 0);
+
+    const doctors = (doctorsRaw || []).map(d => {
+      let revenue = 0;
+      console.log(`DEBUG: [Next.js API] Processing doctor: ${d.name} (${d.id}). Bookings found:`, (d.bookings as any[])?.length || 0);
+      
+      (d.bookings as any[])?.forEach((b: any) => {
+        const amount = Number(b.amount) || 0;
+        const status = (b.payment_status || "").toLowerCase();
+        // Include both 'paid' status and legacy NULL status records
+        if (status === 'paid' || b.payment_status === null) {
+          revenue += amount;
+        }
+        console.log(`   -> Booking: status='${b.payment_status}', amount=${b.amount} | Recognized as paid? ${status === 'paid'}`);
+      });
+      return { id: d.id, name: d.name, image: d.image, revenue: Number(revenue) };
+    });
 
     // 4. Approved Hospitals
     const { data: hospitals } = await supabaseAdmin
@@ -90,7 +119,7 @@ export async function GET() {
     console.log("DEBUG: Final processed pharmacies list:", pharmacies);
 
     return NextResponse.json({
-      doctors: (doctors || []).map(d => ({ ...d, revenue: 0 })), // Revenue logic for docs can be added later
+      doctors,
       hospitals: (hospitals || []).map(h => ({ ...h, revenue: 0 })),
       insurances: (insurances || []).map(i => ({ ...i, revenue: 0 })),
       pharmacies,

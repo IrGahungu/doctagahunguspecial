@@ -3,8 +3,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import Link from "next/link";
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -43,9 +45,9 @@ export default function LoginPage() {
   return (
     <div className="max-w-md mx-auto py-8 md:py-12 px-4 md:px-0">
       <Toaster position="top-center" reverseOrder={false} />
-      <h2 className="text-2xl font-bold mb-8 text-center">Dr. Gahungu Welcomes you, Please Login.</h2>
+      <h2 className="text-2xl font-bold mb-8 text-center">{t.welcomeLogin}</h2>
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-center font-semibold text-gray-700 mb-4">Choose who you are:</p>
+        <p className="text-center font-semibold text-gray-700 mb-4">{t.chooseRole}</p>
         <div className="flex flex-wrap justify-center gap-4 mb-6">
           <label className={`relative flex flex-col items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ease-in-out min-w-[120px] h-24 hover:bg-gray-50 hover:shadow-md ${
             role === "doctor" ? "bg-green-50 border-green-600 ring-2 ring-green-500 shadow-lg" : "border-gray-300"
@@ -71,7 +73,7 @@ export default function LoginPage() {
               <path d="M12 11v4" />
               <path d="M10 13h4" />
             </svg>
-            <span className={`font-medium mt-2 ${role === "doctor" ? "text-green-700" : "text-gray-700"}`}>Doctor</span>
+            <span className={`font-medium mt-2 ${role === "doctor" ? "text-green-700" : "text-gray-700"}`}>{t.doctor}</span>
           </label>
           <label className={`relative flex flex-col items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ease-in-out min-w-[120px] h-24 hover:bg-gray-50 hover:shadow-md ${
             role === "pharmacy" ? "bg-green-50 border-green-600 ring-2 ring-green-500 shadow-lg" : "border-gray-300"
@@ -95,7 +97,7 @@ export default function LoginPage() {
               <path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z" />
               <path d="m8.5 8.5 7 7" />
             </svg>
-            <span className={`font-medium mt-2 ${role === "pharmacy" ? "text-green-700" : "text-gray-700"}`}>Pharmacy</span>
+            <span className={`font-medium mt-2 ${role === "pharmacy" ? "text-green-700" : "text-gray-700"}`}>{t.pharmacy}</span>
           </label>
           <label className={`relative flex flex-col items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ease-in-out min-w-[120px] h-24 hover:bg-gray-50 hover:shadow-md ${
             role === "insurance" ? "bg-green-50 border-green-600 ring-2 ring-green-500 shadow-lg" : "border-gray-300"
@@ -119,7 +121,7 @@ export default function LoginPage() {
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <path d="m9 12 2 2 4-4" />
             </svg>
-            <span className={`font-medium mt-2 ${role === "insurance" ? "text-green-700" : "text-gray-700"}`}>Insurance</span>
+            <span className={`font-medium mt-2 ${role === "insurance" ? "text-green-700" : "text-gray-700"}`}>{t.insurance}</span>
           </label>
           <label className={`relative flex flex-col items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ease-in-out min-w-[120px] h-24 hover:bg-gray-50 hover:shadow-md ${
             role === "hospital" ? "bg-green-50 border-green-600 ring-2 ring-green-500 shadow-lg" : "border-gray-300"
@@ -145,7 +147,7 @@ export default function LoginPage() {
               <path d="M9 12h6" />
               <path d="M12 9v6" />
             </svg>
-            <span className={`font-medium mt-2 ${role === "hospital" ? "text-green-700" : "text-gray-700"}`}>Hospital</span>
+            <span className={`font-medium mt-2 ${role === "hospital" ? "text-green-700" : "text-gray-700"}`}>{t.hospital}</span>
           </label>
         </div>
 
@@ -160,9 +162,9 @@ export default function LoginPage() {
                 animation: fadeIn 0.4s ease-out forwards;
               }
             `}</style>
-            <input required type="email" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full p-2.5 md:p-3 border rounded-lg text-sm md:text-base"/>
+            <input required type="email" placeholder={t.email} value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full p-2.5 md:p-3 border rounded-lg text-sm md:text-base"/>
             <div className="relative">
-              <input required type={showPassword ? "text" : "password"} placeholder="Password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full p-2.5 md:p-3 border rounded-lg pr-10 md:pr-12 text-sm md:text-base"/>
+              <input required type={showPassword ? "text" : "password"} placeholder={t.password} value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full p-2.5 md:p-3 border rounded-lg pr-10 md:pr-12 text-sm md:text-base"/>
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
@@ -176,19 +178,19 @@ export default function LoginPage() {
               </button>
             </div>
             <div className="flex justify-end">
-              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">Forgot Password?</Link>
+              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">{t.forgotPassword}</Link>
             </div>
             <button type="submit" className="w-full p-2.5 md:p-3 bg-green-600 text-white rounded-lg flex justify-center items-center font-medium md:font-semibold" disabled={busy}>
               {busy ? (
                 <Spinner />
-              ) : "Login"}
+              ) : t.login}
             </button>
           </div>
         )}
       </form>
       <div className="mt-6">
         <Link href="/" className="w-full flex justify-center items-center p-2.5 md:p-3 border-2 border-gray-200 text-gray-600 rounded-lg bg-blue-300 hover:border-gray-300 transition-all font-medium text-sm md:text-base">
-          Go to Homepage
+          {t.back}
         </Link>
       </div>
     </div>
