@@ -193,7 +193,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.sessionStorage.getItem('justLoggedIn')) {
-      toast.success('Logged In');
+      toast.success(t.loginSuccess || 'Logged In');
       window.sessionStorage.removeItem('justLoggedIn');
     }
   }, []);
@@ -205,7 +205,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         fetch(`/api/doctor-applications/${app.id}`)
           .then(async (res) => {
             if (!res.ok) {
-              toast.error("Failed to load availability data");
+              toast.error(t.errorLoadingAvailability || "Failed to load availability data");
               return null;
             }
             return res.json();
@@ -239,7 +239,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         fetch(`/api/doctor-applications/${app.id}`)
           .then(async (res) => {
             if (!res.ok) {
-              toast.error("Failed to load profile data");
+              toast.error(t.errorLoadingProfile || "Failed to load profile data");
               return null;
             }
             return res.json();
@@ -318,12 +318,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             const { data: bookingsData, error: bookingsError } = bookingsResult;
             if (bookingsError) {
-              toast.error("Failed to load bookings");
+              toast.error(t.errorLoadingBookings || "Failed to load bookings");
               return;
             }
 
             if (!doctorRes.ok) {
-              toast.error("Failed to load doctor data");
+              toast.error(t.errorLoadingDoctor || "Failed to load doctor data");
               return;
             }
             const doctorData = await doctorRes.json();
@@ -394,7 +394,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         fetch(`/api/doctor-applications/${app.id}`)
           .then(async (res) => {
             if (!res.ok) {
-              toast.error("Failed to load schedule");
+              toast.error(t.errorLoadingSchedule || "Failed to load schedule");
               return null;
             }
             return res.json();
@@ -433,7 +433,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       setLocations(Locations.filter((_, i) => i !== locationToDeleteIndex));
       setShowDeleteLocationConfirm(false);
       setLocationToDeleteIndex(null);
-      toast.success("Location removed");
+      toast.success(t.locationRemoved || "Location removed");
     }
   }
 
@@ -451,7 +451,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   function handleUseCurrentLocation(index: number) {
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser");
+      toast.error(t.geoNotSupported || "Geolocation is not supported by your browser");
       return;
     }
     navigator.geolocation.getCurrentPosition((position) => {
@@ -462,7 +462,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         longitude: position.coords.longitude.toFixed(6)
       };
       setLocations(list);
-    }, (err) => toast.error("Could not retrieve location: " + err.message));
+    }, (err) => toast.error((t.geoError || "Could not retrieve location: ") + err.message));
   }
 
   async function handlePasteCoordinates(index: number) {
@@ -478,10 +478,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         };
         setLocations(list);
       } else {
-        toast.error("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error(t.pasteCoordError || "Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
-      toast.error("Failed to read clipboard.");
+      toast.error(t.clipboardError || "Failed to read clipboard.");
     }
   }
 
@@ -523,7 +523,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   function handleApplyToAllDays() {
     const template = scheduleForm.length > 0 ? scheduleForm[0] : { start_time: "09:00", end_time: "17:00", break_start_time: "", break_end_time: "" };
     
-    if (scheduleForm.length > 0 && !window.confirm(`Apply ${template.start_time} - ${template.end_time} to all days of the week? This will overwrite existing entries.`)) {
+    if (scheduleForm.length > 0 && !window.confirm(`${t.confirmApplyAll || "Apply"} ${template.start_time} - ${template.end_time} ${t.confirmApplyAllSuffix || "to all days of the week? This will overwrite existing entries."}`)) {
       return;
     }
 
@@ -537,7 +537,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }));
     
     setScheduleForm(newSchedule);
-    toast.success("Schedule applied to all days");
+    toast.success(t.scheduleAppliedAll || "Schedule applied to all days");
   }
 
   function handleAddScheduleRow() {
@@ -545,7 +545,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     const nextAvailableDay = DAYS_ORDER.find((day) => !existingDays.includes(day));
 
     if (!nextAvailableDay) {
-      toast.error("All days of the week are already added.");
+      toast.error(t.allDaysAdded || "All days of the week are already added.");
       return;
     }
 
@@ -566,7 +566,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   function handleScheduleChange(index: number, field: keyof WorkSchedule, value: string) {
     if (field === "day" && scheduleForm.some((item, i) => i !== index && item.day === value)) {
-      toast.error(`${value} is already in the schedule.`);
+      toast.error(`${value} ${t.dayAlreadyExists || "is already in the schedule."}`);
       return;
     }
     const updated = [...scheduleForm];
@@ -579,20 +579,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   async function handleSaveSchedule() {
     for (const item of scheduleForm) {
       if (item.start_time >= item.end_time) {
-        toast.error(`Invalid hours for ${item.day}: End time must be after start time.`);
+        toast.error(`${t.invalidHoursFor || "Invalid hours for"} ${item.day}: ${t.endTimeError || "End time must be after start time."}`);
         return;
       }
       if (item.break_start_time && item.break_end_time) {
         if (item.break_start_time < item.start_time || item.break_end_time > item.end_time) {
-          toast.error(`Invalid break for ${item.day}: Break must be within working hours (${item.start_time} - ${item.end_time}).`);
+          toast.error(`${t.invalidBreakFor || "Invalid break for"} ${item.day}: ${t.breakRangeError || "Break must be within working hours."}`);
           return;
         }
         if (item.break_start_time >= item.break_end_time) {
-          toast.error(`Invalid break for ${item.day}: Break end time must be after break start time.`);
+          toast.error(`${t.invalidBreakFor || "Invalid break for"} ${item.day}: ${t.breakTimeError || "Break end time must be after break start time."}`);
           return;
         }
       } else if (item.break_start_time || item.break_end_time) {
-        toast.error(`Invalid break for ${item.day}: Both break start and end times are required.`);
+        toast.error(`${t.invalidBreakFor || "Invalid break for"} ${item.day}: ${t.breakIncompleteError || "Both break start and end times are required."}`);
         return;
       }
     }
@@ -606,14 +606,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         body: JSON.stringify({ work_schedule: JSON.stringify(scheduleToSave) }),
       });
       if (!res.ok) {
-        toast.error("Failed to update schedule");
+        toast.error(t.updateScheduleFail || "Failed to update schedule");
         return;
       }
-      toast.success("Schedule updated successfully!");
+      toast.success(t.updateScheduleSuccess || "Schedule updated successfully!");
       setIsEditingSchedule(false);
     } catch (e) {
       console.error(e);
-      toast.error("Error updating schedule");
+      toast.error(t.updateScheduleError || "Error updating schedule");
     } finally {
       setIsSavingSchedule(false);
     }
@@ -642,11 +642,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         toast.error(errorData.error || errorData.message || "Failed to update");
         return;
       }
-      toast.success("Availability updated successfully!");
+      toast.success(t.updateAvailabilitySuccess || "Availability updated successfully!");
       setIsEditingAvailability(false);
     } catch (e: any) {
       console.error(e);
-      toast.error(`Error updating availability: ${e.message || "Unknown error"}`);
+      toast.error(`${t.updateAvailabilityError || "Error updating availability:"} ${e.message || "Unknown error"}`);
     } finally {
       setIsSavingAvailability(false);
     }
@@ -684,15 +684,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         body: formData,
       });
       if (!res.ok) {
-        toast.error("Failed to update profile");
+        toast.error(t.updateProfileFail || "Failed to update profile");
         return;
       }
-      toast.success("Profile updated successfully!");
+      toast.success(t.updateProfileSuccess || "Profile updated successfully!");
       router.refresh();
       setIsEditingProfile(false);
     } catch (e) {
       console.error(e);
-      toast.error("Error updating profile");
+      toast.error(t.updateProfileError || "Error updating profile");
     } finally {
       setIsSavingProfile(false);
     }
@@ -700,15 +700,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   async function handlePasswordUpdate() {
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      toast.error("New passwords do not match");
+      toast.error(t.passwordsMatchError || "New passwords do not match");
       return;
     }
     if (!passwordForm.oldPassword) {
-      toast.error("Please enter your current password");
+      toast.error(t.enterCurrentPassword || "Please enter your current password");
       return;
     }
     if (passwordForm.newPassword.length < 6) {
-      toast.error("New password must be at least 6 characters");
+      toast.error(t.passwordTooShort || "New password must be at least 6 characters");
       return;
     }
 
@@ -725,10 +725,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to update password");
+        toast.error(data.error || (t.updatePasswordFail || "Failed to update password"));
         return;
       }
-      toast.success("Password updated successfully");
+      toast.success(t.updatePasswordSuccess || "Password updated successfully");
       setIsEditingPassword(false);
       setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
     } catch (e: any) {
@@ -850,7 +850,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const handleNavClick = (tab: string) => {
     if (tab !== "status" && app.status !== "approved") {
-      toast.error("Not yet approved");
+      toast.error(t.notYetApproved || "Not yet approved");
       return;
     }
 
@@ -916,7 +916,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                <span className="hidden md:block">{t.dashboard}</span>
+                <span className="hidden md:block">{t.dashboard || "Dashboard"}</span>
               </>
             )}
           </button>
@@ -939,7 +939,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="hidden md:block">Availability</span>
+                <span className="hidden md:block">{t.availability || "Availability"}</span>
               </>
             )}
           </button>
@@ -962,7 +962,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="hidden md:block">Days and Hours</span>
+                <span className="hidden md:block">{t.daysAndHours || "Days and Hours"}</span>
               </>
             )}
           </button>
@@ -985,7 +985,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="hidden md:block">Bookings</span>
+                <span className="hidden md:block">{t.bookings || "Bookings"}</span>
                 {pendingBookingsCount > 0 && (
                   <span className="absolute -top-1 -right-1 md:top-1/2 md:-translate-y-1/2 md:right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-white">
                     {pendingBookingsCount}
@@ -1013,7 +1013,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                <span className="hidden md:block">My profile</span>
+                <span className="hidden md:block">{t.myProfile || "My profile"}</span>
               </>
             )}
           </button>
@@ -1037,7 +1037,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="hidden md:block">Settings</span>
+                <span className="hidden md:block">{t.settings || "Settings"}</span>
               </>
             )}
           </button>
@@ -1060,7 +1060,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="hidden md:block">Status</span>
+                <span className="hidden md:block">{t.status || "Status"}</span>
               </>
             )}
           </button>
@@ -1082,7 +1082,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white shadow-sm border-b border-gray-200 px-4 md:px-8 py-5">
           <h2 className="text-center text-xl font-semibold text-gray-800">
-          Greetings and welcome dear {app.name} on Dr. Gahungu Platform.
+          {t.welcomeGreeting || "Greetings and welcome dear"} {app.name} {t.welcomeGreetingSuffix || "on Dr. Gahungu Platform."}
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -1090,17 +1090,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "dashboard" && (
               <div>
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Dashboard Overview</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.dashboardOverview || "Dashboard Overview"}</h3>
                 {isDashboardLoading ? (
-                  <div className="text-center py-10">Loading stats...</div>
+                  <div className="text-center py-10">{t.loadingStats || "Loading stats..."}</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Patients</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.totalPatients || "Total Patients"}</h4>
                       <div className="text-lg font-bold text-center text-gray-800">{dashboardStats.totalPatients}</div>
                     </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Pending Bookings</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.pendingBookingsLabel || "Pending Bookings"}</h4>
                       <div className="text-lg font-bold text-center text-blue-600">{dashboardStats.todayBookings}</div>
                     </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
@@ -1108,20 +1108,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <div className="flex flex-col items-center justify-center gap-1">
                         <div className="text-lg font-bold text-center text-green-600">{dashboardStats.totalRevenue.toLocaleString()} BIF</div>
                         <button
-                          onClick={() => toast.success("The team is implementing it for soon")}
+                          onClick={() => toast.success(t.withdrawSoon || "The team is implementing it for soon")}
                           disabled={dashboardStats.totalRevenue === 0}
                           className="px-2 py-0.5 text-[10px] font-medium text-white bg-green-600 rounded hover:bg-green-700 transition cursor-pointer disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-black"
                         >
-                          Withdraw
+                          {t.withdraw || "Withdraw"}
                         </button>
                       </div>
                     </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Completed Bookings</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.completedBookingsLabel || "Completed Bookings"}</h4>
                       <div className="text-lg font-bold text-center text-purple-600">{dashboardStats.completedBookings}</div>
                     </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Profile Views</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.profileViews || "Profile Views"}</h4>
                       <div className="text-lg font-bold text-center text-indigo-600">{dashboardStats.totalViews}</div>
                     </div>
                   </div>
@@ -1130,7 +1130,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 {!isDashboardLoading && (
                   <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="text-gray-800 font-bold mb-4">Revenue Over Time</h4>
+                      <h4 className="text-gray-800 font-bold mb-4">{t.revenueOverTime || "Revenue Over Time"}</h4>
                       <div className="h-80 w-full">
                         {revenueChartData.length > 0 ? (
                           <ResponsiveContainer width="100%" height="100%">
@@ -1144,14 +1144,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </ResponsiveContainer>
                         ) : (
                           <div className="h-full flex items-center justify-center text-gray-400 italic border-2 border-dashed border-gray-100 rounded-lg">
-                            No revenue data available to display
+                            {t.noRevenueData || "No revenue data available to display"}
                           </div>
                         )}
                       </div>
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="text-gray-800 font-bold mb-4">Recent Activity</h4>
+                      <h4 className="text-gray-800 font-bold mb-4">{t.recentActivity || "Recent Activity"}</h4>
                       <div className="space-y-4 overflow-y-auto max-h-80">
                         {bookings.length > 0 ? (
                           [...bookings]
@@ -1184,7 +1184,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             ))
                         ) : (
                           <div className="text-center py-8 text-gray-400 italic">
-                            No recent activity found.
+                            {t.noRecentActivity || "No recent activity found."}
                           </div>
                         )}
                       </div>
@@ -1203,20 +1203,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <p><strong>Submitted:</strong> {new Date(app.created_at).toLocaleString()}</p>
                   {app.status === "pending" && (
                     <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-2xl">
-                      <p className="font-bold">Under Review</p>
-                      <p>Your application is currently being reviewed by our team.</p>
+                      <p className="font-bold">{t.underReview || "Under Review"}</p>
+                      <p>{t.pendingStatusMessage || "Your application is currently being reviewed by our team."}</p>
                     </div>
                   )}
                   {app.status === "approved" && (
                     <div className="mt-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-2xl">
-                      <p className="font-bold">Approved</p>
-                      <p>Congratulations! Your application has been approved.</p>
+                      <p className="font-bold">{t.approved || "Approved"}</p>
+                      <p>{t.approvedStatusMessage || "Congratulations! Your application has been approved."}</p>
                     </div>
                   )}
                   {app.status === "rejected" && (
                     <div className="mt-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-2xl">
-                      <p className="font-bold">Rejected</p>
-                      <p>Unfortunately, your application was rejected. Reason: {app.rejection_reason || "No reason provided"}</p>
+                      <p className="font-bold">{t.rejected || "Rejected"}</p>
+                      <p>{t.rejectedStatusMessage || "Unfortunately, your application was rejected. Reason:"} {app.rejection_reason || (t.noReason || "No reason provided")}</p>
                       <button
                         onClick={() => {
                           setIsNavigating(true);
@@ -1229,10 +1229,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {isNavigating ? (
                           <>
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Loading Form...
+                            {t.loadingForm || "Loading Form..."}
                           </>
                         ) : (
-                          "Edit and Resubmit Application"
+                          t.editResubmitApp || "Edit and Resubmit Application"
                         )}
                       </button>
 

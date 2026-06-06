@@ -28,15 +28,15 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        toast.success("Logged in");
+        toast.success(t.loginSuccess || "Logged in");
         router.push(`/${role}/dashboard`);
       } else {
         // Handle the failure manually instead of throwing to avoid triggering Next.js error overlays
-        toast.error("Wrong Credentials");
+        toast.error(t.wrongCredentials || "Wrong Credentials");
       }
     } catch (err: any) {
       // This only catches network-level failures (like being offline)
-      toast.error("Wrong Credentials");
+      toast.error(t.wrongCredentials || "Wrong Credentials");
     } finally {
       setBusy(false);
     }

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useLanguage } from "../../../context/LanguageContext";
 
 type HospitalApplication = {
   id: string;
@@ -47,6 +48,7 @@ const getImageUrl = (path: string | null | undefined) => {
 };
 
 export default function DashboardClient({ app }: DashboardClientProps) {
+  const { t } = useLanguage();
   const [displayApp, setDisplayApp] = useState(app);
  const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
@@ -129,15 +131,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   async function handlePasswordUpdate() {
         if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-          toast.error("New passwords do not match");
+          toast.error(t.passwordsMatchError || "New passwords do not match");
           return;
         }
         if (!passwordForm.oldPassword) {
-          toast.error("Please enter your current password");
+          toast.error(t.enterCurrentPassword || "Please enter your current password");
           return;
         }
         if (passwordForm.newPassword.length < 6) {
-          toast.error("New password must be at least 6 characters");
+          toast.error(t.passwordTooShort || "New password must be at least 6 characters");
           return;
         }
     
@@ -154,10 +156,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           });
           const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to update password");
+        toast.error(data.error || (t.updatePasswordFail || "Failed to update password"));
         return;
       }
-          toast.success("Password updated successfully");
+          toast.success(t.updatePasswordSuccess || "Password updated successfully");
           setIsEditingPassword(false);
           setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
         } catch (e: any) {
@@ -170,7 +172,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const handleNavClick = (tab: string) => {
     if (displayApp.status !== "approved" && tab !== "status") {
-      toast.error("You have to get approved first");
+      toast.error(t.getApprovedFirst || "You have to get approved first");
       return;
     }
     if (activeTab === tab) {
@@ -212,7 +214,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           const activities = [
             {
               id: "submission",
-              title: "Application Submitted",
+              title: t.applicationSubmitted || "Application Submitted",
               date: displayApp.created_at,
               icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,7 +227,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           if (data.updated_at && new Date(data.updated_at).getTime() > new Date(displayApp.created_at).getTime()) {
             activities.unshift({
               id: "update",
-              title: "Profile Updated",
+              title: t.profileUpdated || "Profile Updated",
               date: data.updated_at,
               icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -260,7 +262,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         .then(async (res) => {
           if (!res.ok) {
             const text = await res.text();
-            toast.error(`Failed to fetch data: ${res.status} ${text}`);
+            toast.error(`${t.unexpectedError || "Failed to fetch data"}: ${res.status} ${text}`);
             return null;
           }
           return res.json();
@@ -357,7 +359,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         })
         .catch((err) => {
           console.error("Failed to load profile", err);
-          toast.error("Failed to load hospital profile data");
+          toast.error(t.errorLoadingProfile || "Failed to load hospital profile data");
         })
         .finally(() => setIsProfileLoading(false));
     }
@@ -373,7 +375,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     setIsSavingProfile(true);
 
     if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-      toast.error("Passwords do not match!");
+      toast.error(t.passwordsMatchError || "Passwords do not match!");
       setIsSavingProfile(false);
       return;
     }
@@ -403,10 +405,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         body: formData,
       });
       if (!res.ok) {
-        toast.error("Failed to update profile");
+        toast.error(t.updateProfileFail || "Failed to update profile");
         return;
       }
-      toast.success("Profile updated successfully!");
+      toast.success(t.updateProfileSuccess || "Profile updated successfully!");
       setDisplayApp(prev => ({ ...prev, name: profileForm.name, image: profileForm.image }));
       setProfileImageFile(null);
       router.refresh();
@@ -470,7 +472,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   function handleUseCurrentLocation(index: number) {
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser");
+      toast.error(t.geoNotSupported || "Geolocation is not supported by your browser");
       return;
     }
     navigator.geolocation.getCurrentPosition((position) => {
@@ -481,7 +483,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         longitude: position.coords.longitude.toFixed(6)
       };
       setLocations(list);
-    }, (err) => toast.error("Could not retrieve location: " + err.message));
+    }, (err) => toast.error((t.geoError || "Could not retrieve location: ") + err.message));
   }
 
   async function handlePasteCoordinates(index: number) {
@@ -497,10 +499,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         };
         setLocations(list);
       } else {
-        toast.error("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error(t.pasteCoordError || "Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
-      toast.error("Failed to read clipboard.");
+      toast.error(t.clipboardError || "Failed to read clipboard.");
     }
   }
 
@@ -554,10 +556,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         body: formData,
       });
       if (!res.ok) {
-        toast.error("Failed to update information");
+        toast.error(t.unexpectedError || "Failed to update information");
         return;
       }
-      toast.success("Information updated successfully!");
+      toast.success(t.updateProfileSuccess || "Information updated successfully!");
       router.refresh();
       setIsEditingUpdates(false);
     } catch (e: any) {
@@ -601,7 +603,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                <span className="hidden md:block">Dashboard</span>
+                <span className="hidden md:block">{t.dashboard}</span>
               </>
             )}
           </button>
@@ -624,7 +626,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="hidden md:block">Updates</span>
+                <span className="hidden md:block">{t.updates}</span>
               </>
             )}
           </button>
@@ -647,7 +649,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="hidden md:block">Bookings</span>
+                <span className="hidden md:block">{t.bookings}</span>
               </>
             )}
           </button>
@@ -670,7 +672,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                <span className="hidden md:block">My Hospital</span>
+                <span className="hidden md:block">{t.myHospital}</span>
               </>
             )}
           </button>
@@ -694,7 +696,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="hidden md:block">Settings</span>
+                <span className="hidden md:block">{t.settings}</span>
               </>
             )}
           </button>
@@ -717,7 +719,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="hidden md:block">Status</span>
+                <span className="hidden md:block">{t.status}</span>
               </>
             )}
           </button>
@@ -731,7 +733,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          <span className="hidden md:block">Logout</span>
+          <span className="hidden md:block">{t.logout}</span>
         </button>
       </div>
 
@@ -739,7 +741,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white shadow-sm border-b border-gray-200 px-4 md:px-8 py-5">
           <h2 className="text-center text-xl font-semibold text-gray-800">
-            Greetings and welcome dear {displayApp.name} on Dr. Gahungu Platform.
+            {t.welcomeGreeting} {displayApp.name} {t.welcomeGreetingSuffix}
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -747,24 +749,24 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "dashboard" && (
               <div>
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Dashboard Overview</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.dashboardOverview}</h3>
                 {isDashboardLoading ? (
-                  <div className="text-center py-10">Loading stats...</div>
+                  <div className="text-center py-10">{t.loadingStats}</div>
                 ) : (
                   <div className="space-y-8"> {/* Changed to space-y-8 for vertical spacing */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {/* Adjusted grid layout */}
                       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
-                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Profile Views</h4>
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">{t.totalProfileViews}</h4>
                         <div className="text-4xl font-bold text-indigo-600">{dashboardStats.totalViews}</div>
                       </div>
                       {/* Total Revenue Card */}
                       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
-                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Revenue</h4>
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">{t.totalRevenue}</h4>
                         <div className="text-4xl font-bold text-green-600">
                           {totalRevenue.toLocaleString()} <span className="text-base text-gray-400">BIF</span>
                         </div>
                         <button
-                          onClick={() => toast.success("The team is implementing it for soon")}
+                          onClick={() => toast.success(t.withdrawSoon || "The team is implementing it for soon")}
                           disabled={totalRevenue === 0}
                           className={`mt-4 px-4 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                             totalRevenue > 0
@@ -772,18 +774,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               : "bg-gray-200 text-gray-500 cursor-not-allowed"
                           }`}
                         >
-                          Withdraw
+                          {t.withdraw}
                         </button>
                       </div>
                       {/* Placeholder for Total Bookings */}
                       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center">
-                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">Total Bookings</h4>
+                        <h4 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-2">{t.totalBookings}</h4>
                         <div className="text-4xl font-bold text-blue-600">{totalBookings}</div>
                       </div>
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="text-gray-800 font-bold mb-4">Profile Views (Last 7 Days)</h4>
+                      <h4 className="text-gray-800 font-bold mb-4">{t.profileViewsLast7Days}</h4>
                       <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData}>
@@ -798,7 +800,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div>
-                      <h3 className="text-lg font-bold mb-4 text-gray-800">Recent Activities</h3>
+                      <h3 className="text-lg font-bold mb-4 text-gray-800">{t.recentActivities}</h3>
                       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         {recentActivities.length > 0 ? (
                           <div className="divide-y divide-gray-100">
@@ -815,7 +817,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             ))}
                           </div>
                         ) : (
-                          <div className="p-8 text-center text-gray-500">No recent activities found.</div>
+                          <div className="p-8 text-center text-gray-500">{t.noRecentActivity}</div>
                         )}
                       </div>
                     </div>
@@ -827,11 +829,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             {activeTab === "bookings" && (
               <div className="bg-white p-10 rounded-2xl shadow-sm border border-gray-100 text-center animate-in fade-in duration-500">
                 <div className="text-6xl mb-4">📅</div>
-                <h3 className="text-2xl font-bold text-gray-800">Hospital Bookings</h3>
+                <h3 className="text-2xl font-bold text-gray-800">{t.hospitalBookings}</h3>
                 <p className="text-gray-500 mt-2">
-                  This feature is currently under development.
+                  {t.featureUnderDevelopment}
                 </p>
-                <div className="mt-6 inline-block px-4 py-2 bg-green-100 text-green-700 rounded-full font-bold text-sm">Coming Soon</div>
+                <div className="mt-6 inline-block px-4 py-2 bg-green-100 text-green-700 rounded-full font-bold text-sm">{t.comingSoon}</div>
               </div>
             )}
 
@@ -839,25 +841,25 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               <div className="flex flex-col items-center">
                 <div className="text-center">
                   <p>
-                    <strong>Status:</strong> <span className={`${statusColorMap[displayApp.status]} font-bold`}>{displayApp.status}</span>
+                    <strong>{t.status}:</strong> <span className={`${statusColorMap[displayApp.status]} font-bold`}>{displayApp.status}</span>
                   </p>
                   <p><strong>Submitted:</strong> {new Date(displayApp.created_at).toLocaleString()}</p>
                   {displayApp.status === "pending" && (
                     <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-2xl">
-                      <p className="font-bold">Under Review</p>
-                      <p>Your application is currently being reviewed by our team.</p>
+                      <p className="font-bold">{t.underReview}</p>
+                      <p>{t.pendingStatusMessage}</p>
                     </div>
                   )}
                   {displayApp.status === "approved" && (
                     <div className="mt-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-2xl">
-                      <p className="font-bold">Approved</p>
-                      <p>Congratulations! Your application has been approved.</p>
+                      <p className="font-bold">{t.approved}</p>
+                      <p>{t.approvedStatusMessage}</p>
                     </div>
                   )}
                   {displayApp.status === "rejected" && (
                     <div className="mt-4 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-2xl">
-                      <p className="font-bold">Rejected</p>
-                      <p>Unfortunately, your application was rejected. Reason: {displayApp.rejection_reason || "No reason provided"}</p>
+                      <p className="font-bold">{t.rejected}</p>
+                      <p>{t.rejectedStatusMessage} {displayApp.rejection_reason || t.noReason}</p>
                       <button
                         onClick={() => {
                           setIsNavigating(true);
@@ -870,10 +872,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {isNavigating ? (
                           <>
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Loading Form...
+                            {t.loadingForm}
                           </>
                         ) : (
-                          "Edit and Resubmit Application"
+                          t.editResubmitApp
                         )}
                       </button>
 
@@ -885,23 +887,23 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "updates" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Hospital Updates</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.hospitalUpdates}</h3>
                 {isProfileLoading ? (
-                  <div className="text-center py-10">Loading updates...</div>
+                  <div className="text-center py-10">{t.loadingUpdates}</div>
                 ) : !isEditingUpdates ? (
                   <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200 space-y-6">
 
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">📋 Services Summary</h4>
-                        <p className="text-gray-600 whitespace-pre-wrap">{profileForm.service_summary || "No service summary available."}</p>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">📋 {t.servicesSummary}</h4>
+                        <p className="text-gray-600 whitespace-pre-wrap">{profileForm.service_summary || t.noServiceSummary}</p>
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🧾 Patient Admission & Treatment Process</h4>
-                        <p className="text-gray-600 whitespace-pre-wrap">{profileForm.admission_process || "No admission process details available."}</p>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🧾 {t.admissionProcess}</h4>
+                        <p className="text-gray-600 whitespace-pre-wrap">{profileForm.admission_process || t.noAdmissionProcess}</p>
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🛠️ Available Services</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🛠️ {t.availableServices}</h4>
                         {availableServices.length > 0 ? (
                           <div className="space-y-3">
                             {availableServices.map((s, i) => (
@@ -911,10 +913,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </div>
                             ))}
                           </div>
-                        ) : <p className="text-gray-500 italic">No services listed.</p>}
+                        ) : <p className="text-gray-500 italic">{t.noServicesListed}</p>}
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🩸 Available Blood Types</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🩸 {t.availableBloodTypes}</h4>
                         {availableBloodTypes.length > 0 ? (
                           <div className="flex flex-wrap gap-2">
                             {availableBloodTypes.map((b, i) => (
@@ -923,41 +925,41 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </span>
                             ))}
                           </div>
-                        ) : <p className="text-gray-500 italic">No blood types listed.</p>}
+                        ) : <p className="text-gray-500 italic">{t.noBloodTypesListed}</p>}
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🩺 Medical Equipment</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🩺 {t.medicalEquipment}</h4>
                         {medicalEquipment.length > 0 ? (
                           <div className="space-y-3">
                             {medicalEquipment.map((e, i) => (
                               <div key={i} className="bg-white p-3 rounded border border-gray-100 flex justify-between items-center">
                                 <span className="font-bold text-gray-800">{e.name}</span>
                                 <span className={`text-xs px-2 py-1 rounded-full font-medium border ${e.status === 'Operational' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-yellow-50 text-yellow-700 border-yellow-100'}`}>
-                                  {e.status}
+                                  {e.status === 'Operational' ? t.operational : t.maintenance}
                                 </span>
                               </div>
                             ))}
                           </div>
-                        ) : <p className="text-gray-500 italic">No medical equipment listed.</p>}
+                        ) : <p className="text-gray-500 italic">{t.noEquipmentListed}</p>}
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏥 Partner Insurances</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏥 {t.partnerInsurances}</h4>
                         {insurancesList.length > 0 ? (
                           <ul className="list-none space-y-1">
                             {insurancesList.map((h, i) => <li key={i} className="text-gray-600">➢ {h}</li>)}
                           </ul>
-                        ) : <p className="text-gray-500 italic">No partner insurances listed.</p>}
+                        ) : <p className="text-gray-500 italic">{t.noInsurancesListed}</p>}
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">💊 Partner Pharmacies</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">💊 {t.partnerPharmacies}</h4>
                         {pharmaciesList.length > 0 ? (
                           <ul className="list-none space-y-1">
                             {pharmaciesList.map((p, i) => <li key={i} className="text-gray-600">➢ {p}</li>)}
                           </ul>
-                        ) : <p className="text-gray-500 italic">No partner pharmacies listed.</p>}
+                        ) : <p className="text-gray-500 italic">{t.noPharmaciesListed}</p>}
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏢 Locations</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏢 {t.locations}</h4>
                         {Locations.length > 0 ? (
                           <div className="space-y-3">
                             {Locations.map((loc, i) => (
@@ -968,25 +970,25 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </div>
                             ))}
                           </div>
-                        ) : <p className="text-gray-500 italic">No locations listed.</p>}
+                        ) : <p className="text-gray-500 italic">{t.noLocationsListed}</p>}
                       </div>
                       <div className="border-t border-gray-200 pt-4">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">📞 Contact Details</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">📞 {t.contactDetails}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Customer Support Email</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.customerSupportEmail}</span>
                             <span className="text-gray-700 font-medium">{profileForm.contact_email || "N/A"}</span>
                           </div>
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Phone / WhatsApp</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.phoneWhatsApp}</span>
                             <span className="text-gray-700 font-medium">{profileForm.contact_phone || "N/A"}</span>
                           </div>
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Head Office</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.headOffice}</span>
                             <span className="text-gray-700 font-medium">{profileForm.contact_office || "N/A"}</span>
                           </div>
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Website</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.website}</span>
                             <a href={profileForm.contact_website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">{profileForm.contact_website || "N/A"}</a>
                           </div>
                         </div>
@@ -1000,13 +1002,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      Edit
+                      {t.edit}
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">📋 Services Summary</label>
+                      <label className="block font-semibold text-gray-700 mb-1">📋 {t.servicesSummary}</label>
                       <textarea
                         rows={4}
                         value={profileForm.service_summary}
@@ -1016,7 +1018,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       />
                     </div>
                     <div>
-                      <label className="block font-semibold text-gray-700 mb-1">🧾 Patient Admission & Treatment Process</label>
+                      <label className="block font-semibold text-gray-700 mb-1">🧾 {t.admissionProcess}</label>
                       <textarea
                         rows={4}
                         value={profileForm.admission_process}
@@ -1028,8 +1030,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block font-semibold text-gray-700">🛠️ Available Services</label>
-                        <button onClick={addService} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Service</button>
+                        <label className="block font-semibold text-gray-700">🛠️ {t.availableServices}</label>
+                        <button onClick={addService} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addService}</button>
                       </div>
                       <div className="space-y-3">
                         {availableServices.map((service, index) => (
@@ -1057,14 +1059,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                         ))}
-                        {availableServices.length === 0 && <div className="text-sm text-gray-500 italic">No services added.</div>}
+                        {availableServices.length === 0 && <div className="text-sm text-gray-500 italic">{t.noServicesListed}</div>}
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block font-semibold text-gray-700">🩸 Available Blood Types</label>
-                        <button onClick={addBloodType} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Blood Type</button>
+                        <label className="block font-semibold text-gray-700">🩸 {t.availableBloodTypes}</label>
+                        <button onClick={addBloodType} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addBloodType}</button>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {availableBloodTypes.map((bt, index) => (
@@ -1082,13 +1084,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </div>
                         ))}
                       </div>
-                      {availableBloodTypes.length === 0 && <div className="text-sm text-gray-500 italic">No blood types added.</div>}
+                      {availableBloodTypes.length === 0 && <div className="text-sm text-gray-500 italic">{t.noBloodTypesListed}</div>}
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block font-semibold text-gray-700">🩺 Medical Equipment</label>
-                        <button onClick={addEquipment} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Equipment</button>
+                        <label className="block font-semibold text-gray-700">🩺 {t.medicalEquipment}</label>
+                        <button onClick={addEquipment} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addEquipment}</button>
                       </div>
                       <div className="space-y-3">
                         {medicalEquipment.map((item, index) => (
@@ -1111,20 +1113,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 onChange={(e) => updateEquipment(index, "status", e.target.value)}
                                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                               >
-                                <option value="Operational">Operational</option>
-                                <option value="Maintenance">Maintenance</option>
+                                <option value="Operational">{t.operational}</option>
+                                <option value="Maintenance">{t.maintenance}</option>
                               </select>
                             </div>
                           </div>
                         ))}
-                        {medicalEquipment.length === 0 && <div className="text-sm text-gray-500 italic">No equipment added.</div>}
+                        {medicalEquipment.length === 0 && <div className="text-sm text-gray-500 italic">{t.noEquipmentListed}</div>}
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block font-semibold text-gray-700">🏥 Partner Insurances</label>
-                        <button onClick={addInsurance} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Insurance</button>
+                        <label className="block font-semibold text-gray-700">🏥 {t.partnerInsurances}</label>
+                        <button onClick={addInsurance} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addInsurance}</button>
                       </div>
                       <div className="space-y-2">
                         {insurancesList.map((insurance, index) => (
@@ -1142,13 +1144,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </button>
                           </div>
                         ))}
-                        {insurancesList.length === 0 && <div className="text-sm text-gray-500 italic">No insurances added.</div>}
+                        {insurancesList.length === 0 && <div className="text-sm text-gray-500 italic">{t.noInsurancesListed}</div>}
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block font-semibold text-gray-700">💊 Partner Pharmacies</label>
-                        <button onClick={addPharmacy} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Pharmacy</button>
+                        <label className="block font-semibold text-gray-700">💊 {t.partnerPharmacies}</label>
+                        <button onClick={addPharmacy} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addPharmacy}</button>
                       </div>
                       <div className="space-y-2">
                         {pharmaciesList.map((pharmacy, index) => (
@@ -1166,14 +1168,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </button>
                           </div>
                         ))}
-                        {pharmaciesList.length === 0 && <div className="text-sm text-gray-500 italic">No pharmacies added.</div>}
+                        {pharmaciesList.length === 0 && <div className="text-sm text-gray-500 italic">{t.noPharmaciesListed}</div>}
                       </div>
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="block font-semibold text-gray-700">🏢 Locations</label>
-                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Location</button>
+                        <label className="block font-semibold text-gray-700">🏢 {t.locations}</label>
+                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addLocation}</button>
                       </div>
                       <div className="space-y-4">
                         {Locations.map((loc, index) => (
@@ -1187,8 +1189,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 onChange={(e) => updateLocation(index, "type", e.target.value)}
                                 className="border rounded px-3 py-2 text-sm"
                               >
-                                <option value="Main Location">Main Location</option>
-                                <option value="Branch Location">Branch Location</option>
+                                <option value="Main Location">{t.mainLocation}</option>
+                                <option value="Branch Location">{t.branchLocation}</option>
                               </select>
                               <input
                                 type="text"
@@ -1236,7 +1238,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg hidden group-hover:block z-10">
-                                  Right-click the pin on the map to see coordinates.
+                                  {t.rightClickMapHint}
                                 </div>
                               </div>
                               <button
@@ -1250,7 +1252,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
-                                Find on Map
+                                {t.findOnMap}
                               </button>
                               <button
                                 onClick={() => handlePasteCoordinates(index)}
@@ -1259,7 +1261,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
-                                Paste Coordinates
+                                {t.pasteCoordinates}
                               </button>
                               <button
                                 onClick={() => handleUseCurrentLocation(index)}
@@ -1268,7 +1270,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                                 </svg>
-                                Use Current Location
+                                {t.useCurrentLocation}
                               </button>
                             </div>
                             {loc.latitude && loc.longitude && !isNaN(Number(loc.latitude)) && !isNaN(Number(loc.longitude)) && (
@@ -1284,15 +1286,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             )}
                           </div>
                         ))}
-                        {Locations.length === 0 && <div className="text-sm text-gray-500 italic">No locations added.</div>}
+                        {Locations.length === 0 && <div className="text-sm text-gray-500 italic">{t.noLocationsListed}</div>}
                       </div>
                     </div>
 
                     <div className="border-t border-gray-200 pt-4">
-                      <h4 className="font-semibold text-gray-700 mb-3">📞 Contact Details</h4>
+                      <h4 className="font-semibold text-gray-700 mb-3">📞 {t.contactDetails}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Customer Support Email</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t.customerSupportEmail}</label>
                           <input
                             type="email"
                             value={profileForm.contact_email}
@@ -1302,7 +1304,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone / WhatsApp</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t.phoneWhatsApp}</label>
                           <input
                             type="text"
                             value={profileForm.contact_phone}
@@ -1312,7 +1314,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Head Office</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t.headOffice}</label>
                           <input
                             type="text"
                             value={profileForm.contact_office}
@@ -1322,7 +1324,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{t.website}</label>
                           <input
                             type="url"
                             value={profileForm.contact_website}
@@ -1340,7 +1342,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
-                        Cancel
+                        {t.cancel || "Cancel"}
                       </button>
                       <button
                         onClick={handleSaveUpdates}
@@ -1350,9 +1352,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {isSavingProfile ? (
                           <>
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Saving...
+                            {t.saving}
                           </>
-                        ) : "Save Updates"}
+                        ) : t.saveUpdates}
                       </button>
                     </div>
                   </div>
@@ -1362,9 +1364,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "profile" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Hospital</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.myHospital}</h3>
                 {isProfileLoading ? (
-                  <div className="text-center py-10">Loading profile...</div>
+                  <div className="text-center py-10">{t.loadingProfile}</div>
                 ) : !isEditingProfile ? (
                   <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200">
@@ -1386,19 +1388,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">WhatsApp</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.whatsappNumber}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.whatsapp_number || "Not set"}</p>
                         </div>
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment ID</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.paymentId}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.payment_id || "Not set"}</p>
                         </div>
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Country</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.country}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.country || "Not set"}</p>
                         </div>
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Origin Country</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.originCountry}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.origin_country || "Not set"}</p>
                         </div>
                       </div>
@@ -1411,7 +1413,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      Update Profile
+                      {t.updateProfile}
                     </button>
                   </div>
                 ) : (
@@ -1432,14 +1434,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           {isUploadingProfileImage ? (
                             <>
                               <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                              Uploading...
+                              {t.updating}
                             </>
                           ) : (
                             <>
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                               </svg>
-                              Change Photo
+                              {t.changePhoto}
                             </>
                           )}
                           <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" disabled={isUploadingProfileImage} />
@@ -1449,7 +1451,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Full Name</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.fullName}</label>
                         <input
                           type="text"
                           value={profileForm.name}
@@ -1458,7 +1460,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Email</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.email}</label>
                         <input
                           type="email"
                           value={profileForm.email}
@@ -1468,7 +1470,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       </div>
 
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">WhatsApp Number</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.whatsappNumber}</label>
                         <input
                           type="text"
                           value={profileForm.whatsapp_number}
@@ -1477,7 +1479,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Country</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.country}</label>
                         <input
                           type="text"
                           value={profileForm.country}
@@ -1486,7 +1488,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Country of Origin</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.originCountry}</label>
                         <input
                           type="text"
                           value={profileForm.origin_country}
@@ -1495,7 +1497,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Payment ID</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.paymentId}</label>
                         <input
                           type="text"
                           value={profileForm.payment_id}
@@ -1511,7 +1513,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
                         disabled={isSavingProfile}
                       >
-                        Cancel
+                        {t.cancel || "Cancel"}
                       </button>
                       <button
                         onClick={handleSaveProfile}
@@ -1521,9 +1523,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {isSavingProfile ? (
                           <>
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Saving...
+                            {t.saving}
                           </>
-                        ) : "Save Profile"}
+                        ) : t.saveProfile}
                       </button>
                     </div>
                   </div>
@@ -1533,42 +1535,42 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "settings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Settings</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.settings}</h3>
                 {isProfileLoading ? (
-                  <div className="text-center py-10">Loading settings...</div>
+                  <div className="text-center py-10">{t.loadingStats}</div>
                 ) : (
                   <div className="max-w-2xl">
                     <div className="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.fullName}</label>
                       <div className="text-lg font-bold text-gray-900">{profileForm.name}</div>
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">
-                      <h4 className="font-bold text-gray-800 mb-4">Security</h4>
+                      <h4 className="font-bold text-gray-800 mb-4">{t.security}</h4>
                       {!isEditingPassword ? (
                         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Password</label>
+                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.password}</label>
                             <div className="text-lg font-bold text-gray-900">••••••••</div>
                           </div>
                           <button
                             onClick={() => setIsEditingPassword(true)}
                             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium"
                           >
-                            Update Password
+                            {t.updatePassword}
                           </button>
                         </div>
                       ) : (
                         <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">Current Password</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.currentPassword}</label>
                             <div className="relative">
                               <input
                                 type={showOldPassword ? "text" : "password"}
                                 value={passwordForm.oldPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder="Enter current password"
+                                placeholder={t.enterCurrentPassword}
                               />
                               <button
                                 type="button"
@@ -1584,14 +1586,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">New Password</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.newPassword}</label>
                             <div className="relative">
                               <input
                                 type={showNewPassword ? "text" : "password"}
                                 value={passwordForm.newPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder="Enter new password"
+                                placeholder={t.enterNewPassword}
                               />
                               <button
                                 type="button"
@@ -1607,14 +1609,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">Confirm New Password</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.confirmNewPassword}</label>
                             <div className="relative">
                               <input
                                 type={showConfirmPassword ? "text" : "password"}
                                 value={passwordForm.confirmPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder="Confirm new password"
+                                placeholder={t.confirmNewPassword}
                               />
                               <button
                                 type="button"
@@ -1659,14 +1661,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             {showLogoutConfirm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
                 <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Logout</h3>
-                  <p className="text-gray-600 mb-6">Are you sure you want to log out?</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t.confirmLogout}</h3>
+                  <p className="text-gray-600 mb-6">{t.confirmLogoutMessage}</p>
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowLogoutConfirm(false)}
                       className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                     >
-                      Cancel
+                      {t.cancel || "Cancel"}
                     </button>
                     <button
                       onClick={handleLogout}
@@ -1679,9 +1681,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Logging out...
+                          {t.loggingOut}
                         </>
-                      ) : "Logout"}
+                      ) : t.logout}
                     </button>
                   </div>
                 </div>
