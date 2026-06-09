@@ -140,7 +140,7 @@ export default function BannerModal({
           </div>
           {bannerForm.image && <img src={bannerForm.image} alt="Preview" className="w-full h-auto object-contain rounded border" />}
           
-          <input type="text" name="link" placeholder="Link URL (e.g., /products/123)" value={bannerForm.link} onChange={handleBannerChange} className="w-full border p-2 rounded" />
+          <input type="text" name="link" placeholder="Link URL (e.g: /products/123)" value={bannerForm.link} onChange={handleBannerChange} className="w-full border p-2 rounded" />
         </form>
         <div className="p-6 border-t shrink-0">
           {formError && <p className="text-red-500 text-sm mb-4">{formError}</p>}

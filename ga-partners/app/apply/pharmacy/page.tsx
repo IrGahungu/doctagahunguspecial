@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
+import { useLanguage } from "../../../context/LanguageContext";
 
 type Pharmacy = {
   id: string;
@@ -63,10 +64,12 @@ export default function PharmacyPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [files, setFiles] = useState<{ image?: File }>({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const { t } = useLanguage();
 
   const applicationStatus = editingPharmacy?.status;
   const rejectionReason = editingPharmacy?.rejection_reason;
@@ -115,10 +118,10 @@ export default function PharmacyPage() {
   }, [editingPharmacy]);
 
   const passwordRequirements = [
-    { label: "At least 8 characters", met: (pharmacyForm.password || "").length >= 8 },
-    { label: "1 capital letter", met: /[A-Z]/.test(pharmacyForm.password || "") },
-    { label: "1 special character (!@#$)", met: /[!@#$%^&*(),.?":{}|<>]/.test(pharmacyForm.password || "") },
-    { label: "At least 3 numbers", met: ((pharmacyForm.password || "").match(/\d/g) || []).length >= 3 },
+    { label: t.atLeast8Chars, met: (pharmacyForm.password || "").length >= 8 },
+    { label: t.oneCapitalLetter, met: /[A-Z]/.test(pharmacyForm.password || "") },
+    { label: t.oneSpecialChar, met: /[!@#$%^&*(),.?":{}|<>]/.test(pharmacyForm.password || "") },
+    { label: t.atLeast3Numbers, met: ((pharmacyForm.password || "").match(/\d/g) || []).length >= 3 },
   ];
 
   const getPasswordStrengthScore = (password: string) => {
@@ -171,25 +174,26 @@ export default function PharmacyPage() {
   );
   function validateForm(): boolean {
     const newErrors: FormErrors = {};
-    if (!pharmacyForm.name) newErrors.name = "Name is required";
-    if (!pharmacyForm.email) newErrors.email = "Email is required";
-    if (!pharmacyForm.whatsapp_number) newErrors.whatsapp_number = "WhatsApp number is required";
-    if (!pharmacyForm.originCountry) newErrors.originCountry = "Origin country is required";
-    if (!pharmacyForm.payment_id) newErrors.payment_id = "Payment ID is required";
+    if (!pharmacyForm.name) newErrors.name = t.pharmacyNameRequired;
+    if (!pharmacyForm.email) newErrors.email = t.emailRequired;
+    if (!pharmacyForm.whatsapp_number) newErrors.whatsapp_number = t.whatsappNumberRequired;
+    if (!pharmacyForm.originCountry) newErrors.originCountry = t.originCountryRequired;
+    if (!pharmacyForm.payment_id) newErrors.payment_id = t.paymentIdRequired;
     if (!editingPharmacy) {
       if (!pharmacyForm.password) {
-        newErrors.password = "Password is required";
+        newErrors.password = t.passwordRequired;
       } else {
         const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>])(?=(?:.*\d){3,}).{8,}$/;
         if (!passwordRegex.test(pharmacyForm.password)) {
-          newErrors.password = "Password must be at least 8 characters, include 1 capital letter, 1 special character, and at least 3 numbers";
+          newErrors.password = t.passwordRequirementsCombined;
         }
       }
     }
-    if (pharmacyForm.password && pharmacyForm.password !== confirmPassword) newErrors.confirmPassword = "Passwords do not match";
-    if (!pharmacyForm.image) newErrors.image = "Pharmacy image is required";
+    if (pharmacyForm.password && pharmacyForm.password !== confirmPassword) newErrors.confirmPassword = t.passwordsDoNotMatch;
+    if (!pharmacyForm.image) newErrors.image = t.pharmacyImageRequired;
 
     setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) toast.error(t.fillAllFieldsAndCorrectErrors);
     return Object.keys(newErrors).length === 0;
   }
 
@@ -199,15 +203,7 @@ export default function PharmacyPage() {
     return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/pharmacy-images/${path}`;
   };
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError(null);
-
-    if (!validateForm()) {
-      setFormError("Please fill out all required fields.");
-      return;
-    }
-
+  async function executeSubmission() {
     setIsSubmitting(true);
 
     try {
@@ -243,35 +239,87 @@ export default function PharmacyPage() {
       } catch (e) {
         throw new Error(`Server error (${res.status}): Invalid JSON response`);
       }
-      if (!res.ok) throw new Error(result.error || "Failed to save Pharmacy");
+      if (!res.ok) throw new Error(result.error || t.serverError);
 
-      toast.success("Application is submitted successfully, Please login to see the status");
-      router.push("/login");
+      toast.success(
+        editingPharmacy ? t.applicationUpdatedSuccess : t.applicationSubmittedSuccess
+      );
+      setTimeout(() => {
+        setShowConfirmModal(false);
+        router.push("/login");
+      }, 2000);
     } catch (err) {
       console.error(err);
-      setFormError(err instanceof Error ? err.message : "Failed to save pharmacy");
+      setFormError(err instanceof Error ? err.message : t.unexpectedError);
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!validateForm()) {
+      return;
+    }
+    setShowConfirmModal(true);
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <Toaster position="top-center" />
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">{t.confirmDetailsTitle}</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                {t.confirmDetailsMessage}
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3 text-sm">
+              <div className="flex justify-between"><span className="text-slate-500">Name:</span> <span className="font-bold text-slate-900">{pharmacyForm.name}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Email:</span> <span className="font-bold text-slate-900">{pharmacyForm.email}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">WhatsApp:</span> <span className="font-bold text-slate-900">{pharmacyForm.whatsapp_number}</span></div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                {t.edit}
+              </button>
+              <button
+                onClick={executeSubmission}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? t.submitting : t.confirmAndSubmit}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-center mb-15">
           <h1 className="inline-block text-2xl font-extrabold tracking-tight text-slate-900 border-b-2 border-green-300 pb-2">
-            {editingPharmacy ? "Edit Pharmacy Details" : "Pharmacy Details"}
+            {editingPharmacy ? t.editPharmacyDetails : t.pharmacyDetails}
           </h1>
         </div>
 
         {applicationStatus === 'rejected' && rejectionReason && (
           <div className="my-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h3 className="font-bold text-red-800">Your Application Needs Attention</h3>
+            <h3 className="font-bold text-red-800">{t.needsAttention}</h3>
             <p className="text-sm text-red-700 mt-1">
-              <span className="font-semibold">Reason for rejection:</span> {rejectionReason}
+              <span className="font-semibold">{t.rejectionReasonLabel}</span> {rejectionReason}
             </p>
-            <p className="text-sm text-red-700 mt-2">Please review your information, make the necessary changes, and resubmit your application.</p>
+            <p className="text-sm text-red-700 mt-2">{t.rejectionInstructions}</p>
           </div>
         )}
 
@@ -283,22 +331,22 @@ export default function PharmacyPage() {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <FieldLabel required>Pharmacy Name</FieldLabel>
+              <FieldLabel required>{t.pharmacyName}</FieldLabel>
               <input
                 type="text"
                 name="name"
-                placeholder="e.g., City Pharmacy"
+                placeholder={t.pharmacyNamePlaceholder}
                 value={pharmacyForm.name}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.name ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
               />
             </div>
             <div>
-              <FieldLabel required>Email</FieldLabel>
+              <FieldLabel required>{t.email}</FieldLabel>
               <input
                 type="email"
                 name="email"
-                placeholder="your@email.com"
+                placeholder="pharmacy@example.com"
                 value={pharmacyForm.email}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.email ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
@@ -308,7 +356,7 @@ export default function PharmacyPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <FieldLabel required>Country</FieldLabel>
+              <FieldLabel required>{t.country}</FieldLabel>
               <select name="country" value={pharmacyForm.country} onChange={handleChange} className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.country ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}>
                 {supportedCountries.map((country) => (
                   <option key={country} value={country}>
@@ -318,11 +366,11 @@ export default function PharmacyPage() {
               </select>
             </div>
             <div>
-              <FieldLabel required>Origin Country</FieldLabel>
+              <FieldLabel required>{t.originCountry}</FieldLabel>
               <input
                 type="text"
                 name="originCountry"
-                placeholder="e.g., France"
+                placeholder={t.originCountryPlaceholder}
                 value={pharmacyForm.originCountry}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.originCountry ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
@@ -331,11 +379,11 @@ export default function PharmacyPage() {
           </div>
 
            <div>
-              <FieldLabel required>Payment ID</FieldLabel>
+              <FieldLabel required>{t.paymentId}</FieldLabel>
               <input
                 type="text"
                 name="payment_id"
-                placeholder="Your Payment ID"
+                placeholder={t.paymentIdPlaceholder}
                 value={pharmacyForm.payment_id}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.payment_id ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
@@ -343,11 +391,11 @@ export default function PharmacyPage() {
             </div>
 
           <div>
-              <FieldLabel required> WhatsApp Number</FieldLabel>
+              <FieldLabel required>{t.whatsappNumber}</FieldLabel>
               <input
                 type="text"
                 name="whatsapp_number"
-                placeholder="Start by your country code like +12345678"
+                placeholder={t.whatsappHintHospital}
                 value={pharmacyForm.whatsapp_number}
                 onChange={handleChange}
                 className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.whatsapp_number ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition`}
@@ -357,12 +405,12 @@ export default function PharmacyPage() {
           {!editingPharmacy && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <FieldLabel required>Password</FieldLabel>
+                <FieldLabel required>{t.password}</FieldLabel>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     name="password"
-                    placeholder="Create a password"
+                    placeholder={t.passwordPlaceholderHospital}
                     value={pharmacyForm.password}
                     onChange={handleChange}
                     className={`w-full rounded-lg px-4 py-3 border border-transparent shadow-sm ring-1 ${errors.password ? 'ring-red-500' : 'ring-slate-200'} focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10`}
@@ -437,11 +485,11 @@ export default function PharmacyPage() {
           )}
 
           <div>
-            <FieldLabel required>Pharmacy Image</FieldLabel>
+            <FieldLabel required>{t.pharmacyImage}</FieldLabel>
             <div className="flex items-center gap-4">
               <label className={`inline-flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-50 border cursor-pointer text-sm shadow-sm ring-1 ${errors.image ? 'ring-red-500' : 'ring-transparent'}`}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                <span>{isUploading ? "Uploading..." : "Choose image"}</span>
+                <span>{isUploading ? t.updating : t.chooseImage}</span>
                 <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={isUploading} />
               </label>
               {pharmacyForm.image && (
@@ -462,11 +510,11 @@ export default function PharmacyPage() {
               className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
             />
             <label htmlFor="terms" className="text-sm text-slate-600 select-none">
-              I agree to the{" "}
+              {t.iAgreeToThe}{" "}
               <a href="#" className="text-blue-600 hover:underline" onClick={(e) => e.preventDefault()}>
-                terms and conditions
+                {t.termsAndConditions}
               </a>{" "}
-              of Dr. Gahungu.
+              {t.ofDrGahungu}
             </label>
           </div>
 
@@ -474,14 +522,38 @@ export default function PharmacyPage() {
           <div className="pt-4">
             {formError && <p className="text-red-500 text-sm text-center mb-4">{formError}</p>}
             <div className="flex justify-center gap-3">
-              <button type="button" onClick={() => setFormError(null)} className="px-4 py-2 rounded-md border border-slate-200 text-sm hover:bg-slate-50 cursor-pointer">Cancel</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPharmacyForm({
+                    name: "",
+                    email: editingPharmacy ? pharmacyForm.email : "",
+                    image: "",
+                    country: "Burundi",
+                    originCountry: "",
+                    whatsapp_number: "",
+                    password: "",
+                    payment_id: "",
+                    id: pharmacyForm.id,
+                  });
+                  setConfirmPassword("");
+                  setFiles({});
+                  setAgreedToTerms(false);
+                  setErrors({});
+                  setPasswordStrength(0);
+                  setFormError(null);
+                }}
+                className="px-4 py-2 rounded-md border border-slate-200 text-sm hover:bg-slate-50 cursor-pointer"
+              >
+                {t.cancel}
+              </button>
               <button
                 type="submit"
                 form="pharmacy-form"
                 className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-linear-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md hover:scale-[1.01] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 disabled={isSubmitting || isUploading || !agreedToTerms}
               >
-                {isSubmitting ? "Submitting..." : "Submit Form"}
+                {isSubmitting ? t.submitting : (editingPharmacy ? t.resubmitForm : t.submitForm)}
               </button>
             </div>
           </div>

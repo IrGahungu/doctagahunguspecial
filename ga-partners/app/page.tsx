@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useLanguage } from "../context/LanguageContext";
-import LanguageSelector from "../components/LanguageSelector";
+import LanguageSelector from "./LanguageSelector";
 
 export default function HomePage() {
   const { t } = useLanguage();

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Language, partnerTranslations, PartnerTranslations } from '../app/translations';
+import { partnerTranslations, PartnerTranslations, Language } from '../app/translations';
 
 interface LanguageContextType {
   lang: Language;
@@ -11,21 +11,24 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Default to English for initial SSR consistency
   const [lang, setLangState] = useState<Language>('en');
 
+  // Load persisted language from localStorage on mount
   useEffect(() => {
-    const storedLang = localStorage.getItem('partner_portal_language') as Language;
-    if (storedLang === 'en' || storedLang === 'fr') {
-      setLangState(storedLang);
+    const savedLang = localStorage.getItem('partner_language') as Language;
+    if (savedLang && (savedLang === 'en' || savedLang === 'fr')) {
+      setLangState(savedLang);
     }
   }, []);
 
   const setLang = (newLang: Language) => {
     setLangState(newLang);
-    localStorage.setItem('partner_portal_language', newLang);
+    localStorage.setItem('partner_language', newLang);
   };
 
+  // Dynamically get the translation object based on current state
   const t = partnerTranslations[lang];
 
   return (
@@ -33,10 +36,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       {children}
     </LanguageContext.Provider>
   );
-}
+};
 
-export function useLanguage() {
+export const useLanguage = () => {
   const context = useContext(LanguageContext);
-  if (!context) throw new Error("useLanguage must be used within a LanguageProvider");
+  if (context === undefined) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
+  }
   return context;
-}
+};

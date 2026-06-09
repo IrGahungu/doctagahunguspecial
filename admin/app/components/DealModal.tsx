@@ -142,7 +142,7 @@ export default function DealModal({
         </div>
         <form id="deal-form" onSubmit={handleDealSubmit} className="p-6 space-y-4 overflow-y-auto">
           <input type="text" name="title" placeholder="Deal Title" value={dealForm.title} onChange={handleDealChange} className="w-full border p-2 rounded" />
-          <input type="text" name="discount" placeholder="Discount Text (e.g., Up to 30% Off)" value={dealForm.discount} onChange={handleDealChange} className="w-full border p-2 rounded" />
+          <input type="text" name="discount" placeholder="Discount Text (e.g: Up to 30% Off)" value={dealForm.discount} onChange={handleDealChange} className="w-full border p-2 rounded" />
           <input type="text" name="tagline" placeholder="Tagline" value={dealForm.tagline} onChange={handleDealChange} className="w-full border p-2 rounded" />
           <div>
             <label className="block text-sm font-medium text-gray-700">Deal Image</label>

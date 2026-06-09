@@ -499,7 +499,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         };
         setLocations(list);
       } else {
-        toast.error(t.pasteCoordError || "Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error(t.pasteCoordError || "Could not find valid coordinates (e.g: '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
       toast.error(t.clipboardError || "Failed to read clipboard.");

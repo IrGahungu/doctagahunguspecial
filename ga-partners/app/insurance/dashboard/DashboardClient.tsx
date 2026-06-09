@@ -435,7 +435,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         list[index].longitude = matches[1];
         setOfficeLocations(list);
       } else {
-        toast.error("Could not find valid coordinates (e.g., '-1.95, 30.06') in clipboard.");
+        toast.error("Could not find valid coordinates (e.g: '-1.95, 30.06') in clipboard.");
       }
     } catch (err) {
       toast.error("Failed to read clipboard.");

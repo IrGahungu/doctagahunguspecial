@@ -1,9 +1,8 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
 
-export type Language = 'en' | 'fr' | 'rn'; // rn for Kirundi (Rundi)
+export type Language = 'en' | 'fr' | 'rn';
 
-interface LanguageState {
+export interface LanguageState {
   language: Language;
   setLanguage: (lang: Language) => Promise<void>;
   loadLanguage: () => Promise<void>;
@@ -11,12 +10,20 @@ interface LanguageState {
 
 export const useLanguageStore = create<LanguageState>((set) => ({
   language: 'en',
+
   setLanguage: async (lang: Language) => {
-    await SecureStore.setItemAsync('user_language', lang);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user_language', lang);
+    }
+
     set({ language: lang });
   },
+
   loadLanguage: async () => {
-    const lang = await SecureStore.getItemAsync('user_language');
+    if (typeof window === 'undefined') return;
+
+    const lang = localStorage.getItem('user_language');
+
     if (lang) {
       set({ language: lang as Language });
     }
@@ -202,7 +209,7 @@ export const translations = {
     retry: "Retry",
     "update profile": "Update Profile",
     "full name": "Full Name",
-    "whatsapp number": "WhatsApp Number (e.g., +257...)",
+    "whatsapp number": "WhatsApp Number (e.g: +257...)",
     updating: "Updating...",
     "save changes": "Save Changes",
     "failed to load profile": "Failed to load profile information.",
@@ -425,7 +432,7 @@ export const translations = {
     "fullname hint": "Enter your name like: GAHUNGU",
     "fullname required": "Full name is required.",
     "password": "Password",
-    "password hint long": "Use letters and numbers, at least 8 chars. e.g., Gahungu12345",
+    "password hint long": "Use letters and numbers, at least 8 chars. e.g: Gahungu12345",
     "password must be at least 8 characters": "Password must be at least 8 characters.",
     "password must contain both letters and numbers": "Password must contain both letters and numbers.",
     "confirm password hint": "Repeat the password you just entered",
@@ -434,7 +441,7 @@ export const translations = {
     "select country": "Select your country",
     "search country": "Search country...",
     "country hint long": "Click and select the country you are in now",
-    "whatsapp format error": "Enter a valid number with country code (e.g., +257...).",
+    "whatsapp format error": "Enter a valid number with country code (e.g: +257...).",
     "whatsapp registered error": "This WhatsApp number is already registered.",
     "error checking whatsapp": "Error checking WhatsApp number.",
     "checking whatsapp": "Checking WhatsApp number...",
@@ -534,7 +541,28 @@ export const translations = {
   "update username": "Update Username",
   "username hint": "3-15 characters long and can only contain letters, numbers, and underscores.",
   username: "Username",
-  "write your comment here...": "write your comment here..."
+  "write your comment here...": "write your comment here...",
+  "edit your application": "Edit Your Application",
+  "welcome doctor application": "Welcome Doctor",
+  "needs attention": "Your Application Needs Attention",
+  "rejection reason label": "Reason for rejection:",
+  "rejection instructions": "Please review your information, make the necessary changes, and resubmit your application.",
+  "specialty": "Specialty",
+  "country of origin": "Country of Origin",
+  "bio": "Bio",
+  "bio placeholder": "A brief biography of the doctor...",
+  "payment id": "Payment ID",
+  "payment id placeholder": "Your Payment ID",
+  "whatsapp hint doctor": "Start by your country code like +12345678",
+  "password placeholder doctor": "Create a password",
+  "doctor image": "Doctor Image",
+  "choose image": "Choose image",
+  "doctor terms": "I hereby agree and accept the terms and conditions of Dr. Gahungu.",
+  "resubmit form": "Resubmit Form",
+  "submit form": "Submit Form",
+  "application updated success": "Application updated successfully! We will review it shortly.",
+  "application submitted success": "Application submitted successfully! Login to check your status.",
+  "submitting": "Submitting..."
   },
 
   fr: {
@@ -1048,6 +1076,27 @@ export const translations = {
   "enter username": "Entrez le nom d'utilisateur souhaité",
   "failed to submit comment": "Commentaire non Soumis",
   "comment submitted":"Commentaire Soumis",
+  "edit your application": "Modifier votre demande",
+  "welcome doctor application": "Bienvenue Docteur",
+  "needs attention": "Votre demande nécessite une attention particulière",
+  "rejection reason label": "Motif du rejet :",
+  "rejection instructions": "Veuillez revoir vos informations, apporter les modifications nécessaires et soumettre à nouveau votre demande.",
+  "specialty": "Spécialité",
+  "country of origin": "Pays d'origine",
+  "bio": "Bio",
+  "bio placeholder": "Une brève biographie du docteur...",
+  "payment id": "ID de paiement",
+  "payment id placeholder": "Votre ID de paiement",
+  "whatsapp hint doctor": "Commencez par le code pays comme +12345678",
+  "password placeholder doctor": "Créez un mot de passe",
+  "doctor image": "Image du docteur",
+  "choose image": "Choisir une image",
+  "doctor terms": "J'accepte par la présente les conditions générales du Dr Gahungu.",
+  "resubmit form": "Renvoyer le formulaire",
+  "submit form": "Soumettre le formulaire",
+  "application updated success": "Demande mise à jour avec succès ! Nous l'examinerons prochainement.",
+  "application submitted success": "Demande soumise avec succès ! Connectez-vous pour vérifier votre statut.",
+  "submitting": "Envoi en cours..."
 },
   rn: {
   "write your comment here...": "Andika komantere yawe hano...",
@@ -1560,5 +1609,26 @@ export const translations = {
   "on post": "Kuri post",
   "create username title": "Kora username",
   "card maintenance": "Kuriha n'ikarata biriko birasanurwa.",
+  "edit your application": "Hindura ubusabe bwawe",
+  "welcome doctor application": "Murakaza neza muganga",
+  "needs attention": "Ubusabe bwawe bukeneye kwitwararirwa",
+  "rejection reason label": "Imvo zatumye vyankwa:",
+  "rejection instructions": "Nyamuneka raba neza amakuru yawe, uhindure ibikenewe, uheze usubire urungike ubusabe bwawe.",
+  "specialty": "Umwuga wawe",
+  "country of origin": "Igihugu ukomokamo",
+  "bio": "Bio",
+  "bio placeholder": "Incamake y'ubuzima bwa muganga...",
+  "payment id": "ID yo kuriha",
+  "payment id placeholder": "ID yawe yo kuriha",
+  "whatsapp hint doctor": "Tanguza kode y'igihugu nka +12345678",
+  "password placeholder doctor": "Kora password",
+  "doctor image": "Ishusho ya muganga",
+  "choose image": "Hitamwo ishusho",
+  "doctor terms": "Nemeye amategeko n'amabwirizwa ya Dr. Gahungu.",
+  "resubmit form": "Subira urungike ubusabe",
+  "submit form": "Rungika ubusabe",
+  "application updated success": "Ubusabe bwahinduwe neza! Turaba turabusuzuma vuba.",
+  "application submitted success": "Ubusabe bwarungitswe neza! Injira kugira urabe aho bigeze.",
+  "submitting": "Turiko turarungika..."
 }
 };
