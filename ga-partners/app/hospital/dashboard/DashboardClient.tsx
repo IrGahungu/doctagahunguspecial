@@ -129,7 +129,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     }
   }
 
-  async function handlePasswordUpdate() {
+ async function handlePasswordUpdate() {
         if (passwordForm.newPassword !== passwordForm.confirmPassword) {
           toast.error(t.passwordsMatchError || "New passwords do not match");
           return;
@@ -147,7 +147,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         try {
           const res = await fetch(`/api/hospital/change-password`, {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               id: app.id,
               oldPassword: passwordForm.oldPassword,
@@ -155,10 +157,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             }),
           });
           const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || (t.updatePasswordFail || "Failed to update password"));
-        return;
-      }
+          if (!res.ok) {
+            // Map the specific backend error string to a localized translation key (case-insensitive)
+            const backendError = data.error || "";
+            const isIncorrect = backendError.toLowerCase().includes("incorrect") && backendError.toLowerCase().includes("password");
+            
+            const message = isIncorrect
+              ? (t.incorrectCurrentPassword || backendError)
+              : (backendError || t.updatePasswordFail || "Failed to update password");
+
+            toast.error(message);
+            return;
+          }
           toast.success(t.updatePasswordSuccess || "Password updated successfully");
           setIsEditingPassword(false);
           setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
@@ -843,7 +853,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <p>
                     <strong>{t.status}:</strong> <span className={`${statusColorMap[displayApp.status]} font-bold`}>{displayApp.status}</span>
                   </p>
-                  <p><strong>Submitted:</strong> {new Date(displayApp.created_at).toLocaleString()}</p>
+                  <p><strong>{t.date || "Submitted"}:</strong> {new Date(displayApp.created_at).toLocaleString()}</p>
                   {displayApp.status === "pending" && (
                     <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-2xl">
                       <p className="font-bold">{t.underReview}</p>
@@ -997,7 +1007,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <button
                       onClick={() => setIsEditingUpdates(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1408,7 +1418,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <button
                       onClick={() => setIsEditingProfile(true)}
-                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2"
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition shadow-sm font-medium whitespace-nowrap flex items-center gap-2 cursor-pointer"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1510,7 +1520,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div className="pt-2 flex gap-3">
                       <button
                         onClick={() => setIsEditingProfile(false)}
-                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
                         {t.cancel || "Cancel"}
@@ -1518,7 +1528,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <button
                         onClick={handleSaveProfile}
                         disabled={isSavingProfile}
-                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2"
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition flex items-center gap-2 cursor-pointer"
                       >
                         {isSavingProfile ? (
                           <>
@@ -1535,47 +1545,47 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "settings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.settings}</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.settings || "Settings"}</h3>
                 {isProfileLoading ? (
-                  <div className="text-center py-10">{t.loadingStats}</div>
+                  <div className="text-center py-10">{t.loadingSettings || "Loading settings..."}</div>
                 ) : (
                   <div className="max-w-2xl">
                     <div className="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.fullName}</label>
+                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.fullName || "Full Name"}</label>
                       <div className="text-lg font-bold text-gray-900">{profileForm.name}</div>
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">
-                      <h4 className="font-bold text-gray-800 mb-4">{t.security}</h4>
+                      <h4 className="font-bold text-gray-800 mb-4">{t.security || "Security"}</h4>
                       {!isEditingPassword ? (
                         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.password}</label>
+                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.password || "Password"}</label>
                             <div className="text-lg font-bold text-gray-900">••••••••</div>
                           </div>
                           <button
                             onClick={() => setIsEditingPassword(true)}
-                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium"
+                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium cursor-pointer"
                           >
-                            {t.updatePassword}
+                            {t.updatePassword || "Update Password"}
                           </button>
                         </div>
                       ) : (
                         <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">{t.currentPassword}</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.currentPassword || "Current Password"}</label>
                             <div className="relative">
                               <input
                                 type={showOldPassword ? "text" : "password"}
                                 value={passwordForm.oldPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder={t.enterCurrentPassword}
+                                placeholder={t.enterCurrentPassword || "Enter current password"}
                               />
                               <button
                                 type="button"
                                 onClick={() => setShowOldPassword(!showOldPassword)}
-                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
                               >
                                 {showOldPassword ? (
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -1586,19 +1596,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">{t.newPassword}</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.newPassword || "New Password"}</label>
                             <div className="relative">
                               <input
                                 type={showNewPassword ? "text" : "password"}
                                 value={passwordForm.newPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder={t.enterNewPassword}
+                                placeholder={t.enterNewPassword || "Enter new password"}
                               />
                               <button
                                 type="button"
                                 onClick={() => setShowNewPassword(!showNewPassword)}
-                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
                               >
                                 {showNewPassword ? (
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -1609,19 +1619,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">{t.confirmNewPassword}</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.confirmNewPassword || "Confirm New Password"}</label>
                             <div className="relative">
                               <input
                                 type={showConfirmPassword ? "text" : "password"}
                                 value={passwordForm.confirmPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder={t.confirmNewPassword}
+                                placeholder={t.confirmNewPassword || "Confirm new password"}
                               />
                               <button
                                 type="button"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
+                                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700 cursor-pointer"
                               >
                                 {showConfirmPassword ? (
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
@@ -1637,17 +1647,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 setIsEditingPassword(false);
                                 setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
                               }}
-                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                              className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition cursor-pointer"
                               disabled={isSavingPassword}
                             >
-                              Cancel
+                              {t.cancel || "Cancel"}
                             </button>
                             <button
                               onClick={handlePasswordUpdate}
                               disabled={isSavingPassword || !passwordForm.newPassword || !passwordForm.oldPassword}
-                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2"
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2 cursor-pointer"
                             >
-                              {isSavingPassword ? "Updating..." : "Save Password"}
+                              {isSavingPassword ? (t.updating || "Updating...") : (t.savePassword || "Save Password")}
                             </button>
                           </div>
                         </div>

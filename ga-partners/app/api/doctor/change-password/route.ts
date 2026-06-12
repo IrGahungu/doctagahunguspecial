@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { partnerTranslations, Language } from "@/app/translations";
 
 export async function PUT(req: Request) {
+  const lang = (req.headers.get("x-language") as Language) || "en";
+  const t = partnerTranslations[lang] || partnerTranslations.en;
+
   try {
     const body = await req.json();
     const { id, oldPassword, newPassword } = body;
@@ -12,7 +16,7 @@ export async function PUT(req: Request) {
     console.log("Provided Old Password Length:", oldPassword?.length);
 
     if (!id || !oldPassword || !newPassword) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ error: t.fillAllFields }, { status: 400 });
     }
 
     // Fetch the doctor application to verify the old password
@@ -23,7 +27,7 @@ export async function PUT(req: Request) {
       .single();
 
     if (fetchError || !app) {
-      return NextResponse.json({ error: "Doctor not found" }, { status: 404 });
+      return NextResponse.json({ error: t.errorLoadingDoctor }, { status: 404 });
     }
 
     console.log("Stored Password in DB:", app.password);
@@ -36,7 +40,7 @@ export async function PUT(req: Request) {
     console.log("Match Result:", passwordsMatch);
 
     if (!passwordsMatch) {
-      return NextResponse.json({ error: "Incorrect current password" }, { status: 400 });
+      return NextResponse.json({ error: t.incorrectCurrentPassword }, { status: 400 });
     }
 
     // 1. Update to new password in doctor_applications
@@ -46,7 +50,7 @@ export async function PUT(req: Request) {
       .eq("id", id);
 
     if (updateError) {
-      return NextResponse.json({ error: "Failed to update password" }, { status: 500 });
+      return NextResponse.json({ error: t.updatePasswordFail }, { status: 500 });
     }
 
     // 2. Update to new password in doctor_users (Required for Login)
@@ -57,12 +61,12 @@ export async function PUT(req: Request) {
 
     if (userUpdateError) {
       console.error("Failed to update password in doctor_users:", userUpdateError);
-      return NextResponse.json({ error: "Failed to update login password" }, { status: 500 });
+      return NextResponse.json({ error: t.updateLoginPasswordFail }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Password update error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: t.serverError }, { status: 500 });
   }
 }

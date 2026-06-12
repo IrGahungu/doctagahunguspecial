@@ -71,7 +71,7 @@ function sortSchedule(schedule: WorkSchedule[]) {
 }
 
 export default function DashboardClient({ app }: DashboardClientProps) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
@@ -716,7 +716,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     try {
       const res = await fetch(`/api/doctor/change-password`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "x-language": lang
+        },
         body: JSON.stringify({
           id: app.id,
           oldPassword: passwordForm.oldPassword,
@@ -1812,7 +1815,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 onClick={() => {
                                   const query = `${loc.address} ${loc.city}`.trim();
-                                  if (!query) return alert("Please enter an address or city to search.");
+                                  if (!query) return toast.error(t.enterAddressOrCity);
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
                                 className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
@@ -1870,11 +1873,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <div key={idx} className="border border-gray-200 rounded p-3 mb-3 bg-gray-50">
                           <div className="flex justify-between items-start mb-2">
                             <h5 className="text-xs font-bold text-gray-500 uppercase">Slot {idx + 1}</h5>
-                            <button onClick={() => handleRemoveAvailability(idx)} className="text-red-600 text-xs hover:underline cursor-pointer">Remove</button>
+                            <button onClick={() => handleRemoveAvailability(idx)} className="text-red-600 text-xs hover:underline cursor-pointer">{t.remove || "Remove"}</button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">{t.date || "Date"}</label>
                               <input
                                 type="date"
                                 value={slot.date}
@@ -1883,7 +1886,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Times (comma separated)</label>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">{t.timesCommaSeparated || "Times (comma separated)"}</label>
                               <input
                                 type="text"
                                 value={slot.times.join(", ")}
@@ -1893,39 +1896,39 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Booking Type</label>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">{t.bookingType || "Booking Type"}</label>
                               <select
                                 value={slot.booking_type || "online"}
                                 onChange={(e) => handleAvailabilityChange(idx, "booking_type", e.target.value)}
                                 className="w-full border rounded px-2 py-1.5 text-sm"
                               >
-                                <option value="online">Online</option>
-                                <option value="in-office">In Office</option>
-                                <option value="both">Both</option>
+                                <option value="online">{t.online || "Online"}</option>
+                                <option value="in-office">{t.inOffice || "In Office"}</option>
+                                <option value="both">{t.both || "Both"}</option>
                               </select>
                             </div>
                             <div className="flex gap-2">
                               {(slot.booking_type === "online" || slot.booking_type === "both" || !slot.booking_type) && (
                                 <div className="flex-1">
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">Online Fee</label>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">{t.onlineFee || "Online Fee"}</label>
                                   <input
                                     type="text"
                                     value={slot.consultation_fee_online || ""}
                                     onChange={(e) => handleAvailabilityChange(idx, "consultation_fee_online", e.target.value)}
                                     className="w-full border rounded px-2 py-1.5 text-sm"
-                                    placeholder="Fee"
+                                    placeholder={t.fee || "Fee"}
                                   />
                                 </div>
                               )}
                               {(slot.booking_type === "in-office" || slot.booking_type === "both") && (
                                 <div className="flex-1">
-                                  <label className="block text-xs font-medium text-gray-700 mb-1">Office Fee</label>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">{t.officeFee || "Office Fee"}</label>
                                   <input
                                     type="text"
                                     value={slot.consultation_fee_offline || ""}
                                     onChange={(e) => handleAvailabilityChange(idx, "consultation_fee_offline", e.target.value)}
                                     className="w-full border rounded px-2 py-1.5 text-sm"
-                                    placeholder="Fee"
+                                    placeholder={t.fee || "Fee"}
                                   />
                                 </div>
                               )}
@@ -2049,7 +2052,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {scheduleForm.map((item, idx) => (
                           <div key={item._ui_id || idx} className="flex flex-col md:flex-row gap-3 items-end md:items-center bg-gray-50 p-3 rounded border border-gray-200">
                             <div className="w-full md:w-32 shrink-0">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">Day</label>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">{t.day || "Day"}</label>
                               <select
                                 value={item.day}
                                 onChange={(e) => handleScheduleChange(idx, "day", e.target.value)}
@@ -2061,7 +2064,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </select>
                             </div>
                             <div className="w-full md:flex-1">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">Start</label>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">{t.start || "Start"}</label>
                               <input
                                 type="time"
                                 value={item.start_time}
@@ -2076,7 +2079,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               />
                             </div>
                             <div className="w-full md:flex-1">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">End</label>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">{t.end || "End"}</label>
                               <input
                                 type="time"
                                 value={item.end_time}
@@ -2089,7 +2092,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               />
                             </div>
                             <div className="w-full md:flex-1">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">Break Start</label>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">{t.breakStart || "Break Start"}</label>
                               <input
                                 type="time"
                                 value={item.break_start_time || ""}
@@ -2104,7 +2107,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               />
                             </div>
                             <div className="w-full md:flex-1">
-                              <label className="block text-xs font-medium text-gray-500 mb-1">Break End</label>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">{t.breakEnd || "Break End"}</label>
                               <input
                                 type="time"
                                 value={item.break_end_time || ""}

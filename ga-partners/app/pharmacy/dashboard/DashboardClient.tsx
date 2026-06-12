@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
+import { useLanguage } from "../../../context/LanguageContext";
 
 type PharmacyApplication = {
   contact_email: string;
@@ -71,9 +72,20 @@ const supabase = createClient(
 );
 
 export default function DashboardClient({ app }: DashboardClientProps) {
+  const { t, lang } = useLanguage();
   const [showStatus, setShowStatus] = useState(false);
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
+
+  useEffect(() => {
+    if (app.status === "approved") {
+      setActiveTab("dashboard");
+    } else {
+      setActiveTab("status");
+      setShowStatus(true);
+    }
+  }, [app.status]);
+
   const [activeTab, setActiveTab] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -109,7 +121,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     price: "", 
     original_price: "", 
     quantity: "", 
-    description: "Dosage to be given by the approved Doctor.", 
+    description: "", // Initialize as empty, will be set by useEffect
     category_id: "", 
     image: "", 
     insurances: [] as string[] 
@@ -151,6 +163,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const [stockToDeleteId, setStockToDeleteId] = useState<string | null>(null);
   const [isDeletingStock, setIsDeletingStock] = useState(false);
 
+  // Set default description when language loads or changes.
+  // Updates if the field is empty OR if it currently contains the default text from another language.
+  useEffect(() => {
+    const defaultTexts = [
+      "Dosage to be given by the approved Doctor.",
+      "Dose à être donner par le médecin agréé.",
+      "Dosage à être donné par le médecin agréé."
+    ];
+
+    if (!editingStockId && (stockForm.description === "" || defaultTexts.includes(stockForm.description))) {
+      setStockForm(prev => ({ ...prev, description: t.defaultMedicineDescription }));
+    }
+  }, [t.defaultMedicineDescription, editingStockId]);
+
   const statusColorMap = {
     pending: "text-yellow-500",
     approved: "text-green-500",
@@ -184,15 +210,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   async function handlePasswordUpdate() {
       if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-        toast.error("New passwords do not match");
+        toast.error(t.passwordsMatchError || "New passwords do not match");
         return;
       }
       if (!passwordForm.oldPassword) {
-        toast.error("Please enter your current password");
+        toast.error(t.enterCurrentPassword || "Please enter your current password");
         return;
       }
       if (passwordForm.newPassword.length < 6) {
-        toast.error("New password must be at least 6 characters");
+        toast.error(t.passwordTooShort || "New password must be at least 6 characters");
         return;
       }
   
@@ -200,7 +226,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       try {
         const res = await fetch(`/api/pharmacy/change-password`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "x-language": lang
+          },
           body: JSON.stringify({
             id: app.id,
             oldPassword: passwordForm.oldPassword,
@@ -209,15 +238,22 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         });
         const data = await res.json();
         if (!res.ok) {
-          toast.error(data.error || "Failed to update password");
+          // Map the specific backend error string to a localized translation key (case-insensitive)
+          const backendError = data.error || "";
+          const isIncorrect = backendError.toLowerCase().includes("incorrect") && backendError.toLowerCase().includes("password");
+          
+          const message = isIncorrect
+            ? (t.incorrectCurrentPassword || backendError)
+            : (backendError || t.updatePasswordFail || "Failed to update password");
+
+          toast.error(message);
           return;
         }
-        toast.success("Password updated successfully");
+      toast.success(t.updatePasswordSuccess || "Password updated successfully");
         setIsEditingPassword(false);
         setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" });
       } catch (e: any) {
-        console.error(e);
-        toast.error(e.message || "Error updating password");
+        toast.error(e.message || t.updatePasswordError);
       } finally {
         setIsSavingPassword(false);
       }
@@ -225,7 +261,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const handleNavClick = (tab: string) => {
     if (tab !== "status" && app.status !== "approved") {
-      toast.error("You need to be approved first");
+      toast.error(t.getApprovedFirst || "You need to be approved first");
       return;
     }
     if (activeTab === tab) {
@@ -249,10 +285,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       if (Array.isArray(data)) {
         setOrders(data);
       } else {
-        setOrders([]);
+        setOrders([]); // Ensure orders is always an array
       }
     } catch (err) {
-      console.error("Failed to load orders", err);
       toast.error("Failed to load orders");
     } finally {
       setIsOrdersLoading(false);
@@ -282,13 +317,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'order_items' },
         async (payload) => {
-          const { data } = await supabase.from('stock').select('pharmacy_id').eq('id', payload.new.stock_id).single();
+          const { data } = await supabase.from('stock').select('pharmacy_id').eq('id', payload.new.stock_id).maybeSingle();
           if (data && data.pharmacy_id === app.id) {
-            toast.success("New Order Received! 🔔", { duration: 5000 });
+            toast.success(t.newOrderReceived, { duration: 5000 });
             updatePendingCount();
             if (activeTab === 'bookings') {
               fetchOrders();
-            }
+            } 
           }
         }
       )
@@ -367,7 +402,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         })
         .catch((err) => {
           console.error("Error fetching dashboard stats:", err);
-          toast.error("Failed to load dashboard statistics");
+          toast.error(t.failedToLoadDashboardStats);
         })
         .finally(() => setIsDashboardLoading(false));
     }
@@ -421,9 +456,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             if (data.accepted_insurances) insurances = JSON.parse(data.accepted_insurances);
           } catch (e) { console.error("Error parsing insurances", e); }
           if (!Array.isArray(insurances)) insurances = [];
-          setInsurancesList(insurances);
+          setInsurancesList(insurances.map((i: string) => i.toUpperCase()));
         })
-        .catch((err) => console.error("Failed to load profile", err))
+        .catch((err) => toast.error(t.failedToLoadProfile))
         .finally(() => setIsProfileLoading(false));
     }
   }, [activeTab, app.id, refreshKey]);
@@ -446,9 +481,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             if (profileData.accepted_insurances) insurances = JSON.parse(profileData.accepted_insurances);
           } catch (e) { console.error("Error parsing insurances", e); }
           if (!Array.isArray(insurances)) insurances = [];
-          setInsurancesList(insurances);
+          setInsurancesList(insurances.map((i: string) => i.toUpperCase()));
         })
-        .catch((err) => console.error("Failed to load data", err))
+        .catch((err) => toast.error(t.failedToLoadData))
         .finally(() => setIsStockLoading(false));
     }
   }, [activeTab, app.id, refreshKey]);
@@ -471,7 +506,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
       if (!res.ok) {
         const err = await res.json();
-        toast.error(err.error || "Failed to update");
+        toast.error(err.error || t.failedToUpdate);
         return;
       }
 
@@ -489,7 +524,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       toast.success(`Order marked as ${newStatus}`);
       updatePendingCount();
     } catch (error) {
-      console.error(error);
+      console.error("Error updating order status:", error);
       toast.error("Failed to update status");
     } finally {
       setUpdatingOrderId(null);
@@ -512,17 +547,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   async function handleSaveProfile() {
     setIsSavingProfile(true);
-
+  
     if (profileForm.password && profileForm.password !== profileForm.confirmPassword) {
-      toast.error("Passwords do not match!");
+      toast.error(t.newPasswordsDoNotMatch);
       setIsSavingProfile(false);
       return;
     }
-
+  
     const sanitizedOpeningHours = openingHours.map((h) => {
       if (h.is24Hours || h.isClosed) {
         return { ...h, open: "", close: "" };
-      }
+      } 
       return h;
     });
 
@@ -535,7 +570,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     };
 
     if (!updateData.password) {
-      delete (updateData as any).password;
+      delete (updateData as any).password; // Remove password if not being updated
     }
     delete (updateData as any).confirmPassword;
 
@@ -562,13 +597,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         body: formData,
       });
       if (!res.ok) {
-        toast.error("Failed to update profile");
+        toast.error(t.failedToUpdateProfile);
         return;
       }
-      toast.success("Profile updated successfully!");
+      toast.success(t.profileUpdatedSuccessfully);
       router.refresh();
       setIsEditingProfile(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       toast.error("Error updating profile");
     } finally {
@@ -612,7 +647,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const updateInsurance = (index: number, value: string) => {
     const newList = [...insurancesList];
-    newList[index] = value;
+    newList[index] = value.toUpperCase();
     setInsurancesList(newList);
   };
 
@@ -626,19 +661,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
   const handleCurrentLocation = (index: number) => {
     if (!navigator.geolocation) {
-      toast.error("Geolocation is not supported by your browser");
+      toast.error(t.geolocationNotSupported);
       return;
     }
-    toast.loading("Getting location...", { id: "geo" });
+    toast.loading(t.gettingLocation, { id: "geo" });
     navigator.geolocation.getCurrentPosition(
       (position) => {
         updateLocation(index, "latitude", position.coords.latitude.toFixed(6));
         updateLocation(index, "longitude", position.coords.longitude.toFixed(6));
-        toast.success("Location updated", { id: "geo" });
+        toast.success(t.locationUpdated, { id: "geo" });
       },
       (error) => {
         console.error(error);
-        toast.error("Unable to retrieve location. Please allow location access.", { id: "geo" });
+        toast.error(t.unableToRetrieveLocation, { id: "geo" });
       }
     );
   };
@@ -656,21 +691,21 @@ export default function DashboardClient({ app }: DashboardClientProps) {
         if (!isNaN(lat) && !isNaN(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
           setlocation((prev) => prev.map((loc, i) => {
             if (i === index) return { ...loc, latitude: lat.toString(), longitude: lng.toString() };
-            return loc;
+            return loc; 
           }));
-          toast.success("Coordinates pasted from clipboard");
+          toast.success(t.coordinatesPasted);
           return;
         }
       }
-      toast.error("Clipboard does not contain valid coordinates (e.g. -1.94, 30.05)");
+      toast.error(t.invalidCoordinatesClipboard);
     } catch (err) {
-      toast.error("Unable to access clipboard");
+      toast.error(t.unableToAccessClipboard);
     }
   };
 
   async function handleSaveStock() {
     if (!stockForm.name || !stockForm.price || !stockForm.category_id) {
-      toast.error("Name, Price, and Category are required");
+      toast.error(t.namePriceCategoryRequired);
       return;
     }
     setIsAddingStock(true);
@@ -679,8 +714,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     try {
       const url = editingStockId ? `/api/pharmacy/stock?id=${editingStockId}` : "/api/pharmacy/stock";
       const method = editingStockId ? "PUT" : "POST";
-      
-      const currentItem = editingStockId ? stockItems.find(i => i.id === editingStockId) : null;
 
       const formData = new FormData();
       formData.append("name", stockForm.name);
@@ -705,28 +738,28 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       if (res.ok) {
         const savedItem = await res.json();
         if (editingStockId) {
-          setStockItems((prev) => prev.map(item => item.id === editingStockId ? savedItem : item));
-          toast.success("Stock item updated");
+          setStockItems((prev) => prev.map(item => item.id === editingStockId ? savedItem : item)); // Update existing item
+          toast.success(t.stockItemUpdated);
         } else {
-          setStockItems((prev) => [...prev, savedItem]);
-          toast.success("Stock item added");
+          setStockItems((prev) => [...prev, savedItem]); // Add new item
+          toast.success(t.stockItemAdded);
         }
         setStockForm({ 
           name: "", 
           price: "", 
           original_price: "", 
           quantity: "", 
-          description: "Dosage to be given by the approved Doctor",
+          description: t.defaultMedicineDescription,
           category_id: "", 
           image: "", 
           insurances: [] 
         });
         setStockImageFile(null);
         setEditingStockId(null);
-      } else {
-        toast.error("Failed to save item");
+      } else { 
+        toast.error(t.failedToSaveItem);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       toast.error("Error saving item");
     } finally {
@@ -755,7 +788,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       price: "", 
       original_price: "", 
       quantity: "", 
-      description: "Dosage to be given by the approved Doctor", 
+      description: t.defaultMedicineDescription,
       category_id: "", 
       image: "", 
       insurances: [] 
@@ -775,10 +808,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     try {
       const res = await fetch(`/api/pharmacy/stock?id=${stockToDeleteId}`, { method: "DELETE" });
       if (res.ok) {
-        setStockItems((prev) => prev.filter((item) => item.id !== stockToDeleteId));
-        toast.success("Item deleted");
-      } else {
-        toast.error("Failed to delete");
+        setStockItems((prev) => prev.filter((item) => item.id !== stockToDeleteId)); // Remove deleted item
+        toast.success(t.itemDeleted);
+      } else { 
+        toast.error(t.failedToDelete);
       }
     } catch (e) {
       toast.error("Failed to delete");
@@ -792,7 +825,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   const handlePrintOrder = (order: Order) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      toast.error("Please allow popups to print");
+      toast.error(t.pleaseAllowPopupsToPrint);
       return;
     }
 
@@ -926,7 +959,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                 </svg>
-                <span className="hidden md:block">Dashboard</span>
+                <span className="hidden md:block">{t.dashboard || "Dashboard"}</span>
               </>
             )}
           </button>
@@ -949,7 +982,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="hidden md:block">My Stock</span>
+                <span className="hidden md:block">{t.myStock || "My Stock"}</span>
               </>
             )}
           </button>
@@ -972,7 +1005,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span className="hidden md:block">Orders</span>
+                <span className="hidden md:block">{t.orders || "Orders"}</span>
                 <span className="absolute -top-1 -right-1 md:top-1/2 md:-translate-y-1/2 md:right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm border border-white">
                   {pendingOrdersCount}
                 </span>
@@ -998,7 +1031,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                <span className="hidden md:block">My pharmacy</span>
+                <span className="hidden md:block">{t.myPharmacy || "My pharmacy"}</span>
               </>
             )}
           </button>
@@ -1022,7 +1055,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="hidden md:block">Settings</span>
+                <span className="hidden md:block">{t.settings || "Settings"}</span>
               </>
             )}
           </button>
@@ -1045,7 +1078,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="hidden md:block">Status</span>
+                <span className="hidden md:block">{t.status || "Status"}</span>
               </>
             )}
           </button>
@@ -1059,7 +1092,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 md:mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          <span className="hidden md:block">Logout</span>
+          <span className="hidden md:block">{t.logout || "Logout"}</span>
         </button>
       </div>
 
@@ -1067,7 +1100,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="bg-white shadow-sm border-b border-gray-200 px-4 md:px-8 py-5">
           <h2 className="text-center text-xl font-semibold text-gray-800">
-          Greetings and welcome dear {app.name} on Dr. Gahungu Platform.
+          {t.welcomeGreeting || "Greetings and welcome dear"} {app.name} {t.welcomeGreetingSuffix || "on Dr. Gahungu Platform."}
           </h2>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -1075,26 +1108,26 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "dashboard" && (
               <div>
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Dashboard Overview</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.dashboardOverview || "Dashboard Overview"}</h3>
                 {isDashboardLoading ? (
-                  <div className="text-center py-10">Loading stats...</div>
+                  <div className="text-center py-10">{t.loadingStats || "Loading stats..."}</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Customers</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.totalCustomers || "Total Customers"}</h4>
                       <div className="text-2xl font-bold text-center text-gray-800">{dashboardStats.totalCustomers}</div>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Products</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.totalProducts || "Total Products"}</h4>
                       <div className="text-2xl font-bold text-center text-blue-600">{dashboardStats.totalProducts}</div>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Revenue</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.totalRevenue || "Total Revenue"}</h4>
                       <div className="text-2xl font-bold text-center text-green-600">
                         {dashboardStats.totalRevenue.toLocaleString()} <span className="text-xs text-gray-400">BIF</span>
                       </div>
                       <button
-                        onClick={() => toast.success("The team is implementing it for soon")}
+                        onClick={() => toast.success(t.withdrawSoon || "The team is implementing it for soon")}
                         disabled={dashboardStats.totalRevenue === 0}
                         className={`mt-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                           dashboardStats.totalRevenue > 0
@@ -1102,15 +1135,15 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             : "bg-gray-200 text-gray-500 cursor-not-allowed"
                         }`}
                       >
-                        Withdraw
+                        {t.withdraw || "Withdraw"}
                       </button>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Pending Orders</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.totalPendingOrders || "Pending Orders"}</h4>
                       <div className="text-2xl font-bold text-center text-orange-500">{dashboardStats.totalPendingOrders}</div>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">Total Views</h4>
+                      <h4 className="text-gray-500 text-[10px] text-center font-medium uppercase tracking-wider mb-1">{t.totalViews || "Total Views"}</h4>
                       <div className="text-2xl font-bold text-center text-indigo-600">{dashboardStats.totalViews}</div>
                     </div>
                   </div>
@@ -1119,7 +1152,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 {!isDashboardLoading && (
                   <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="text-gray-800 font-bold mb-4">Revenue (Last 7 Days)</h4>
+                      <h4 className="text-gray-800 font-bold mb-4">{t.revenueLast7Days || "Revenue (Last 7 Days)"}</h4>
                       <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={chartData}>
@@ -1134,7 +1167,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="text-gray-800 font-bold mb-4">Orders (Last 7 Days)</h4>
+                      <h4 className="text-gray-800 font-bold mb-4">{t.ordersLast7Days || "Orders (Last 7 Days)"}</h4>
                       <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={chartData}>
@@ -1149,7 +1182,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                      <h4 className="text-gray-800 font-bold mb-4">Profile Views (Last 7 Days)</h4>
+                      <h4 className="text-gray-800 font-bold mb-4">{t.profileViewsLast7Days || "Profile Views (Last 7 Days)"}</h4>
                       <div className="h-80 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData}>
@@ -1167,21 +1200,21 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                 {!isDashboardLoading && (
                   <div className="mt-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h4 className="text-gray-800 font-bold mb-4">Recent Activity</h4>
+                    <h4 className="text-gray-800 font-bold mb-4">{t.recentActivity || "Recent Activity"}</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left">
                         <thead className="bg-gray-50 text-gray-600 font-semibold text-sm">
                           <tr>
-                            <th className="p-3 rounded-l-lg">Order ID</th>
-                            <th className="p-3">Customer</th>
-                            <th className="p-3">Date</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3 rounded-r-lg">Amount</th>
+                            <th className="p-3 rounded-l-lg">{t.orderId || "Order ID"}</th>
+                            <th className="p-3">{t.customer || "Customer"}</th>
+                            <th className="p-3">{t.date || "Date"}</th>
+                            <th className="p-3">{t.status || "Status"}</th>
+                            <th className="p-3 rounded-r-lg">{t.amount || "Amount"}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {recentOrders.length === 0 ? (
-                            <tr><td colSpan={5} className="p-4 text-center text-gray-500">No recent orders</td></tr>
+                            <tr><td colSpan={5} className="p-4 text-center text-gray-500">{t.noRecentOrders || "No recent orders"}</td></tr>
                           ) : (
                             recentOrders.map((order) => (
                               <tr key={order.id} className="hover:bg-gray-50 transition">
@@ -1208,7 +1241,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 )}
 
                 {!isDashboardLoading && (
-                  <div className="mt-8 text-center text-gray-400 text-sm italic">Select other tabs to manage your pharmacy.</div>
+                  <div className="mt-8 text-center text-gray-400 text-sm italic">{t.selectOtherTabs || "Select other tabs to manage your pharmacy."}</div>
                 )}
               </div>
             )}
@@ -1217,19 +1250,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               <div className="flex flex-col items-center">
                 <div className="text-center">
                   <p>
-                    <strong>Status:</strong> <span className={`${statusColorMap[app.status]} font-bold`}>{app.status}</span>
+                    <strong>{t.status || "Status"}:</strong> <span className={`${statusColorMap[app.status]} font-bold`}>{app.status}</span>
                   </p>
-                  <p><strong>Submitted:</strong> {new Date(app.created_at).toLocaleString()}</p>
+                  <p><strong>{t.applicationSubmitted || "Submitted"}:</strong> {new Date(app.created_at).toLocaleString()}</p>
                   {app.status === "pending" && (
                     <div className="mt-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-2xl">
-                      <p className="font-bold">Under Review</p>
-                      <p>Your application is currently being reviewed by our team.</p>
+                      <p className="font-bold">{t.underReview || "Under Review"}</p>
+                      <p>{t.pendingStatusMessage || "Your application is currently being reviewed by our team."}</p>
                     </div>
                   )}
                   {app.status === "approved" && (
                     <div className="mt-4 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-2xl">
-                      <p className="font-bold">Approved</p>
-                      <p>Congratulations! Your application has been approved.</p>
+                      <p className="font-bold">{t.approved || "Approved"}</p>
+                      <p>{t.approvedSuccessMessage || "Congratulations! Your application has been approved."}</p>
                     </div>
                   )}
                   {app.status === "rejected" && (
@@ -1250,10 +1283,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {isNavigating ? (
                           <>
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Loading Form...
+                            {t.loadingForm || "Loading Form..."}
                           </>
                         ) : (
-                          "Edit and Resubmit Application"
+                          t.editResubmitApp || "Edit and Resubmit Application"
                         )}
                       </button>
 
@@ -1265,33 +1298,33 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "availability" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Stock Management</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.stockManagement || "My Stock Management"}</h3>
 
                 <div className="mb-8 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                  <h4 className="font-semibold text-gray-700 mb-3">{editingStockId ? "Edit Item" : "Add New Item"}</h4>
+                  <h4 className="font-semibold text-gray-700 mb-3">{editingStockId ? t.editItem : t.addNewItem}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <input
-                      placeholder="Item Name"
+                      placeholder={t.itemName || "Item Name"}
                       value={stockForm.name}
                       onChange={(e) => setStockForm({ ...stockForm, name: e.target.value })}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <input
-                      placeholder="Price"
+                      placeholder={t.price || "Price"}
                       type="number"
                       value={stockForm.price}
                       onChange={(e) => setStockForm({ ...stockForm, price: e.target.value })}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <input
-                      placeholder="Original Price"
+                      placeholder={t.originalPrice || "Original Price"}
                       type="number"
                       value={stockForm.original_price}
                       onChange={(e) => setStockForm({ ...stockForm, original_price: e.target.value })}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <input
-                      placeholder="Quantity"
+                      placeholder={t.quantity || "Quantity"}
                       type="number"
                       value={stockForm.quantity}
                       onChange={(e) => setStockForm({ ...stockForm, quantity: e.target.value })}
@@ -1310,20 +1343,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       }}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     >
-                      <option value="">Select Category</option>
+                      <option value="">{t.selectCategory || "Select Category"}</option>
                       {categories.map((cat) => (
                         <option key={cat.id} value={cat.id}>{cat.name}</option>
                       ))}
                     </select>
                     <input
-                      placeholder="Description"
+                      placeholder={t.description}
                       value={stockForm.description}
                       onChange={(e) => setStockForm({ ...stockForm, description: e.target.value })}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Applicable Insurances</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t.applicableInsurances || "Applicable Insurances"}</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-lg p-3 max-h-48 overflow-y-auto bg-white">
                       {insurancesList.length > 0 ? insurancesList.map((ins) => (
                         <label key={ins} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
@@ -1343,14 +1376,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                           <span className="text-sm text-gray-700">{ins}</span>
                         </label>
-                      )) : <p className="text-sm text-gray-500 italic">No insurances found in profile.</p>}
+                      )) : <p className="text-sm text-gray-500 italic">{t.noInsurancesFoundProfile || "No insurances found in profile."}</p>}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Select specific insurances. Leave empty to accept all pharmacy insurances.</p>
+                    <p className="text-xs text-gray-500 mt-1">{t.insuranceSelectionHint || "Select specific insurances. Leave empty to accept all pharmacy insurances."}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="flex-1">
                       <label className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm font-medium text-gray-700 w-full justify-center">
-                        {stockForm.image ? "Change Image" : "Upload Image"}
+                        {stockForm.image ? (t.changeImage || "Change Image") : (t.uploadImage || "Upload Image")}
                         <input type="file" accept="image/*" onChange={handleStockImageUpload} className="hidden" />
                       </label>
                     </div>
@@ -1364,7 +1397,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         onClick={handleCancelEdit}
                         className="bg-gray-500 text-white rounded px-6 py-2 hover:bg-gray-600 transition cursor-pointer"
                       >
-                        Cancel
+                        {t.cancel || "Cancel"}
                       </button>
                     )}
                     <button
@@ -1372,7 +1405,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       disabled={isAddingStock}
                       className="bg-indigo-600 text-white rounded px-6 py-2 hover:bg-indigo-700 disabled:bg-indigo-400 transition cursor-pointer"
                     >
-                      {isAddingStock ? "Saving..." : editingStockId ? "Update Item" : "Add Item"}
+                      {isAddingStock ? (t.saving || "Saving...") : editingStockId ? (t.updateItem || "Update Item") : (t.addItem || "Add Item")}
                     </button>
                   </div>
                 </div>
@@ -1381,7 +1414,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                   <div className="relative w-full md:w-64">
                     <input
                       type="text"
-                      placeholder="Search items..."
+                      placeholder={t.searchItemsPlaceholder || "Search items..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full border rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1399,21 +1432,21 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <table className="w-full text-left">
                       <thead className="bg-gray-50 text-gray-600 font-semibold text-sm">
                         <tr>
-                          <th className="p-3 rounded-l-lg">Image</th>
-                          <th className="p-3">Name</th>
-                          <th className="p-3">Category</th>
-                          <th className="p-3">Price</th>
-                          <th className="p-3">Orig. Price</th>
-                          <th className="p-3">Quantity</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3 rounded-r-lg text-right">Actions</th>
+                          <th className="p-3 rounded-l-lg">{t.image}</th>
+                          <th className="p-3">{t.fullName || "Name"}</th>
+                          <th className="p-3">{t.specialty || "Category"}</th>
+                          <th className="p-3">{t.price || "Price"}</th>
+                          <th className="p-3">{t.originalPrice || "Orig. Price"}</th>
+                          <th className="p-3">{t.quantity || "Quantity"}</th>
+                          <th className="p-3">{t.status}</th>
+                          <th className="p-3 rounded-r-lg text-right">{t.actions}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {stockItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                           <tr>
                             <td colSpan={8} className="p-4 text-center text-gray-500">
-                              {stockItems.length === 0 ? "No items in stock" : "No items match your search"}
+                              {stockItems.length === 0 ? (t.noItemsInStock || "No items in stock") : (t.noItemsMatchSearch || "No items match your search")}
                             </td>
                           </tr>
                         ) : (
@@ -1423,17 +1456,17 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 {item.image ? (
                                   <img src={getStockImageUrl(item.image)} alt={item.name} className="h-24 w-24 rounded object-cover border border-gray-200" />
                                 ) : (
-                                  <div className="h-24 w-24 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">No Img</div>
+                                  <div className="h-24 w-24 rounded bg-gray-100 flex items-center justify-center text-gray-400 text-xs">{t.noImage}</div>
                                 )}
                               </td>
                               <td className="p-3 font-medium">{item.name}</td>
-                              <td className="p-3 text-sm text-gray-600">{item.categories?.name || "No Category"}</td>
+                              <td className="p-3 text-sm text-gray-600">{item.categories?.name || t.noCategory}</td>
                               <td className="p-3">{item.price}</td>
                               <td className="p-3 text-gray-500 text-sm">{item.original_price}</td>
                               <td className="p-3">{item.quantity}</td>
                               <td className="p-3">
                                 <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${item.in_stock && item.quantity > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                                  {item.in_stock && item.quantity > 0 ? "In Stock" : "Out-of-Stock"}
+                                  {item.in_stock && item.quantity > 0 ? (t.inStock || "In Stock") : (t.outOfStock || "Out-of-Stock")}
                                 </span>
                               </td>
                               <td className="p-3 text-right">
@@ -1441,13 +1474,13 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   onClick={() => handleEditStock(item)}
                                   className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded-full text-xs font-semibold mr-2 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
-                                  Edit
+                                  {t.edit || "Edit"}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteStock(item.id)}
                                   className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded-full text-xs font-semibold transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
                                 >
-                                  Delete
+                                  {t.delete || "Delete"}
                                 </button>
                               </td>
                             </tr>
@@ -1462,14 +1495,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "bookings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Incoming Orders</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.incomingOrders || "Incoming Orders"}</h3>
                 
                 <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Search Bar */}
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search Order ID or Customer..."
+                      placeholder={t.searchItemsPlaceholder || "Search Order ID or Customer..."}
                       value={orderSearchQuery}
                       onChange={(e) => setOrderSearchQuery(e.target.value)}
                       className="w-full border rounded-lg pl-10 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1485,7 +1518,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     onChange={(e) => setOrderStatusFilter(e.target.value)}
                     className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   >
-                    <option value="All">All Statuses</option>
+                    <option value="All">{t.allStatuses}</option>
                     {["Pending", "Accepted", "Packed", "On the way", "Delivered", "Cancelled"].map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
@@ -1497,14 +1530,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     value={orderStartDate}
                     onChange={(e) => setOrderStartDate(e.target.value)}
                     className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder="Start Date"
+                    placeholder={t.startDate}
                   />
                   <input
                     type="date"
                     value={orderEndDate}
                     onChange={(e) => setOrderEndDate(e.target.value)}
                     className="border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    placeholder="End Date"
+                    placeholder={t.endDate}
                   />
                 </div>
 
@@ -1515,18 +1548,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <table className="w-full text-left">
                       <thead className="bg-gray-50 text-gray-600 font-semibold text-sm">
                         <tr>
-                          <th className="p-3 rounded-l-lg">Order ID</th>
-                          <th className="p-3">Customer</th>
+                          <th className="p-3 rounded-l-lg">{t.orderId || "Order ID"}</th>
+                          <th className="p-3">{t.customer || "Customer"}</th>
                           <th className="p-3">Date</th>
                           <th className="p-3">Status</th>
-                          <th className="p-3">Total Amount</th>
-                          <th className="p-3 rounded-r-lg">Items</th>
+                          <th className="p-3">{t.totalAmount || "Total Amount"}</th>
+                          <th className="p-3 rounded-r-lg">{t.items || "Items"}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {filteredOrders.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="p-4 text-center text-gray-500">No orders found</td>
+                            <td colSpan={6} className="p-4 text-center text-gray-500">{t.noBookingsFound || "No orders found"}</td>
                           </tr>
                         ) : (
                           filteredOrders.map((order: Order) => (
@@ -1563,7 +1596,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <td className="p-3">
                                 <details className="group cursor-pointer">
                                   <summary className="text-indigo-600 text-sm font-medium hover:text-indigo-800 list-none flex items-center gap-1">
-                                    <span>View {order.items.length} Items</span>
+                                    <span>{t.viewItems || "View Items"} ({order.items.length})</span>
                                     <svg className="w-4 h-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                                   </summary>
                                   <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm shadow-inner">
@@ -1601,7 +1634,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                         </svg>
-                                        Print Invoice
+                                        {t.printInvoice || "Print Invoice"}
                                       </button>
                                     </div>
                                   </div>
@@ -1619,7 +1652,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "profile" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">My Pharmacy</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.myPharmacy || "My Pharmacy"}</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading profile...</div>
                 ) : !isEditingProfile ? (
@@ -1637,35 +1670,35 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         </div>
                         <div className="min-w-0 flex-1 overflow-hidden w-full text-center md:text-left">
                           <h4 className="text-lg md:text-2xl font-bold text-gray-900 truncate">{profileForm.name}</h4>
-                          <p className="text-gray-500 text-sm mt-1 truncate">{profileForm.email}</p>
+                          <p className="text-gray-500 text-sm mt-1 truncate">{profileForm.email || (t.email + " not set")}</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">WhatsApp</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.whatsappNumber || "WhatsApp"}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.whatsapp_number || "Not set"}</p>
                         </div>
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Payment ID</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.paymentId || "Payment ID"}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.payment_id || "Not set"}</p>
                         </div>
                         <div className="text-center md:text-left">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Country</h5>
+                          <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{t.country || "Country"}</h5>
                           <p className="text-gray-900 font-medium">{profileForm.country || "Not set"}</p>
                         </div>
                       </div>
 
                       <div className="border-t border-gray-200 pt-6">
                         <h5 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          🕒 Opening Hours
+                          🕒 {t.openingHoursLabel || "Opening Hours"}
                         </h5>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {openingHours.map((day, i) => (
                             <div key={i} className="flex justify-between items-center text-sm p-2 bg-white rounded border border-gray-100">
                               <span className="font-medium text-gray-700">{day.day}</span>
                               <span className={day.isClosed ? "text-red-500 font-medium" : "text-green-600 font-medium"}>
-                                {day.isClosed ? "Closed" : day.is24Hours ? "24 Hours" : `${day.open} - ${day.close}`}
+                                {day.isClosed ? (t.closed || "Closed") : day.is24Hours ? (t.hours24 || "24 Hours") : `${day.open} - ${day.close}`}
                               </span>
                             </div>
                           ))}
@@ -1674,14 +1707,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                       <div className="border-t border-gray-200 pt-6 mt-6">
                         <h5 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                          📍 locations
+                          📍 {t.locations || "Locations"}
                         </h5>
                         <div className="space-y-3">
                           {location.map((loc, i) => (
                             <div key={i} className="text-sm p-3 bg-white rounded border border-gray-100 flex justify-between items-center">
                               <div>
-                                <p className="font-bold text-gray-800">{loc.city || "City not set"}</p>
-                                <p className="text-gray-600">{loc.address || "Address not set"}</p>
+                                <p className="font-bold text-gray-800">{loc.city || t.cityNotSet || "City not set"}</p>
+                                <p className="text-gray-600">{loc.address || t.addressNotSet || "Address not set"}</p>
                                 {loc.phone && <p className="text-gray-500 text-xs mt-1">📞 {loc.phone}</p>}
                               </div>
                               {(loc.address || loc.city || (loc.latitude && loc.longitude)) && (
@@ -1704,31 +1737,31 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       </div>
 
                       <div className="border-t border-gray-200 pt-6 mt-6">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-4">📞 Contact Details</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-4">📞 {t.contactDetails || "Contact Details"}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Customer Support Email</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.customerSupportEmail || "Customer Support Email"}</span>
                             <span className="text-gray-700 font-medium">{profileForm.contact_email || "N/A"}</span>
                           </div>
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Phone / WhatsApp</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.phoneWhatsApp || "Phone / WhatsApp"}</span>
                             <span className="text-gray-700 font-medium">{profileForm.contact_phone || "N/A"}</span>
                           </div>
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Head Office</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.headOffice || "Head Office"}</span>
                             <span className="text-gray-700 font-medium">{profileForm.contact_office || "N/A"}</span>
                           </div>
                           <div>
-                            <span className="block text-gray-500 text-xs uppercase">Website</span>
+                            <span className="block text-gray-500 text-xs uppercase">{t.website || "Website"}</span>
                             <a href={profileForm.contact_website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">{profileForm.contact_website || "N/A"}</a>
                           </div>
                         </div>
                       </div>
 
                       <div className="border-t border-gray-200 pt-6 mt-6">
-                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏥 Accepted Insurances</h4>
+                        <h4 className="font-semibold text-gray-700 flex items-center gap-2 mb-2">🏥 {t.acceptedInsurances || "Accepted Insurances"}</h4>
                         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                          {insurancesList.length > 0 ? insurancesList.map((p, i) => <li key={i} className="text-gray-600">➢ {p}</li>) : <li className="text-gray-500 italic">No insurances listed</li>}
+                          {insurancesList.length > 0 ? insurancesList.map((p, i) => <li key={i} className="text-gray-600">➢ {p}</li>) : <li className="text-gray-500 italic">{t.noInsurancesListed || "No insurances listed"}</li>}
                         </ul>
                       </div>
                     </div>
@@ -1740,7 +1773,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      Update Profile
+                      {t.updateProfile}
                     </button>
                   </div>
                 ) : (
@@ -1768,7 +1801,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                               </svg>
-                              Change Photo
+                              {t.changePhoto}
                             </>
                           )}
                           <input type="file" accept="image/*" onChange={handleProfileImageUpload} className="hidden" disabled={isUploadingProfileImage} />
@@ -1778,7 +1811,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Pharmacy Name</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.pharmacyName}</label>
                         <input
                           type="text"
                           value={profileForm.name}
@@ -1787,7 +1820,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Email</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.email}</label>
                         <input
                           type="email"
                           value={profileForm.email}
@@ -1797,7 +1830,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       </div>
 
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">WhatsApp Number</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.whatsappNumber}</label>
                         <input
                           type="text"
                           value={profileForm.whatsapp_number}
@@ -1806,7 +1839,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Country</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.country}</label>
                         <input
                           type="text"
                           value={profileForm.country}
@@ -1815,7 +1848,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-gray-700 mb-1">Payment ID</label>
+                        <label className="block font-semibold text-gray-700 mb-1">{t.paymentId}</label>
                         <input
                           type="text"
                           value={profileForm.payment_id}
@@ -1826,10 +1859,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div className="border-t border-gray-100 pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-800 mb-4">Contact Details</h4>
+                      <h4 className="font-semibold text-gray-800 mb-4">{t.contactDetails}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Support Email</label>
+                          <label className="block font-semibold text-gray-700 mb-1">{t.customerSupportEmail}</label>
                           <input
                             type="email"
                             value={profileForm.contact_email}
@@ -1838,7 +1871,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                         </div>
                         <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Phone / WhatsApp</label>
+                          <label className="block font-semibold text-gray-700 mb-1">{t.phoneWhatsApp}</label>
                           <input
                             type="text"
                             value={profileForm.contact_phone}
@@ -1847,7 +1880,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                         </div>
                         <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Head Office Address</label>
+                          <label className="block font-semibold text-gray-700 mb-1">{t.headOffice}</label>
                           <input
                             type="text"
                             value={profileForm.contact_office}
@@ -1856,7 +1889,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           />
                         </div>
                         <div>
-                          <label className="block font-semibold text-gray-700 mb-1">Website URL</label>
+                          <label className="block font-semibold text-gray-700 mb-1">{t.website}</label>
                           <input
                             type="text"
                             value={profileForm.contact_website}
@@ -1868,7 +1901,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div className="border-t border-gray-100 pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-800 mb-4">Manage Opening Hours</h4>
+                      <h4 className="font-semibold text-gray-800 mb-4">{t.manageOpeningHours}</h4>
                       <div className="space-y-3">
                         {openingHours.map((day, i) => (
                           <div key={i} className="flex flex-wrap items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -1877,11 +1910,19 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               onChange={(e) => updateDay(i, "day", e.target.value)}
                               className="w-32 md:w-40 border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                             >
-                              <option value="">Select Day</option>
-                              {["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
-                                .filter((d) => d === day.day || !openingHours.some((h) => h.day === d))
+                              <option value="">{t.selectDay}</option>
+                              {[
+                                { val: "MONDAY", label: t.monday || "MONDAY" },
+                                { val: "TUESDAY", label: t.tuesday || "TUESDAY" },
+                                { val: "WEDNESDAY", label: t.wednesday || "WEDNESDAY" },
+                                { val: "THURSDAY", label: t.thursday || "THURSDAY" },
+                                { val: "FRIDAY", label: t.friday || "FRIDAY" },
+                                { val: "SATURDAY", label: t.saturday || "SATURDAY" },
+                                { val: "SUNDAY", label: t.sunday || "SUNDAY" }
+                              ]
+                                .filter((d) => d.val === day.day || !openingHours.some((h) => h.day === d.val))
                                 .map((d) => (
-                                <option key={d} value={d}>{d}</option>
+                                <option key={d.val} value={d.val}>{d.label}</option>
                               ))}
                             </select>
                             <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
@@ -1891,7 +1932,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 onChange={(e) => updateDay(i, "isClosed", e.target.checked)}
                                 className="rounded text-indigo-600 focus:ring-indigo-500"
                               />
-                              Closed
+                              {t.closed}
                             </label>
                             <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                               <input
@@ -1900,7 +1941,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 onChange={(e) => updateDay(i, "is24Hours", e.target.checked)}
                                 className="rounded text-indigo-600 focus:ring-indigo-500"
                               />
-                              24 Hours
+                              {t.hours24}
                             </label>
                             {!day.isClosed && !day.is24Hours && (
                               <div className="flex items-center gap-2">
@@ -1931,27 +1972,27 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </div>
                         ))}
                         <button onClick={addOpeningHour} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2 cursor-pointer">
-                          + Add Another Day
+                          {t.addAnotherDay || "+ Add Another Day"}
                         </button>
                       </div>
                     </div>
 
                     <div className="border-t border-gray-100 pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-800 mb-4">Manage location</h4>
+                      <h4 className="font-semibold text-gray-800 mb-4">{t.manageLocation || "Manage location"}</h4>
                       <div className="space-y-3">
                         {location.map((loc, index) => (
                           <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                             <div className="flex flex-wrap items-center gap-4 mb-3">
                               <input
                                 type="text"
-                                placeholder="City"
+                                placeholder={t.city || "City"}
                                 value={loc.city}
                                 onChange={(e) => updateLocation(index, "city", e.target.value)}
                                 className="flex-1 min-w-[120px] border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                               />
                               <input
                                 type="text"
-                                placeholder="Address / Street"
+                                placeholder={t.addressStreet || "Address / Street"}
                                 value={loc.address}
                                 onChange={(e) => updateLocation(index, "address", e.target.value)}
                                 className="flex-2 min-w-[200px] border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1977,14 +2018,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 value={loc.phone || ""}
                                 onChange={(e) => updateLocation(index, "phone", e.target.value)}
                                 className="border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Phone (Optional)"
+                                placeholder={t.phoneOptional || "Phone (Optional)"}
                               />
                             </div>
                             <div className="mt-2 flex justify-end gap-3 items-center">
                               <button
                                 onClick={() => {
                                   const query = `${loc.address} ${loc.city}`.trim();
-                                  if (!query) return alert("Please enter an address or city to search.");
+                                  if (!query) return toast.error(t.enterAddressOrCity);
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
                                 className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
@@ -1992,7 +2033,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
-                                Find on Map
+                                {t.findOnMap}
                               </button>
                               <button
                                 type="button"
@@ -2003,7 +2044,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
-                                Use Current Location
+                                {t.useCurrentLocation}
                               </button>
                               <button
                                 onClick={() => handlePasteCoordinates(index)}
@@ -2012,7 +2053,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                                 </svg>
-                                Paste Coordinates
+                                {t.pasteCoordinates}
                               </button>
                             </div>
                             {(loc.city || loc.address || (loc.latitude && loc.longitude)) && (
@@ -2033,7 +2074,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     </div>
 
                     <div className="border-t border-gray-100 pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-800 mb-4">Accepted Insurances</h4>
+                      <h4 className="font-semibold text-gray-800 mb-4">{t.partnerInsurances}</h4>
                       <div className="space-y-3">
                         {insurancesList.map((ins, index) => (
                           <div key={index} className="flex items-center gap-2">
@@ -2043,7 +2084,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               value={ins}
                               onChange={(e) => updateInsurance(index, e.target.value)}
                               className="flex-1 border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                              placeholder="Insurance Name"
+                              placeholder={t.insuranceName}
                             />
                             <button
                               onClick={() => removeInsurance(index)}
@@ -2056,7 +2097,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           </div>
                         ))}
                         <button onClick={addInsurance} type="button" className="text-sm text-indigo-600 font-medium hover:text-indigo-800 flex items-center gap-1 mt-2 cursor-pointer">
-                          + Add Insurance
+                          {t.addAnotherInsurance}
                         </button>
                       </div>
                     </div>
@@ -2067,7 +2108,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition cursor-pointer"
                         disabled={isSavingProfile}
                       >
-                        Cancel
+                        {t.cancel}
                       </button>
                       <button
                         onClick={handleSaveProfile}
@@ -2077,9 +2118,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         {isSavingProfile ? (
                           <>
                             <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            Saving...
+                            {t.saving}
                           </>
-                        ) : "Save Profile"}
+                        ) : t.saveProfile}
                       </button>
                     </div>
                   </div>
@@ -2089,42 +2130,42 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
             {activeTab === "settings" && (
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">Settings</h3>
+                <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.settings || "Settings"}</h3>
                 {isProfileLoading ? (
                   <div className="text-center py-10">Loading settings...</div>
                 ) : (
                   <div className="max-w-2xl">
                     <div className="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Full Name</label>
+                      <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.fullName || "Full Name"}</label>
                       <div className="text-lg font-bold text-gray-900">{profileForm.name}</div>
                     </div>
 
                     <div className="border-t border-gray-100 pt-6">
-                      <h4 className="font-bold text-gray-800 mb-4">Security</h4>
+                      <h4 className="font-bold text-gray-800 mb-4">{t.security || "Security"}</h4>
                       {!isEditingPassword ? (
                         <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
                           <div>
-                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">Password</label>
+                            <label className="block text-sm font-semibold text-gray-500 uppercase tracking-wider mb-1">{t.password || "Password"}</label>
                             <div className="text-lg font-bold text-gray-900">••••••••</div>
                           </div>
                           <button
                             onClick={() => setIsEditingPassword(true)}
                             className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition shadow-sm font-medium cursor-pointer"
                           >
-                            Update Password
+                            {t.updatePassword || "Update Password"}
                           </button>
                         </div>
                       ) : (
                         <div className="space-y-4 bg-gray-50 p-6 rounded-xl border border-gray-200">
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">Current Password</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.currentPassword || "Current Password"}</label>
                             <div className="relative">
                               <input
                                 type={showOldPassword ? "text" : "password"}
                                 value={passwordForm.oldPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder="Enter current password"
+                                placeholder={t.enterCurrentPassword || "Enter current password"}
                               />
                               <button
                                 type="button"
@@ -2140,14 +2181,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">New Password</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.newPassword}</label>
                             <div className="relative">
                               <input
                                 type={showNewPassword ? "text" : "password"}
                                 value={passwordForm.newPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder="Enter new password"
+                                placeholder={t.newPassword}
                               />
                               <button
                                 type="button"
@@ -2163,14 +2204,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             </div>
                           </div>
                           <div>
-                            <label className="block font-semibold text-gray-700 mb-1">Confirm New Password</label>
+                            <label className="block font-semibold text-gray-700 mb-1">{t.confirmNewPassword}</label>
                             <div className="relative">
                               <input
                                 type={showConfirmPassword ? "text" : "password"}
                                 value={passwordForm.confirmPassword}
                                 onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                                 className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none pr-10"
-                                placeholder="Confirm new password"
+                                placeholder={t.confirmNewPassword}
                               />
                               <button
                                 type="button"
@@ -2194,14 +2235,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition cursor-pointer"
                               disabled={isSavingPassword}
                             >
-                              Cancel
+                              {t.cancel}
                             </button>
                             <button
                               onClick={handlePasswordUpdate}
                               disabled={isSavingPassword || !passwordForm.newPassword || !passwordForm.oldPassword}
                               className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition flex items-center gap-2 cursor-pointer"
                             >
-                              {isSavingPassword ? "Updating..." : "Save Password"}
+                              {isSavingPassword ? t.updating : t.savePassword}
                             </button>
                           </div>
                         </div>
@@ -2216,14 +2257,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             {showLogoutConfirm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
                 <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Logout</h3>
-                  <p className="text-gray-600 mb-6">Are you sure you want to log out?</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t.confirmLogout}</h3>
+                  <p className="text-gray-600 mb-6">{t.confirmLogoutMessage}</p>
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => setShowLogoutConfirm(false)}
                       className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                     >
-                      Cancel
+                      {t.cancel}
                     </button>
                     <button
                       onClick={handleLogout}
@@ -2236,9 +2277,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Logging out...
+                          {t.loggingOut}
                         </>
-                      ) : "Logout"}
+                      ) : t.logout}
                     </button>
                   </div>
                 </div>
@@ -2248,8 +2289,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
             {showDeleteStockConfirm && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm bg-black/10">
                 <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Deletion</h3>
-                  <p className="text-gray-600 mb-6">Are you sure you want to delete this stock item? This action cannot be undone.</p>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{t.confirmDelete}</h3>
+                  <p className="text-gray-600 mb-6">{t.confirmDeleteStock}</p>
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => {
@@ -2259,14 +2300,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
                       disabled={isDeletingStock}
                     >
-                      Cancel
+                      {t.cancel}
                     </button>
                     <button
                       onClick={confirmDeleteStock}
                       disabled={isDeletingStock}
                       className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 disabled:bg-red-400 cursor-pointer"
                     >
-                      {isDeletingStock ? "Deleting..." : "Delete"}
+                      {isDeletingStock ? t.deleting : t.delete}
                     </button>
                   </div>
                 </div>
