@@ -1024,7 +1024,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         value={profileForm.service_summary}
                         onChange={(e) => setProfileForm(prev => ({ ...prev, service_summary: e.target.value }))}
                         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        placeholder="Summarize service details..."
+                        placeholder={t.summarizeService || "Summarize service details..."}
                       />
                     </div>
                     <div>
@@ -1034,28 +1034,30 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         value={profileForm.admission_process}
                         onChange={(e) => setProfileForm(prev => ({ ...prev, admission_process: e.target.value }))}
                         className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        placeholder="Explain the admission process..."
+                        placeholder={t.admissionProcessExplanation || "Explain the admission process..."}
                       />
                     </div>
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🛠️ {t.availableServices}</label>
-                        <button onClick={addService} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addService}</button>
+                        <button onClick={addService} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ {t.addService}</button>
                       </div>
                       <div className="space-y-3">
                         {availableServices.map((service, index) => (
                           <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative">
-                            <button onClick={() => removeService(index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                            </button>
+                            <div className="flex justify-end mb-2">
+                              <button onClick={() => removeService(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                              </button>
+                            </div>
                             <div className="mb-2">
                               <input
                                 type="text"
                                 value={service.name}
                                 onChange={(e) => updateService(index, "name", e.target.value)}
                                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Service Name"
+                                placeholder={t.serviceName || "Service Name"}
                               />
                             </div>
                             <div>
@@ -1064,7 +1066,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 value={service.description}
                                 onChange={(e) => updateService(index, "description", e.target.value)}
                                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Description"
+                                placeholder={t.description || "Description"}
                               />
                             </div>
                           </div>
@@ -1076,20 +1078,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🩸 {t.availableBloodTypes}</label>
-                        <button onClick={addBloodType} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addBloodType}</button>
+                        <button onClick={addBloodType} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ {t.addBloodType}</button>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-3">
                         {availableBloodTypes.map((bt, index) => (
-                          <div key={index} className="flex items-center gap-1 bg-gray-50 border rounded-lg px-2 py-1">
+                          <div key={index} className="flex items-center gap-2">
                             <input
                               type="text"
                               value={bt}
                               onChange={(e) => updateBloodType(index, e.target.value)}
-                              className="w-16 bg-transparent border-none focus:ring-0 text-sm p-0"
+                              className="w-20 border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                               placeholder="Type"
                             />
-                            <button onClick={() => removeBloodType(index)} className="text-red-400 hover:text-red-600">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            <button onClick={() => removeBloodType(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                             </button>
                           </div>
                         ))}
@@ -1100,21 +1102,18 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🩺 {t.medicalEquipment}</label>
-                        <button onClick={addEquipment} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addEquipment}</button>
+                        <button onClick={addEquipment} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ {t.addEquipment}</button>
                       </div>
                       <div className="space-y-3">
                         {medicalEquipment.map((item, index) => (
-                          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative flex gap-3 items-center pr-10">
-                            <button onClick={() => removeEquipment(index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                            </button>
+                          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200 relative flex gap-3 items-center">
                             <div className="flex-1">
                               <input
                                 type="text"
                                 value={item.name}
                                 onChange={(e) => updateEquipment(index, "name", e.target.value)}
                                 className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                placeholder="Equipment Name"
+                                placeholder={t.equipmentName || "Equipment Name"}
                               />
                             </div>
                             <div className="w-1/3">
@@ -1127,6 +1126,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 <option value="Maintenance">{t.maintenance}</option>
                               </select>
                             </div>
+                            <button onClick={() => removeEquipment(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                            </button>
                           </div>
                         ))}
                         {medicalEquipment.length === 0 && <div className="text-sm text-gray-500 italic">{t.noEquipmentListed}</div>}
@@ -1136,7 +1138,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🏥 {t.partnerInsurances}</label>
-                        <button onClick={addInsurance} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addInsurance}</button>
+                        <button onClick={addInsurance} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ {t.addInsurance}</button>
                       </div>
                       <div className="space-y-2">
                         {insurancesList.map((insurance, index) => (
@@ -1147,9 +1149,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               value={insurance}
                               onChange={(e) => updateInsurance(index, e.target.value)}
                               className="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                              placeholder="Insurance Name"
+                              placeholder={t.insuranceName || "Insurance Name"}
                             />
-                            <button onClick={() => removeInsurance(index)} className="text-red-500 hover:text-red-700 p-1">
+                            <button onClick={() => removeInsurance(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                             </button>
                           </div>
@@ -1160,7 +1162,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">💊 {t.partnerPharmacies}</label>
-                        <button onClick={addPharmacy} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addPharmacy}</button>
+                        <button onClick={addPharmacy} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ {t.addPharmacy}</button>
                       </div>
                       <div className="space-y-2">
                         {pharmaciesList.map((pharmacy, index) => (
@@ -1171,10 +1173,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               value={pharmacy}
                               onChange={(e) => updatePharmacy(index, e.target.value)}
                               className="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                              placeholder="Pharmacy Name"
+                              placeholder={t.pharmacyName || "Pharmacy Name"}
                             />
-                            <button onClick={() => removePharmacy(index)} className="text-red-500 hover:text-red-700 p-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            <button onClick={() => removePharmacy(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0" >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                             </button>
                           </div>
                         ))}
@@ -1185,14 +1187,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <label className="block font-semibold text-gray-700">🏢 {t.locations}</label>
-                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ {t.addLocation}</button>
+                        <button onClick={addLocation} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer">+ {t.addLocation}</button>
                       </div>
                       <div className="space-y-4">
                         {Locations.map((loc, index) => (
                           <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200 relative">
-                            <button onClick={() => removeLocation(index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                            </button>
+                            <div className="flex justify-end mb-2">
+                              <button onClick={() => removeLocation(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                              </button>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                               <select
                                 value={loc.type}
@@ -1207,7 +1211,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 value={loc.city}
                                 onChange={(e) => updateLocation(index, "city", e.target.value)}
                                 className="border rounded px-3 py-2 text-sm"
-                                placeholder="City"
+                                placeholder={t.city || "City"}
                               />
                             </div>
                             <div className="mb-3">
@@ -1216,7 +1220,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 value={loc.address}
                                 onChange={(e) => updateLocation(index, "address", e.target.value)}
                                 className="w-full border rounded px-3 py-2 text-sm"
-                                placeholder="Address / Street"
+                                placeholder={t.addressStreet || "Address / Street"}
                               />
                             </div>
                             <div className="grid grid-cols-3 gap-3">
@@ -1239,7 +1243,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 value={loc.phone}
                                 onChange={(e) => updateLocation(index, "phone", e.target.value)}
                                 className="border rounded px-3 py-2 text-sm"
-                                placeholder="Phone (Optional)"
+                                placeholder={t.phoneOptional || "Phone (Optional)"}
                               />
                             </div>
                             <div className="mt-2 flex justify-end gap-3 items-center">
@@ -1257,7 +1261,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                   if (!query) return toast.error("Please enter an address or city to search.");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
-                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1266,7 +1270,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handlePasteCoordinates(index)}
-                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -1275,7 +1279,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               </button>
                               <button
                                 onClick={() => handleUseCurrentLocation(index)}
-                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium"
+                                className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
@@ -1330,7 +1334,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             value={profileForm.contact_office}
                             onChange={(e) => setProfileForm(prev => ({ ...prev, contact_office: e.target.value.toUpperCase() }))}
                             className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                            placeholder="City, Country"
+                            placeholder={t.cityCountryPlaceholder || "City, Country"}
                           />
                         </div>
                         <div>

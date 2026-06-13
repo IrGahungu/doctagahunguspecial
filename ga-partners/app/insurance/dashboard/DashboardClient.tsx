@@ -880,11 +880,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <div className="flex justify-end mb-2">
                               <button
                                 onClick={() => removePlan(index)}
-                                className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
+                                className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0"
                                 title="Remove Plan"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
                                 </svg>
                               </button>
                             </div>
@@ -1003,10 +1003,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             />
                             <button
                               onClick={() => removePharmacy(index)}
-                              className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black shrink-0"
+                              className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0"
                               title="Remove Pharmacy"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                             </button>
                           </div>
                         ))}
@@ -1025,10 +1025,10 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <div className="flex justify-end mb-2">
                               <button
                                 onClick={() => removeLocation(index)}
-                                className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
+                                className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0"
                                 title="Remove Location"
                               >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                               </button>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">

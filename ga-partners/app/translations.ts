@@ -493,6 +493,11 @@ export const partnerTranslations = {
     cityCountryPlaceholder: "City, Country",
     incorrectCurrentPassword: "Incorrect current password",
     updateLoginPasswordFail: "Failed to update login password",
+    summarizeService: "Summarize service details...",
+    admissionProcessExplanation: "Explain the admission process...",
+    serviceName: "Service Name",
+    equipmentName: "Equipment Name",
+    
   },
   fr: {
     title: "Portail Partenaire du Dr. Gahungu",
@@ -987,6 +992,10 @@ export const partnerTranslations = {
     partnerHospitals: "Hôpitaux partenaires",
     incorrectCurrentPassword: "Mot de passe actuel incorrect",
     updateLoginPasswordFail: "Échec de la mise à jour du mot de passe de connexion",
+    summarizeService: "Résumer les détails du service...",
+    admissionProcessExplanation: "Expliquer le processus d'admission...",
+    serviceName: "Nom du service",
+    equipmentName: "Nom de l'équipement",
   }
 };
 

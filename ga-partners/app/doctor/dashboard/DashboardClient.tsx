@@ -1757,11 +1757,14 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                       </div>
                       <div className="space-y-4">
                         {Locations.map((loc, index) => (
-                          <div key={index} className="relative">
-                            <button onClick={() => removeLocation(index)} className="absolute -top-2 -right-2 z-10 p-1 bg-white text-gray-400 hover:text-red-500 rounded-full border border-gray-200 shadow-sm transition-colors cursor-pointer">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                            </button>
-                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex justify-end mb-2">
+                              <button onClick={() => removeLocation(index)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0" title={t.remove || "Remove"}>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                </svg>
+                              </button>
+                            </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                               <select
                                 value={loc.type}
@@ -1782,7 +1785,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <div className="mb-3">
                               <input
                                 type="text"
-                                value={loc.address}
                                 onChange={(e) => updateLocation(index, "address", e.target.value)}
                                 className="w-full border rounded px-3 py-2 text-sm"
                                 placeholder={t.addressStreet || "Address / Street"}
@@ -1815,7 +1817,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                               <button
                                 onClick={() => {
                                   const query = `${loc.address} ${loc.city}`.trim();
-                                  if (!query) return toast.error(t.enterAddressOrCity);
+                                  if (!query) return toast.error(t.enterAddressOrCity || "Please enter address or city");
                                   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
                                 }}
                                 className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
@@ -1856,7 +1858,6 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 ></iframe>
                               </div>
                             )}
-                            </div>
                           </div>
                         ))}
                         {Locations.length === 0 && <div className="text-sm text-gray-500 italic">{t.noLocationsListed || "No locations added."}</div>}
@@ -1873,7 +1874,11 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                         <div key={idx} className="border border-gray-200 rounded p-3 mb-3 bg-gray-50">
                           <div className="flex justify-between items-start mb-2">
                             <h5 className="text-xs font-bold text-gray-500 uppercase">Slot {idx + 1}</h5>
-                            <button onClick={() => handleRemoveAvailability(idx)} className="text-red-600 text-xs hover:underline cursor-pointer">{t.remove || "Remove"}</button>
+                            <button onClick={() => handleRemoveAvailability(idx)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0" title={t.remove || "Remove"}>
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                              </svg>
+                            </button>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
@@ -1993,7 +1998,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                           {scheduleForm.map((item, idx) => (
                             <div key={idx} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                               <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-bold text-lg text-gray-800">{item.day}</h4>
+                                <h4 className="font-bold text-lg text-gray-800">{(t as any)[item.day.toLowerCase()] || item.day}</h4>
                                 <span className="h-2 w-2 rounded-full bg-green-500"></span>
                               </div>
                               <div className="space-y-2 text-sm">
@@ -2058,8 +2063,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 onChange={(e) => handleScheduleChange(idx, "day", e.target.value)}
                                 className="w-full border rounded px-2 py-1.5 text-sm"
                               >
-                                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(d => (
-                                  <option key={d} value={d}>{d}</option>
+                                {DAYS_ORDER.map(d => (
+                                  <option key={d} value={d}>{(t as any)[d.toLowerCase()] || d}</option>
                                 ))}
                               </select>
                             </div>
@@ -2119,9 +2124,9 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                                 }}
                               />
                             </div>
-                            <button onClick={() => handleRemoveScheduleRow(idx)} className="text-red-600 p-2 hover:bg-red-50 rounded cursor-pointer">
+                            <button onClick={() => handleRemoveScheduleRow(idx)} className="bg-red-50 text-red-500 hover:bg-red-100 p-1.5 rounded-full transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black flex-shrink-0" title={t.remove || "Remove"}>
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
                               </svg>
                             </button>
                           </div>
