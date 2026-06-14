@@ -180,7 +180,7 @@ export default function LoginPage() {
             <div className="flex justify-end">
               <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">{t.forgotPassword}</Link>
             </div>
-            <button type="submit" className="w-full p-2.5 md:p-3 bg-green-600 text-white rounded-lg flex justify-center items-center font-medium md:font-semibold" disabled={busy}>
+            <button type="submit" className="w-full p-2.5 md:p-3 bg-green-600 text-white rounded-lg flex justify-center items-center font-medium md:font-semibold cursor-pointer" disabled={busy}>
               {busy ? (
                 <Spinner />
               ) : t.login}

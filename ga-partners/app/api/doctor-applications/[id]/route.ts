@@ -43,6 +43,7 @@ export async function PUT(
     const consultation_fee_offline = formData.get("consultation_fee_offline") ? Number(formData.get("consultation_fee_offline")?.toString()) : undefined;
     const location = formData.get("location")?.toString();
     const originCountry = formData.get("originCountry")?.toString();
+    const work_schedule = formData.get("work_schedule")?.toString();
 
     const availabilityRaw = formData.get("availability")?.toString();
     let availability = undefined;
@@ -84,6 +85,7 @@ export async function PUT(
     if (availability !== undefined) updateData.availability = availability;
     if (imagePath !== undefined) updateData.image = imagePath;
     if (originCountry !== undefined) updateData.origin_country = originCountry;
+    if (work_schedule !== undefined) updateData.work_schedule = work_schedule;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ message: "No data provided for update" }, { status: 400 });

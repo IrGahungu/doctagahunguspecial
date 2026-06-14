@@ -54,6 +54,14 @@ interface DashboardClientProps {
   app: DoctorApplication;
 }
 
+const formatPrice = (value: string) => {
+  const rawValue = value.replace(/,/g, "");
+  if (/^\d+$/.test(rawValue)) {
+    return rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  return value;
+};
+
 // Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -513,6 +521,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
       if (field === "times") {
         updatedAvailability[index].times = value.split(",").map((t) => t.trim());
+      } else if (field === "consultation_fee_online" || field === "consultation_fee_offline") {
+        (updatedAvailability[index] as any)[field] = formatPrice(value);
       } else {
         (updatedAvailability[index] as any)[field] = value;
       }
@@ -600,10 +610,12 @@ export default function DashboardClient({ app }: DashboardClientProps) {
     setIsSavingSchedule(true);
     try {
       const scheduleToSave = scheduleForm.map(({ _ui_id, ...rest }) => rest);
+      const formData = new FormData();
+      formData.append("work_schedule", JSON.stringify(scheduleToSave));
+
       const res = await fetch(`/api/doctor-applications/${app.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ work_schedule: JSON.stringify(scheduleToSave) }),
+        body: formData,
       });
       if (!res.ok) {
         toast.error(t.updateScheduleFail || "Failed to update schedule");
@@ -622,20 +634,20 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   async function handleSaveAvailability() {
     setIsSavingAvailability(true);
     try {
-      const payload = {
-        ...availabilityForm,
-        location: JSON.stringify(Locations),
-        availability: availabilityForm.availability.map((a) => ({
+      const formData = new FormData();
+      formData.append("location", JSON.stringify(Locations));
+      formData.append("booking_type", availabilityForm.booking_type);
+      formData.append("consultation_fee_online", availabilityForm.consultation_fee_online);
+      formData.append("consultation_fee_offline", availabilityForm.consultation_fee_offline);
+      formData.append("availability", JSON.stringify(availabilityForm.availability.map((a) => ({
           ...a,
           times: a.times.filter((t) => t.trim() !== ""),
           booking_type: a.booking_type || "online",
-        })),
-      };
+        }))));
 
       const res = await fetch(`/api/doctor-applications/${app.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: formData,
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -1698,7 +1710,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     You can only manage your availability and fees once your application has been approved.
                   </div>
                 ) : isAvailabilityLoading ? (
-                  <div className="text-center py-10">Loading details...</div>
+                  <div className="text-center py-10">{t.loadingDetails || "Loading details..."}</div>
                 ) : !isEditingAvailability ? (
                   <div className="flex flex-col gap-6 items-center">
                     <div className="flex-1 w-full">
@@ -1785,6 +1797,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                             <div className="mb-3">
                               <input
                                 type="text"
+                                value={loc.address}
                                 onChange={(e) => updateLocation(index, "address", e.target.value)}
                                 className="w-full border rounded px-3 py-2 text-sm"
                                 placeholder={t.addressStreet || "Address / Street"}
@@ -1976,7 +1989,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.daysAndHours || "Manage Working Days & Hours"}</h3>
                 {isScheduleLoading ? (
-                  <div className="text-center py-10">Loading schedule...</div>
+                  <div className="text-center py-10">{t.loadingSchedule || "Loading Schedule..."}</div>
                 ) : !isEditingSchedule ? (
                   <div className="space-y-6">
                     {scheduleForm.length === 0 ? (

@@ -180,6 +180,7 @@ export const partnerTranslations = {
     noWorkingDaysAdded: "No working days added yet",
     addDay: "add day",
     loadingBookings: "Loading bookings",
+    loadingDetails: "Loading details...",
     noBookingsFound: "No bookings found",
     loggingOut: "Logging out...",
     savePassword: "Save Password",
@@ -497,9 +498,18 @@ export const partnerTranslations = {
     admissionProcessExplanation: "Explain the admission process...",
     serviceName: "Service Name",
     equipmentName: "Equipment Name",
-    
+    loadingItems: "Loading Items...",
+    loadingOrders: "Loading Orders...",
+    loadingSchedule: "Loading Schedule...",
+    loadingStock: "Loading Stock...",
+    loadingLocations: "Loading Locations...",
+    loadingInsurances: "Loading Insurances...",
   },
   fr: {
+    loadingStock: "Chargement du stock...",
+    loadingLocations: "Chargement des emplacements...",
+    loadingInsurances: "Chargement des assurances...",
+    loadingSchedule: "Chargement de l'horaire...",
     title: "Portail Partenaire du Dr. Gahungu",
     subtitle: "Inscrivez-vous en tant que médecin, pharmacie, hôpital ou assurance.",
     or: "OU",
@@ -677,7 +687,7 @@ export const partnerTranslations = {
     createSchedule: "Créer un horaire",
     noWorkingDaysAdded: "Aucun jour de travail ajouté pour le moment",
     addDay: "ajouter un jour",
-    loadingBookings: "Chargement des réservations",
+    loadingBookings: "Chargement des réservations...",
     noBookingsFound: "Aucune réservation trouvée",
     loggingOut: "Déconnexion en cours...",
     savePassword: "Enregistrer le mot de passe",
@@ -996,6 +1006,9 @@ export const partnerTranslations = {
     admissionProcessExplanation: "Expliquer le processus d'admission...",
     serviceName: "Nom du service",
     equipmentName: "Nom de l'équipement",
+    loadingDetails: "Chargement des détails...",
+    loadingItems: "Chargement des articles...",
+    loadingOrders: "Chargement des commandes...",
   }
 };
 

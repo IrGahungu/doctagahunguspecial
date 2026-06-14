@@ -71,6 +71,14 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+const formatPrice = (value: string) => {
+  const rawValue = value.replace(/,/g, "");
+  if (/^\d+$/.test(rawValue)) {
+    return rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  return value;
+};
+
 export default function DashboardClient({ app }: DashboardClientProps) {
   const { t, lang } = useLanguage();
   const [showStatus, setShowStatus] = useState(false);
@@ -717,8 +725,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
 
       const formData = new FormData();
       formData.append("name", stockForm.name);
-      formData.append("price", stockForm.price);
-      formData.append("original_price", stockForm.original_price);
+      formData.append("price", stockForm.price.replace(/,/g, ""));
+      formData.append("original_price", stockForm.original_price.replace(/,/g, ""));
       formData.append("quantity", stockForm.quantity);
       formData.append("description", stockForm.description);
       formData.append("category_id", stockForm.category_id);
@@ -770,8 +778,8 @@ export default function DashboardClient({ app }: DashboardClientProps) {
   function handleEditStock(item: StockItem) {
     setStockForm({
       name: item.name,
-      price: item.price.toString(),
-      original_price: item.original_price.toString(),
+      price: formatPrice(item.price.toString()),
+      original_price: formatPrice(item.original_price.toString()),
       quantity: item.quantity.toString(),
       description: item.description || "",
       category_id: item.category_id || "",
@@ -1311,16 +1319,16 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                     />
                     <input
                       placeholder={t.price || "Price"}
-                      type="number"
+                      type="text"
                       value={stockForm.price}
-                      onChange={(e) => setStockForm({ ...stockForm, price: e.target.value })}
+                      onChange={(e) => setStockForm({ ...stockForm, price: formatPrice(e.target.value) })}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <input
                       placeholder={t.originalPrice || "Original Price"}
-                      type="number"
+                      type="text"
                       value={stockForm.original_price}
-                      onChange={(e) => setStockForm({ ...stockForm, original_price: e.target.value })}
+                      onChange={(e) => setStockForm({ ...stockForm, original_price: formatPrice(e.target.value) })}
                       className="border rounded px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <input
@@ -1426,7 +1434,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 </div>
 
                 {isStockLoading ? (
-                  <div className="text-center py-10">Loading stock...</div>
+                  <div className="text-center py-10">{t.loadingStock || "Loading stock..."}</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -1542,7 +1550,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
                 </div>
 
                 {isOrdersLoading ? (
-                  <div className="text-center py-10">Loading orders...</div>
+                  <div className="text-center py-10">{t.loadingOrders || "Loading orders..."}</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -1654,7 +1662,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.myPharmacy || "My Pharmacy"}</h3>
                 {isProfileLoading ? (
-                  <div className="text-center py-10">Loading profile...</div>
+                  <div className="text-center py-10">{t.loadingProfile || "Loading profile..."}</div>
                 ) : !isEditingProfile ? (
                   <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
                     <div className="flex-1 w-full bg-gray-50 p-6 rounded-xl border border-gray-200">
@@ -2132,7 +2140,7 @@ export default function DashboardClient({ app }: DashboardClientProps) {
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h3 className="text-xl font-bold mb-6 text-gray-800 text-center">{t.settings || "Settings"}</h3>
                 {isProfileLoading ? (
-                  <div className="text-center py-10">Loading settings...</div>
+                  <div className="text-center py-10">{t.loadingSettings || "Loading settings..."}</div>
                 ) : (
                   <div className="max-w-2xl">
                     <div className="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
