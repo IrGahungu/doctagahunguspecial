@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type Hospital = {
   id: string;
@@ -110,11 +111,18 @@ export default function HospitalModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
+      if (!res.ok) {
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       setHospitalForm((prev) => ({ ...prev, image: result.publicUrl }));
     } catch (err) {
-      setFormError("Image upload failed");
+      const msg = err instanceof Error ? err.message : "Image upload failed";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsUploading(false);
     }
@@ -172,10 +180,16 @@ export default function HospitalModal({
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed to save data");
+      if (!res.ok) {
+        toast.error("Failed to save data");
+        setFormError("Failed to save data");
+        return;
+      }
       onSuccess();
     } catch {
-      setFormError("Error saving hospital");
+      const msg = "Error saving hospital";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

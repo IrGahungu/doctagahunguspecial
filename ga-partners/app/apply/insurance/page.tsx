@@ -240,9 +240,23 @@ export default function InsurancePage() {
       try {
         result = JSON.parse(text);
       } catch (e) { // If response is not JSON, it's likely a plain text error or success
-        throw new Error(text || `Server error (${res.status}): ${t.invalidJsonResponse}`);
+        if (!res.ok) {
+          const msg = text || `${t.serverError} (${res.status})`;
+          toast.error(msg);
+          setFormError(msg);
+          return;
+        }
+        const msg = `${t.serverError} (${res.status}): ${t.invalidJsonResponse}`;
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
-      if (!res.ok) throw new Error(result.error || t.serverError);
+      if (!res.ok) {
+        const msg = result.error || t.serverError;
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
       
       toast.success(editingInsurance 
         ? t.applicationResubmittedSuccess 
@@ -252,7 +266,9 @@ export default function InsurancePage() {
       }, 4000);
       } catch (err:any) {
       console.error(err);
-      setFormError(err instanceof Error ? err.message : "Failed to save insurance");
+      const msg = err instanceof Error ? err.message : "Failed to save insurance";
+      setFormError(msg);
+      toast.error(msg);
       } finally {
       setShowConfirmModal(false); // Close modal on submission attempt
       setIsSubmitting(false);

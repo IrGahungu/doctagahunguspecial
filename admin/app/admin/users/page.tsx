@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import toast, { Toaster } from "react-hot-toast";
 
 interface User {
   id: string;
@@ -25,11 +26,16 @@ export default function UsersPage() {
         const res = await fetch(`/api/admin/users`);
         if (!res.ok) {
           if (res.status === 401 || res.status === 403) router.push("/admin/login");
-          throw new Error((await res.json()).error || "Failed to fetch users");
+          const errorData = await res.json();
+          const msg = errorData.error || "Failed to fetch users";
+          toast.error(msg);
+          setError(msg);
+          return;
         }
         setUsers(await res.json());
       } catch (err: any) {
-        setError(err.message);
+        setError(err.message || "An unexpected error occurred");
+        toast.error(err.message || "Failed to load users");
       } finally {
         setLoading(false);
       }
@@ -44,25 +50,30 @@ export default function UsersPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "admin", id }),
     });
-    if (res.ok) router.refresh();
-    else {
+    if (res.ok) {
+      toast.success("User role updated to admin");
+      router.refresh();
+    } else {
       const data = await res.json();
-      alert(data.error || "Failed");
+      toast.error(data.error || "Failed to update role");
     }
   };
 
   const deleteUser = async (id: string) => {
     if (!confirm("Delete user?")) return;
     const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
-    else {
+    if (res.ok) {
+      toast.success("User deleted successfully");
+      router.refresh();
+    } else {
       const data = await res.json();
-      alert(data.error || "Failed");
+      toast.error(data.error || "Failed to delete user");
     }
   };
 
   return (
     <>
+      <Toaster />
       <h1>Users</h1>
       {loading && <p>Loading users...</p>}
       {error && <p className="text-red-500">{error}</p>}

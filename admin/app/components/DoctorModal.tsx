@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type Availability = {
   date: string; // "2025-09-10"
@@ -100,11 +101,18 @@ export default function DoctorModal({
     try {
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
+      if (!res.ok) {
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       setDoctorForm((prev) => ({ ...prev, image: result.publicUrl }));
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Upload failed unexpectedly");
+      const msg = err instanceof Error ? err.message : "Upload failed unexpectedly";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsUploading(false);
     }
@@ -186,11 +194,18 @@ export default function DoctorModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to save doctor");
+      if (!res.ok) {
+        const msg = result.error || "Failed to save doctor";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       onSuccess();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Failed to save doctor");
+      const msg = err instanceof Error ? err.message : "Failed to save doctor";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

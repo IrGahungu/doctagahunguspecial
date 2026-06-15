@@ -55,7 +55,10 @@ export default function BusModal({ isOpen, onClose, editingBus, onSuccess }: Bus
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      if (!res.ok) throw new Error("Failed to save");
+      if (!res.ok) {
+        toast.error("Failed to save bus");
+        return;
+      }
       toast.success(editingBus ? "Bus updated" : "Bus added");
       onSuccess();
       onClose();

@@ -248,7 +248,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
       console.log("Fetch applications response status:", res.status);
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(`Failed to fetch applications: ${res.status} - ${JSON.stringify(errorData)}`);
+        const msg = `Failed to fetch applications: ${res.status} - ${JSON.stringify(errorData)}`;
+        toast.error(msg);
+        setError(msg);
+        return;
       }
       const data = await res.json();
       setApplications(data);
@@ -271,7 +274,10 @@ export default function ApplicationsTable({ type }: { type: "doctor" | "pharmacy
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status, type, rejection_reason: reason }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Failed to update application status");
+        return false;
+      }
       setApplications(prev => prev.map(app => (app.id === id ? { ...app, status, rejection_reason: reason } : app)));
       return true;
     } catch (err) {

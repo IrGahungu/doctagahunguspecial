@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type Deal = {
   id: string;
@@ -83,7 +84,10 @@ export default function DealModal({
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
 
       setDealForm((prev) => ({ ...prev, image: result.publicUrl }));
@@ -123,7 +127,12 @@ export default function DealModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to save Deal");
+      if (!res.ok) {
+        const msg = result.error || "Failed to save Deal";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       onSuccess();
     } catch (err) {

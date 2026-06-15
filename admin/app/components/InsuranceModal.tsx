@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type InsurancePlan = {
   type: string;
@@ -104,13 +105,17 @@ export default function InsuranceModal({
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
 
       setInsuranceForm((prev) => ({ ...prev, image: result.publicUrl }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unknown error occurred during upload.";
-      setFormError(message);
+      const msg = err instanceof Error ? err.message : "An unknown error occurred during upload.";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsUploading(false);
     }
@@ -151,12 +156,19 @@ export default function InsuranceModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to save Insurance");
+      if (!res.ok) {
+        const msg = result.error || "Failed to save Insurance";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       onSuccess();
     } catch (err) {
       console.error(err);
-      setFormError(err instanceof Error ? err.message : "Failed to save insurance");
+      const msg = err instanceof Error ? err.message : "Failed to save insurance";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

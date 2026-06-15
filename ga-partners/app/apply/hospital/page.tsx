@@ -237,12 +237,23 @@ export default function HospitalPage() {
          } catch (e) {
            if (!res.ok) {
              // The response was not ok and not valid JSON, so the text itself is likely the error. // No translation needed for icon
-             throw new Error(text || `${t.serverError} (${res.status})`);
+             const msg = text || `${t.serverError} (${res.status})`;
+             toast.error(msg);
+             setFormError(msg);
+             return;
            }
            // The response was ok but not valid JSON. // No translation needed for icon
-           throw new Error(`${t.serverError} (${res.status}): ${t.invalidJsonResponse}`);
+           const msg = `${t.serverError} (${res.status}): ${t.invalidJsonResponse}`;
+           toast.error(msg);
+           setFormError(msg);
+           return;
          }
-         if (!res.ok) throw new Error(result.error || "Failed to save Hospital");
+         if (!res.ok) {
+           const msg = result.error || "Failed to save Hospital";
+           toast.error(msg);
+           setFormError(msg);
+           return;
+         }
    
          toast.success(editingHospital // No translation needed for icon
            ? t.applicationResubmittedSuccess
@@ -253,7 +264,9 @@ export default function HospitalPage() {
          }, 4000);
          } catch (err:any) {
          console.error(err);
-         setFormError(err instanceof Error ? err.message : "Failed to save hospital");
+         const msg = err instanceof Error ? err.message : "Failed to save hospital";
+         setFormError(msg);
+         toast.error(msg);
          } finally {
          setIsSubmitting(false);
        }

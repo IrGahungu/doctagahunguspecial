@@ -265,7 +265,12 @@ const BusCheckoutSkeleton = () => (
       const token = await SecureStore.getItemAsync('token');
 
       if (!token) {
-        throw new Error('Authentication expired. Please log in again.');
+        Toast.show({
+          type: 'error',
+          text1: t["authentication error"],
+          text2: 'Authentication expired. Please log in again.',
+        });
+        return;
       }
 
       /* ================================
@@ -286,9 +291,13 @@ const BusCheckoutSkeleton = () => (
       try { verifyData = JSON.parse(verifyText); } catch (e) {}
 
       if (!verifyRes.ok || !verifyData.success) {
-        throw new Error(
-          verifyData.error || 'The PIN you entered is incorrect.'
-        ); // This error message is already translated in login-payment-fee.tsx, but here it's a fallback.
+        setIsPinModalVisible(false);
+        Toast.show({
+          type: 'error',
+          text1: t["wallet error"],
+          text2: verifyData.error || 'The PIN you entered is incorrect.',
+        });
+        return;
       }
 
       /* ================================
@@ -312,7 +321,13 @@ const BusCheckoutSkeleton = () => (
       const bookingData = await bookingRes.json();
 
       if (!bookingRes.ok) {
-        throw new Error(bookingData.error || 'Booking failed.');
+        setIsPinModalVisible(false);
+        Toast.show({
+          type: 'error',
+          text1: t["booking failed"],
+          text2: bookingData.error || 'Booking failed.',
+        });
+        return;
       }
 
       /* ================================

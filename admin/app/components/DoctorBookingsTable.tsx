@@ -51,7 +51,10 @@ export default function DoctorBookingsTable() {
           const data = await res.json();
           msg = data.error || msg;
         } catch {}
-        throw new Error(msg);
+        toast.error(msg);
+        setError(msg);
+        setLoading(false);
+        return;
       }
       const data = await res.json();
       setBookings(Array.isArray(data) ? data : []);
@@ -75,7 +78,10 @@ export default function DoctorBookingsTable() {
         body: JSON.stringify({ id, status, type: 'doctor' }),
       });
 
-      if (!res.ok) throw new Error("Failed to update status");
+      if (!res.ok) {
+        toast.error("Failed to update status");
+        return;
+      }
 
       setBookings((prev) =>
         prev.map((b) => (b.id === id ? { ...b, status } : b))
@@ -135,7 +141,10 @@ export default function DoctorBookingsTable() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to bulk update booking statuses");
+      if (!res.ok) {
+        toast.error("Failed to bulk update booking statuses");
+        return;
+      }
 
       setBookings(prev =>
         prev.map(booking =>

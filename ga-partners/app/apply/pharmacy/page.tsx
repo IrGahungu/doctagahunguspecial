@@ -237,9 +237,17 @@ export default function PharmacyPage() {
       try {
         result = JSON.parse(text);
       } catch (e) {
-        throw new Error(`Server error (${res.status}): Invalid JSON response`);
+        const msg = `Server error (${res.status}): Invalid JSON response`;
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
-      if (!res.ok) throw new Error(result.error || t.serverError);
+      if (!res.ok) {
+        const msg = result.error || t.serverError;
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       toast.success(
         editingPharmacy ? t.applicationUpdatedSuccess : t.applicationSubmittedSuccess
@@ -250,7 +258,9 @@ export default function PharmacyPage() {
       }, 2000);
     } catch (err) {
       console.error(err);
-      setFormError(err instanceof Error ? err.message : t.unexpectedError);
+      const msg = err instanceof Error ? err.message : t.unexpectedError;
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

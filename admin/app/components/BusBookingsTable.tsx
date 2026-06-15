@@ -75,7 +75,10 @@ export default function BusBookingsTable() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status, type: 'bus' }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Update failed");
+        return;
+      }
       setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
       toast.success(`Booking ${status}`);
     } catch (err) {
@@ -106,7 +109,10 @@ export default function BusBookingsTable() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids, status: bulkUpdateStatus, type: 'bus' }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Bulk update failed");
+        return;
+      }
       
       setBookings(prev => prev.map(b => 
         ids.includes(b.id) ? { ...b, status: bulkUpdateStatus } : b

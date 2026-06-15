@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type Category = {
   id: string;
@@ -64,7 +65,10 @@ export default function CategoryModal({
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
 
       setCategoryForm((prev) => ({ ...prev, image: result.publicUrl }));
@@ -96,7 +100,12 @@ export default function CategoryModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to save category");
+      if (!res.ok) {
+        const msg = result.error || "Failed to save category";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       onSuccess();
     } catch (err) {

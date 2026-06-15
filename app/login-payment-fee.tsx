@@ -149,7 +149,12 @@ export default function LoginPaymentFeeScreen() {
         await SecureStore.setItemAsync(`cached_balance_${data.id}`, data.wallet_balance.toString());
         await SecureStore.setItemAsync('userId', data.id);
       } else {
-        throw new Error("Failed to fetch profile");
+        Toast.show({
+          type: 'error',
+          text1: t.error,
+          text2: t["failed to load profile"],
+        });
+        return;
       }
     } catch (err) {
       console.error('Error fetching data:', err);

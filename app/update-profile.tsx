@@ -70,7 +70,14 @@ export default function UpdateProfileScreen() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) throw new Error("Failed to fetch profile");
+      if (!res.ok) {
+        Toast.show({
+          type: 'error',
+          text1: t.error,
+          text2: t["failed to load profile"],
+        });
+        return;
+      }
 
       const data = await res.json();
       setFullname((data.fullname || "").toUpperCase());
@@ -129,7 +136,12 @@ export default function UpdateProfileScreen() {
 
               if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.error || "Failed to update profile");
+                Toast.show({
+                  type: 'error',
+                  text1: t.error,
+                  text2: err.error || t["failed to update profile"],
+                });
+                return;
               }
 
               Alert.alert(

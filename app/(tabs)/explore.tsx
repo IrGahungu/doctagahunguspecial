@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, FlatList, TouchableOpacity, Dimensions, TouchableWithoutFeedback, Animated, Modal, Share, BackHandler, Alert, Linking, PanResponder, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context'; // Ensure SafeAreaView is imported
-import { Heart, MessageCircle, Send, MoreHorizontal, X, Plus, Check, Play, Pause, ChevronRight, Wallet, Globe, Instagram, Twitter } from 'lucide-react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Heart, MessageCircle, Send, MoreHorizontal, X, Plus, Check, Play, Pause, ChevronRight, Wallet, Globe, Instagram, Twitter, Bell } from 'lucide-react-native';
 import { Video, ResizeMode } from 'expo-av';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import * as SecureStore from 'expo-secure-store';
@@ -10,6 +10,8 @@ import { useLanguageStore, translations } from '@/stores/languageStore';
 import { useAuthStore } from '@/stores/authStore';
 import { API_BASE_URL } from '@/config';
 import { supabase } from '@/lib/supabase';
+import Toast from 'react-native-toast-message';
+import NotificationsModal from '@/components/NotificationsModal'; // Import the new modal
 
 const { width } = Dimensions.get('window');
 
@@ -65,6 +67,46 @@ const SkeletonPost = () => (
   </SkeletonPulse>
 );
 
+const PostImageItem = ({ uri, isVisible, onDoubleTap }: { uri: string, isVisible: boolean, onDoubleTap: () => void }) => {
+  const [loading, setLoading] = useState(true);
+  const isMediaVideo = isVideo(uri);
+
+  return (
+    <TouchableWithoutFeedback onPress={onDoubleTap}>
+      <View style={styles.postImageWrapper}>
+        {loading && (
+          <View style={styles.imageSkeletonContainer}>
+            <SkeletonPulse>
+              <View style={styles.postImageSkeleton} />
+            </SkeletonPulse>
+          </View>
+        )}
+        {isMediaVideo ? (
+          <Video
+            source={{ uri }}
+            style={styles.postImage}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={isVisible}
+            isLooping
+            isMuted
+            onLoadStart={() => setLoading(true)}
+            onLoad={() => setLoading(false)}
+            useNativeControls={false}
+          />
+        ) : (
+          <Image 
+            source={{ uri }} 
+            style={styles.postImage} 
+            resizeMode="cover"
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+          />
+        )}
+      </View>
+    </TouchableWithoutFeedback>
+  );
+};
+
 const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onNextImage, onViewComments, refreshCommentsTrigger, userUsername }: { 
   item: any, 
   isLiked: boolean,
@@ -81,6 +123,14 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
   const [isLiked, setIsLiked] = useState(initialIsLiked);
   const [likes, setLikes] = useState(item.likes || 0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const flatListRef = useRef<FlatList>(null);
+
+  const handleNextImage = () => {
+    if (item.images.length > 1) {
+      const nextIndex = (currentImageIndex + 1) % item.images.length;
+      flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+    }
+  };
   // Initialize viewedIndices with the prop, ensuring it's always an object
   const [viewedIndices, setViewedIndices] = useState<Record<number, boolean>>(() => initialViewedIndices || {});
   const [comments, setComments] = useState<any[]>([]);
@@ -207,18 +257,6 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
     }
   };
 
-  const handleNextImage = () => {
-    const nextIndex = (currentImageIndex + 1) % item.images.length;
-    setCurrentImageIndex(nextIndex);
-    
-    console.log(`[Post ${item.id}] Swiped to index ${nextIndex}. Already viewed in map? ${viewedIndices[nextIndex]}`);
-    if (!viewedIndices[nextIndex]) {
-      console.log(`[Post ${item.id}] New image view detected at index ${nextIndex}. Awarding EP...`);
-      setViewedIndices(prev => ({ ...prev, [nextIndex]: true }));
-      onNextImage(nextIndex);
-    }
-  };
-
   const handleInlineSubmit = async () => {
     if (!inlineComment.trim()) return;
     if (!userUsername) {
@@ -306,37 +344,56 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
         )}
       </View>
 
-      <TouchableWithoutFeedback onPress={handleDoubleTap}>
-        <View>
-          {isVideo(item.images[currentImageIndex]) ? (
-            <Video
-              source={{ uri: item.images[currentImageIndex] }}
-              style={styles.postImage}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay
-              isLooping
-              isMuted
-              useNativeControls={false}
+      <View>
+        <FlatList
+          ref={flatListRef}
+          data={item.images}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) => {
+            const nextIndex = Math.round(e.nativeEvent.contentOffset.x / (width - 24));
+            if (nextIndex !== currentImageIndex) {
+              setCurrentImageIndex(nextIndex);
+              if (!viewedIndices[nextIndex]) {
+                setViewedIndices(prev => ({ ...prev, [nextIndex]: true }));
+                onNextImage(nextIndex);
+              }
+            }
+          }}
+          keyExtractor={(_, index) => index.toString()}
+          renderItem={({ item: uri, index }) => (
+            <PostImageItem 
+              uri={uri} 
+              isVisible={index === currentImageIndex} 
+              onDoubleTap={handleDoubleTap} 
             />
-          ) : (
-            <Image source={{ uri: item.images[currentImageIndex] }} style={styles.postImage} resizeMode="cover" />
           )}
+          style={styles.postFlatList}
+        />
 
-          {item.images.length > 1 ? (
-            <>
-              <TouchableOpacity style={styles.nextImageButton} onPress={handleNextImage}>
-                <ChevronRight size={20} color="#fff" />
-              </TouchableOpacity>
-              <View style={styles.paginationDotsContainer}>
-                {item.images.map((_: any, index: number) => (
-                  <View
-                    key={index}
-                    style={[styles.dot, index === currentImageIndex && styles.activeDot]}
-                  />
-                ))}
-              </View>
-            </>
-          ) : null}
+        {item.images.length > 1 && (
+          <View style={styles.imageCounterContainer}>
+            <Text style={styles.imageCounterText}>{currentImageIndex + 1}/{item.images.length}</Text>
+          </View>
+        )}
+
+        {item.images.length > 1 && (
+          <TouchableOpacity style={styles.nextImageButton} onPress={handleNextImage}>
+            <ChevronRight size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+
+        {item.images.length > 1 ? (
+          <View style={styles.paginationDotsContainer}>
+            {item.images.map((_: any, index: number) => (
+              <View
+                key={index}
+                style={[styles.dot, index === currentImageIndex && styles.activeDot]}
+              />
+            ))}
+          </View>
+        ) : null}
 
           {/* Multi-heart burst animation */}
           <View style={styles.heartOverlay}>
@@ -358,8 +415,6 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
             })}
           </View>
         </View>
-      </TouchableWithoutFeedback>
-
       <View style={styles.postActions}>
         <View style={styles.postActionsLeft}>
           <TouchableOpacity style={styles.actionIcon} onPress={toggleLike}>
@@ -402,7 +457,15 @@ const Post = ({ item, isLiked: initialIsLiked, initialViewedIndices, onLike, onN
               return (
                 <View key={c.id} style={styles.commentRow}>
                   <Text style={styles.shortCommentText}>
-                    <Text style={styles.commentUser}>{c.user_username}</Text> {displayText}
+                    <Text style={styles.commentUser}>{c.user_username}</Text>{' '}
+                    {displayText.split(/(@\w+)/g).map((part: string, i: number) => (
+                      <Text 
+                        key={i} 
+                        style={part.startsWith('@') ? { color: '#2874F0', fontWeight: 'bold' } : null}
+                      >
+                        {part}
+                      </Text>
+                    ))}
                     {shouldTruncate && (
                       <Text style={styles.readMoreText} onPress={() => setExpandedComments(prev => ({...prev, [c.id]: true}))}> read more</Text>
                     )}
@@ -647,7 +710,16 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
                     </TouchableOpacity>
                   )}
                 </View>
-                <Text style={styles.fullCommentText}>{item.comment_text}</Text>
+                <Text style={styles.fullCommentText}>
+                  {item.comment_text.split(/(@\w+)/g).map((part: string, i: number) => (
+                    <Text 
+                      key={i} 
+                      style={part.startsWith('@') ? { color: '#2874F0', fontWeight: 'bold' } : null}
+                    >
+                      {part}
+                    </Text>
+                  ))}
+                </Text>
                 
                 <View style={styles.commentActionsRow}>
                   <TouchableOpacity onPress={() => handleReply(item.user_username)} style={styles.replyButton}>
@@ -699,7 +771,7 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
                   onPress={handleModalSubmit}
                   disabled={isSubmitting || !newComment.trim()}
                 >
-                  {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.modalPostBtnText}>{editingCommentId ? t.update : t.submit}</Text>}
+                  {isSubmitting ? <ActivityIndicator size="small" color="#fff" /> : <Send size={18} color="#fff" />}
                 </TouchableOpacity>
               </View>
             ) : (
@@ -767,6 +839,10 @@ export default function ExploreScreen() {
   const language = useLanguageStore(state => state.language);
   const t: any = translations[language];
   const walletGraffitiAnimations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
+  const insets = useSafeAreaInsets();
+
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
 
   const fetchUserProfile = async () => {
     try {
@@ -785,6 +861,23 @@ export default function ExploreScreen() {
     }
   };
 
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const token = await SecureStore.getItemAsync('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/notifications`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadNotificationsCount(data.filter((n: any) => !n.is_read).length);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  }, []);
+
   // Effect to load/save daily stats and reset if new day
   useFocusEffect(
     useCallback(() => {
@@ -799,21 +892,35 @@ export default function ExploreScreen() {
           const storedCountry = await SecureStore.getItemAsync('user_country') || 'Burundi';
           const headers = { Authorization: `Bearer ${token}` };
 
-          const [storiesRes, postsRes, interactionsRes, configRes, profileRes] = await Promise.all([
+          const [storiesRes, postsRes, interactionsRes, notificationsRes, configRes, profileRes] = await Promise.all([
             fetch(`${API_BASE_URL}/stories`, { headers }),
             fetch(`${API_BASE_URL}/posts`, { headers }),
             fetch(`${API_BASE_URL}/interactions/me`, { headers }),
+            fetch(`${API_BASE_URL}/notifications`, { headers }), // Fetch notifications
             fetch(`${API_BASE_URL}/api/config/engagement-settings?country=${storedCountry}`, { headers }),
             fetch(`${API_BASE_URL}/me`, { headers })
           ]);
 
-          if (!storiesRes.ok || !postsRes.ok) throw new Error('Failed to fetch essential explore data');
+          if (!storiesRes.ok || !postsRes.ok) {
+            Toast.show({
+              type: 'error',
+              text1: t.error,
+              text2: 'Failed to fetch essential explore data',
+            });
+            setIsLoading(false);
+            return;
+          }
 
           if (profileRes.ok) {
             const profileData = await profileRes.json();
             setUserFullname(profileData.fullname);
             setUserId(profileData.id);
             setUsername(profileData.username);
+          }
+
+          if (notificationsRes.ok) {
+            const notificationsData = await notificationsRes.json();
+            setUnreadNotificationsCount(notificationsData.filter((n: any) => !n.is_read).length);
           }
 
           if (configRes.ok) {
@@ -1394,7 +1501,7 @@ export default function ExploreScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -1440,6 +1547,19 @@ export default function ExploreScreen() {
           <Text style={styles.walletText}>{engagementPoints} EP</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Notification Icon */}
+      <TouchableOpacity 
+        style={styles.notificationIconContainer} 
+        onPress={() => setIsNotificationsModalVisible(true)}
+      >
+        <Bell size={24} color="#212121" />
+        {unreadNotificationsCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationBadgeText}>{unreadNotificationsCount}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       {!!rewardText && (
         <Animated.Text
@@ -1537,6 +1657,7 @@ export default function ExploreScreen() {
           if (!isTimerActive) setSelectedStory(null);
         }}
       >
+        <>
         <Animated.View style={[styles.storyModalContainer, { transform: pan.getTranslateTransform() }]} {...panResponder.panHandlers}>
           {/* Progress Bar Container */}
           <View style={styles.progressBarContainer}>
@@ -1660,6 +1781,7 @@ export default function ExploreScreen() {
             onAnimationEnd={() => setShowConfetti(false)}
           />
         )}
+        </>
       </Modal>
 
       <ViewAllCommentsModal
@@ -1676,6 +1798,14 @@ export default function ExploreScreen() {
         typingUsers={Object.keys(typingUsers)}
         onTyping={broadcastTypingStatus}
       />
+
+      <NotificationsModal
+        isVisible={isNotificationsModalVisible}
+        onClose={() => setIsNotificationsModalVisible(false)}
+        userId={userId}
+        t={t}
+        onNotificationsRead={fetchNotifications} // Callback to refresh count
+      />
     </SafeAreaView>
   );
 }
@@ -1684,14 +1814,45 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E0F7FA' },
   header: {
     paddingHorizontal: 16,
+    paddingTop: 12, // Adjust to move content down from top edge
     paddingVertical: 12,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    position: 'relative', // For absolute positioning of notification icon
   },
   headerTitle: { fontSize: 24, fontFamily: 'Roboto-Bold', color: '#212121' },
+  notificationIconContainer: {
+    position: 'absolute',
+    right: 16,
+    top: 12, // Adjust based on header padding
+    zIndex: 10,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#F44336',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   walletContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1762,7 +1923,39 @@ const styles = StyleSheet.create({
   postAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 10 },
   postUsername: { fontSize: 14, fontWeight: 'bold', color: '#212121' },
   postTag: { fontSize: 12, fontWeight: '600', color: '#757575', fontStyle: 'italic' },
-  postImage: { width: width - 24, height: width - 24, backgroundColor: '#f0f0f0', borderRadius: 16, alignSelf: 'center' },
+  postImage: { width: width - 24, height: width - 24, backgroundColor: '#f0f0f0', borderRadius: 16 },
+  postImageWrapper: { width: width - 24, height: width - 24 },
+  postFlatList: { alignSelf: 'center', width: width - 24, borderRadius: 16 },
+  imageSkeletonContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 },
+  postImageSkeleton: { width: '100%', height: '100%', borderRadius: 16, backgroundColor: '#f0f0f0' },
+  imageCounterContainer: {
+    position: 'absolute',
+    bottom: 12,
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 20,
+  },
+  imageCounterText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    fontFamily: 'Roboto-Bold',
+  },
+  nextImageButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
   postActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10 },
   postActionsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, marginRight: 12 },
   actionIcon: {},
@@ -1795,18 +1988,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#424242',
     fontWeight: '500',
-  },
-  nextImageButton: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 20,
   },
   paginationDotsContainer: {
     flexDirection: 'row',
@@ -2190,10 +2371,12 @@ const styles = StyleSheet.create({
   },
   modalPostBtn: {
     backgroundColor: '#4CAF50',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginLeft: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   modalPostBtnText: {
     color: '#fff',
@@ -2330,8 +2513,6 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   replyButton: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
   },
   replyButtonText: {
     fontSize: 12,
@@ -2353,7 +2534,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   showMoreButton: {
-    alignSelf: 'flex-start',
   },
   showMoreText: {
     fontSize: 12,

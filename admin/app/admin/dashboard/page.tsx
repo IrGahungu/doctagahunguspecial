@@ -557,7 +557,8 @@ export default function AdminDashboard() {
         console.error(
           `[Dashboard] Update failed. Status: ${res.status}`
         );
-        throw new Error("Update failed");
+        toast.error("Update failed");
+        return;
       }
 
       console.log(`[Dashboard] Server confirmed update`);
@@ -618,7 +619,10 @@ export default function AdminDashboard() {
         }),
       });
 
-      if (!res.ok) throw new Error("Update failed");
+      if (!res.ok) {
+        toast.error("Update failed");
+        return;
+      }
 
       setEpRewards((prev) => ({
         ...prev,
@@ -644,7 +648,10 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value: val }),
       });
-      if (!res.ok) throw new Error("Update failed");
+      if (!res.ok) {
+        toast.error("Update failed");
+        return;
+      }
       toast.success("Setting updated successfully!");
       if (key === 'min_ep_required') fetchEpThreshold();
       else fetchEpRewards();
@@ -872,7 +879,8 @@ export default function AdminDashboard() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "Failed to create fee");
+        toast.error(err.error || "Failed to create fee");
+        return;
       }
 
       toast.success("Service fee created");
@@ -898,7 +906,10 @@ export default function AdminDashboard() {
         body: JSON.stringify({ fee: tempFeeValue }),
       });
 
-      if (!res.ok) throw new Error("Failed to update fee");
+      if (!res.ok) {
+        toast.error("Failed to update fee");
+        return;
+      }
 
       toast.success("Service fee updated");
       setEditingFeeId(null);
@@ -946,7 +957,10 @@ export default function AdminDashboard() {
           if (res.ok) {
             toast.success("Category deleted");
             fetchCategories();
-          } else throw new Error();
+          } else {
+            toast.error("Failed to delete category");
+            return;
+          }
         } catch (err) {
           toast.error("Failed to delete category");
         } finally {
@@ -1036,7 +1050,10 @@ export default function AdminDashboard() {
         try {
           const res = await fetch(`/api/pharmacies?id=${id}`, { method: "DELETE" });
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Failed to delete pharmacy");
+          if (!res.ok) {
+            toast.error(result.error || "Failed to delete pharmacy");
+            return;
+          }
           toast.success("Pharmacy deleted");
           fetchPharmacies();
         } catch (err) {
@@ -1083,7 +1100,10 @@ export default function AdminDashboard() {
         try {
           const res = await fetch(`/api/hospitals?id=${id}`, { method: "DELETE" });
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Failed to delete hospital");
+          if (!res.ok) {
+            toast.error(result.error || "Failed to delete hospital");
+            return;
+          }
           toast.success("Hospital deleted");
           fetchHospitals();
         } catch (err) {
@@ -1132,7 +1152,10 @@ export default function AdminDashboard() {
             method: "DELETE",
           });
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Failed to delete insurance");
+          if (!res.ok) {
+            toast.error(result.error || "Failed to delete insurance");
+            return;
+          }
           toast.success("Insurance deleted");
           fetchInsurances();
         } catch (err) {
@@ -1187,7 +1210,10 @@ export default function AdminDashboard() {
           if (res.ok) {
             toast.success("Banner deleted");
             fetchBanners();
-          } else throw new Error();
+          } else {
+            toast.error("Failed to delete banner");
+            return;
+          }
         } catch (err) {
           toast.error("Failed to delete banner");
         } finally {
@@ -1423,7 +1449,10 @@ export default function AdminDashboard() {
             method: "DELETE",
           });
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Failed to delete deal");
+          if (!res.ok) {
+            toast.error(result.error || "Failed to delete deal");
+            return;
+          }
           toast.success("Deal deleted");
           fetchDeals();
         } catch (err) {
@@ -1472,7 +1501,10 @@ export default function AdminDashboard() {
             method: "DELETE",
           });
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Failed to delete doctor");
+          if (!res.ok) {
+            toast.error(result.error || "Failed to delete doctor");
+            return;
+          }
           toast.success("Doctor deleted");
           fetchDoctors();
         } catch (err) {
@@ -1521,7 +1553,10 @@ export default function AdminDashboard() {
             method: "DELETE",
           });
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Failed to delete medicine");
+          if (!res.ok) {
+            toast.error(result.error || "Failed to delete medicine");
+            return;
+          }
           toast.success("Medicine deleted");
           fetchMedicines();
         } catch (err) {
@@ -1567,7 +1602,10 @@ export default function AdminDashboard() {
         setLoadingId(id);
         try {
           const res = await fetch(`/api/stories?id=${id}`, { method: "DELETE" });
-          if (!res.ok) throw new Error("Failed to delete story");
+          if (!res.ok) {
+            toast.error("Failed to delete story");
+            return;
+          }
           toast.success("Story deleted");
           fetchStories();
         } catch (err) {
@@ -1613,7 +1651,10 @@ export default function AdminDashboard() {
         setLoadingId(id);
         try {
           const res = await fetch(`/api/posts?id=${id}`, { method: "DELETE" });
-          if (!res.ok) throw new Error("Failed to delete post");
+          if (!res.ok) {
+            toast.error("Failed to delete post");
+            return;
+          }
           toast.success("Post deleted");
           fetchPosts();
         } catch (err) {
@@ -1656,9 +1697,11 @@ export default function AdminDashboard() {
           errorData = JSON.parse(resText);
         } catch (e) {
           console.error(`[DEBUG] Route not found or Server Error. URL: ${url} | Body: ${resText.substring(0, 100)}`);
-          throw new Error(`Server error (${res.status}): ${res.statusText}`);
+          toast.error(`Server error (${res.status}): ${res.statusText}`);
+          return;
         }
-        throw new Error(errorData.error || errorData.details || "Failed to save reply");
+        toast.error(errorData.error || errorData.details || "Failed to save reply");
+        return;
       }
 
       fetchReviews();
@@ -1696,7 +1739,8 @@ export default function AdminDashboard() {
           if (!res.ok) {
             const resText = await res.text();
             console.error(`[DEBUG] Delete failed:`, resText.substring(0, 100));
-            throw new Error("Failed to delete review");
+            toast.error("Failed to delete review");
+            return;
           }
 
           fetchReviews();
@@ -1723,7 +1767,10 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Failed to update visibility");
+        return;
+      }
       setStories((prev) => prev.map((s) => (s.id === story.id ? { ...s, [field]: newVal } : s)));
       toast.success("Visibility updated");
     } catch {
@@ -1740,7 +1787,10 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Failed to update visibility");
+        return;
+      }
       setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, [field]: newVal } : p)));
       toast.success("Visibility updated");
     } catch {

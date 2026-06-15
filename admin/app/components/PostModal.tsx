@@ -137,7 +137,11 @@ export default function PostModal({
           });
 
           const result = await res.json();
-          if (!res.ok) throw new Error(result.error);
+          if (!res.ok) {
+            const msg = result.error || "Upload failed";
+            toast.error(msg);
+            continue;
+          }
 
           newUrls.push(result.url || result.publicUrl);
         } catch (err) {
@@ -195,7 +199,11 @@ export default function PostModal({
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Failed to save post");
+      if (!res.ok) {
+        const msg = "Failed to save post";
+        toast.error(msg);
+        return;
+      }
 
       console.log("[PostModal] Save successful");
       onSuccess();

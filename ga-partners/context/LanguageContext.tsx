@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { partnerTranslations, PartnerTranslations, Language } from '../app/translations';
 
 interface LanguageContextType {
@@ -41,7 +42,12 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (context === undefined) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
+    toast.error('useLanguage must be used within a LanguageProvider');
+    return {
+      lang: 'en' as Language,
+      setLang: () => {},
+      t: partnerTranslations['en']
+    };
   }
   return context;
 };

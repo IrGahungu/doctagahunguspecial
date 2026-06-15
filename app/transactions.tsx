@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/config';
 import * as Print from 'expo-print';
 import { useLanguageStore, translations } from '@/stores/languageStore';
 import * as Sharing from 'expo-sharing';
+import Toast from 'react-native-toast-message';
 import { supabase } from '@/lib/supabase';
 
 type Transaction = {
@@ -208,7 +209,12 @@ export default function TransactionsScreen() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to fetch transactions');
+        Toast.show({
+          type: 'error',
+          text1: t.error,
+          text2: t["failed to load transactions"],
+        });
+        return;
       }
 
       const data = await res.json();

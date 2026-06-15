@@ -366,7 +366,10 @@ export default function DoctorDetailScreen() {
     setIsPaying(true);
     try {
       const token = await SecureStore.getItemAsync("token");
-      if (!token) throw new Error("Authentication error.");
+      if (!token) {
+        showToast(t["authentication error"] || "Authentication error.");
+        return;
+      }
 
       // 0. Check for duplicate booking
       const { data: { user } } = await supabase.auth.getUser();
@@ -383,8 +386,14 @@ export default function DoctorDetailScreen() {
           .neq('status', 'cancelled')
           .limit(1);
 
-        if (checkError) throw new Error(t["failed to check existing bookings"]);
-        if (existingBookings && existingBookings.length > 0) throw new Error(t["duplicate booking message"]);
+        if (checkError) {
+          showToast(t["failed to check existing bookings"]);
+          return;
+        }
+        if (existingBookings && existingBookings.length > 0) {
+          showToast(t["duplicate booking message"]);
+          return;
+        }
       }
 
       // 1. Verify PIN
@@ -396,7 +405,8 @@ export default function DoctorDetailScreen() {
       });
       if (!verifyRes.ok) {
         const errData = await verifyRes.json();
-        throw new Error(errData.error || t["incorrect pin"]);
+        showToast(errData.error || t["incorrect pin"]);
+        return;
       }
 
       // 2. Deduct Wallet
@@ -410,7 +420,8 @@ export default function DoctorDetailScreen() {
         if (!deductRes.ok) {
           const errData = await deductRes.json();
           console.error('Wallet deduction failed:', errData);
-          throw new Error(errData.error || "Payment failed.");
+          showToast(errData.error || "Payment failed.");
+          return;
         }
       } else {
         console.log('Booking is free, skipping wallet deduction.');
@@ -432,7 +443,8 @@ export default function DoctorDetailScreen() {
 
       if (error) {
         console.error('Supabase insert error:', error);
-        throw error;
+        showToast(error.message || "An error occurred.");
+        return;
       }
 
       setPaymentSuccess(true);

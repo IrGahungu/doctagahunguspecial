@@ -46,7 +46,10 @@ export default function BusesTable() {
     if (!busToDelete) return;
     try {
       const res = await fetch(`/api/admin/buses?id=${busToDelete}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Failed to delete bus");
+        return;
+      }
       setBuses(prev => prev.filter(b => b.id !== busToDelete));
       toast.success("Bus deleted");
     } catch (err) {

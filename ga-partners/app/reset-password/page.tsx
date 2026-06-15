@@ -54,7 +54,10 @@ function ResetPasswordForm() {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Something went wrong");
+      if (!res.ok) {
+        toast.error(data.error || "Something went wrong");
+        return;
+      }
 
       toast.success("Password reset successfully. Redirecting to login...");
       setTimeout(() => {

@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', textAlign: 'center', color: '#212121' },
   label: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#212121' },
-  input: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff' },
+  input: { borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 8, padding: 12, fontSize: 16, backgroundColor: '#fff', letterSpacing: 0 },
   hintText: { fontSize: 12, color: '#757575', marginTop: 5, marginBottom: 20 },
   submitButton: { backgroundColor: '#4CAF50', paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 20 },
   submitButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },

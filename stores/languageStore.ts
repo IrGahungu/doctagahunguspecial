@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type Language = 'en' | 'fr' | 'rn';
 
@@ -12,20 +13,23 @@ export const useLanguageStore = create<LanguageState>((set) => ({
   language: 'en',
 
   setLanguage: async (lang: Language) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('user_language', lang);
+    try {
+      await AsyncStorage.setItem('user_language', lang);
+      set({ language: lang });
+    } catch (error) {
+      console.error('Error saving language:', error);
     }
-
-    set({ language: lang });
   },
 
   loadLanguage: async () => {
-    if (typeof window === 'undefined') return;
+    try {
+      const lang = await AsyncStorage.getItem('user_language');
 
-    const lang = localStorage.getItem('user_language');
-
-    if (lang) {
-      set({ language: lang as Language });
+      if (lang) {
+        set({ language: lang as Language });
+      }
+    } catch (error) {
+      console.error('Error loading language:', error);
     }
   },
 }));
@@ -591,6 +595,10 @@ export const translations = {
   "failed to submit comment": "Comment failed to be Submitted",
   "orders description": "Check the status of your orders",
   "update username": "Update Username",
+  "notifications": "Notifications",
+  "no notifications yet": "No notifications yet.",
+  "mentioned you in a comment": "mentioned you in a comment",
+  "replied to your comment": "replied to your comment",
   "username hint": "3-15 characters long and can only contain letters, numbers, and underscores.",
   username: "Username",
   "write your comment here...": "write your comment here...",
@@ -633,9 +641,13 @@ export const translations = {
   inOffice: "In Office",
   both: "Both",
   fee: "Fee",
+  "failed to update profile": "Failed to update profile. Please check your connection.",
   },
 
   fr: {
+  "failed to update profile": "Échec de la mise à jour du profil. Veuillez vérifier votre connexion.",
+  "failed to load profile": "Échec du chargement des informations de profil.",
+  "failed to load appointments": "Échec du chargement des rendez-vous. Veuillez vérifier votre connexion.",
   "write your comment here...": "Écrivez votre commentaire ici...",
   username: "Nom d'Utilisateur",
   "update username": "Mettre à jour le nom d'utilisateur",
@@ -696,7 +708,6 @@ export const translations = {
   incomplete: "Incomplet",
   refunded: "Remboursé",
   paid: "Payé",
-  "failed to load appointments": "Échec du chargement des rendez-vous. Veuillez vérifier votre connexion.",
   "no appointments found": "Aucun rendez-vous trouvé.",
   locations: "Emplacements",
   contact: "Contact",
@@ -827,7 +838,6 @@ export const translations = {
   "whatsapp number": "Numéro WhatsApp (ex : +257...)",
   updating: "Mise à jour...",
   "save changes": "Enregistrer les modifications",
-  "failed to load profile": "Impossible de charger les informations du profil.",
   "my bus tickets": "Mes billets de bus",
   new: "NOUVEAU",
   origin: "Origine",
@@ -1197,6 +1207,10 @@ export const translations = {
   "failed to update username": "Échec de la mise à jour du nom d'utilisateur.",
   "enter username": "Entrez le nom d'utilisateur souhaité",
   "failed to submit comment": "Commentaire non Soumis",
+  "notifications": "Notifications",
+  "no notifications yet": "Aucune notification pour le moment.",
+  "mentioned you in a comment": "vous a mentionné dans un commentaire",
+  "replied to your comment": "a répondu à votre commentaire",
   "comment submitted":"Commentaire Soumis",
   "edit your application": "Modifier votre demande",
   "welcome doctor application": "Bienvenue Docteur",
@@ -1239,6 +1253,8 @@ export const translations = {
   fee: "Frais",
 },
   rn: {
+  "failed to update profile": "Vyanse guhindura amakuru yawe. Raba ko ufise internet.",
+  "failed to load profile": "Vyanse kuronka amakuru yawe. Raba ko ufise internet.",
   "write your comment here...": "Andika komantere yawe hano...",
   username: "Username",
   "username required": "Username irakenewe.",
@@ -1442,7 +1458,6 @@ export const translations = {
   "whatsapp number": "Numero ya WhatsApp (akarorero +257...)",
   updating: "Biriko birahindurwa...",
   "save changes": "Emeza amahinduka",
-  "failed to load profile": "Ntivyashobotse gutora umwirondoro.",
   "my bus tickets": "Amatike yanje ya bisi",
   new: "GISHASHA",
   origin: "Aho uva",
@@ -1798,6 +1813,10 @@ export const translations = {
   "failed to update username": "Kuhindura username vyanse.",
   "add a comment": "Andika iciyumviro",
   "commenting as": "Uriko uratanga iciyumviro nka",
+  "notifications": "Notifications",
+  "no notifications yet": "Nta notifications zihari.",
+  "mentioned you in a comment": "yakuvuze muri komantere",
+  "replied to your comment": "yagishuye komantere yawe",
   "on post": "Kuri post",
   "create username title": "Kora username",
   "card maintenance": "Kuriha n'ikarata biriko birasanurwa.",

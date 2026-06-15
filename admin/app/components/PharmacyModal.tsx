@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type Insurance = {
   id: string;
@@ -120,7 +121,10 @@ export default function PharmacyModal({
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result.error || "Upload failed");
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
       }
 
       setPharmacyForm((prev) => ({ ...prev, image: result.publicUrl }));
@@ -128,6 +132,7 @@ export default function PharmacyModal({
       const message =
         err instanceof Error ? err.message : "An unknown error occurred during upload.";
       setFormError(message);
+      toast.error(message);
     } finally {
       setIsUploading(false);
     }
@@ -157,12 +162,19 @@ export default function PharmacyModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to save Pharmacy");
+      if (!res.ok) {
+        const msg = result.error || "Failed to save Pharmacy";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       onSuccess();
     } catch (err) {
       console.error(err);
-      setFormError(err instanceof Error ? err.message : "Failed to save pharmacy");
+      const msg = err instanceof Error ? err.message : "Failed to save pharmacy";
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 type Category = {
   id: string;
@@ -202,7 +203,12 @@ export default function MedicineModal({
         body: formData,
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Upload failed");
+      if (!res.ok) {
+        const msg = result.error || "Upload failed";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       setMedicineForm((prev) => ({ ...prev, image: result.publicUrl }));
     } catch (err) {
@@ -253,7 +259,12 @@ export default function MedicineModal({
         body: JSON.stringify(body),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to save medicine");
+      if (!res.ok) {
+        const msg = result.error || "Failed to save medicine";
+        toast.error(msg);
+        setFormError(msg);
+        return;
+      }
 
       onSuccess();
     } catch (err) {

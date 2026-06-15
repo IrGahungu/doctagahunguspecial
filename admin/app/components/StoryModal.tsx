@@ -104,7 +104,12 @@ export default function StoryModal({
       });
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      if (!res.ok) {
+        const msg = result.error || "Avatar upload failed";
+        toast.error(msg);
+        setAvatarStatus("idle");
+        return;
+      }
 
       setFormData((prev) => ({
         ...prev,
@@ -146,7 +151,11 @@ export default function StoryModal({
         });
 
         const result = await res.json();
-        if (!res.ok) throw new Error(result.error || "Upload failed");
+        if (!res.ok) {
+          const msg = result.error || "Upload failed";
+          toast.error(msg);
+          continue;
+        }
 
         newUrls.push(result.url || result.publicUrl);
       } catch (err) {
@@ -211,7 +220,11 @@ export default function StoryModal({
     const data = await res.json();
     console.log("Response:", data);
 
-    if (!res.ok) throw new Error(data.error || "Failed to save story");
+    if (!res.ok) {
+      const msg = data.error || "Failed to save story";
+      toast.error(msg);
+      return;
+    }
 
     onSuccess();
     toast.success("Story added");
