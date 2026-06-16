@@ -326,7 +326,7 @@ export default function LoginPaymentFeeScreen() {
         Toast.show({
           type: 'success',
           text1: t["payment successful"] || 'Payment Successful',
-          text2: t["Dieu avec Gahungu, Votre Santé est assurée"] || 'Welcome to Gahungu Pharmacy!',
+          text2: t["Dieu avec Gahungu, Votre Santé est assurée"] || 'Welcome to MELANA!',
         });
         router.replace('/(tabs)');
       } else {

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { API_BASE_URL } from "@/config";
 import { ArrowLeft } from "lucide-react-native";
+import { useLanguageStore, translations } from "@/stores/languageStore";
 
 const backgroundImage = require("@/assets/images/login-bg.jpg");
 const ADMIN_PHONE = "+25777990118";
@@ -23,6 +24,8 @@ const ADMIN_PHONE = "+25777990118";
 const VerifyCredentialsScreen = () => {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const language = useLanguageStore(state => state.language);
+    const t = translations[language];
     const [whatsapp, setWhatsapp] = useState("");
     const [isVerified, setIsVerified] = useState<null | boolean>(null);
     const [loading, setLoading] = useState(false);
@@ -77,16 +80,16 @@ const VerifyCredentialsScreen = () => {
 
     const handleContactAdmin = () => {
         Alert.alert(
-            "Contact Admin",
-            "Choose an option",
+            t["contact admin"],
+            t["choose option"],
             [
-                { text: "Call", onPress: () => Linking.openURL(`tel:${ADMIN_PHONE}`) },
+                { text: t.call, onPress: () => Linking.openURL(`tel:${ADMIN_PHONE}`) },
                 {
                     text: "WhatsApp",
                     onPress: () =>
                         Linking.openURL(`https://wa.me/${ADMIN_PHONE.replace("+", "")}`),
                 },
-                { text: "Cancel", style: "cancel" },
+                { text: t.cancel, style: "cancel" },
             ],
             { cancelable: true }
         );
@@ -103,7 +106,7 @@ const VerifyCredentialsScreen = () => {
                 <View style={styles.screen}>
                     <View style={[styles.headerContainer, { paddingTop: insets.top + 10 }]}>
                         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}><ArrowLeft size={24} color="black" /></TouchableOpacity>
-                        <Text style={styles.title}>Verify Your Identity</Text>
+                        <Text style={styles.title}>{t["verify identity"]}</Text>
                         <View style={styles.headerSpacer} />
                     </View>
                     {/* New container to center the card vertically below the header */}
@@ -111,7 +114,7 @@ const VerifyCredentialsScreen = () => {
                         <View style={styles.card}>
                             <TextInput
                             style={styles.input}
-                            placeholder="Enter your WhatsApp Number"
+                            placeholder={t["enter whatsapp"]}
                             placeholderTextColor="#999"
                             keyboardType="phone-pad"
                             value={whatsapp}
@@ -124,9 +127,9 @@ const VerifyCredentialsScreen = () => {
                         {loading ? (
                             <ActivityIndicator size="small" color="#007bff" />
                         ) : isVerified === false ? (
-                            <Text style={styles.notVerified}>❌ Number not verified</Text>
+                            <Text style={styles.notVerified}>❌ {t["number not verified"]}</Text>
                         ) : isVerified === true ? (
-                            <Text style={styles.verified}>✅ Number verified</Text>
+                            <Text style={styles.verified}>✅ {t["number verified"]}</Text>
                         ) : null}
 
                         <TouchableOpacity
@@ -134,11 +137,11 @@ const VerifyCredentialsScreen = () => {
                             disabled={!isVerified || loading}
                             onPress={handleVerify}
                         >
-                            <Text style={styles.buttonText}>Verify</Text>
+                            <Text style={styles.buttonText}>{t.verify}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.adminButton} onPress={handleContactAdmin}>
-                            <Text style={styles.adminButtonText}>Contact Admin to Verify</Text>
+                            <Text style={styles.adminButtonText}>{t["contact admin to verify"]}</Text>
                         </TouchableOpacity>
                         </View>
                     </View>

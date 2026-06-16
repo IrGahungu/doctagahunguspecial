@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   StyleSheet,
   Text,
@@ -21,6 +21,7 @@ import { Link, useRouter } from "expo-router";
 import { API_BASE_URL } from "@/config";
 import CountryPicker from "@/components/CountryPicker";
 import { useLanguageStore, translations } from "@/stores/languageStore";
+import DropDownPicker from "react-native-dropdown-picker";
 
 const backgroundImage = require("@/assets/images/two.jpg");
 
@@ -37,7 +38,7 @@ const COUNTRIES = [
 const AuthScreen = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const language = useLanguageStore(state => state.language);
+  const { language, setLanguage } = useLanguageStore();
   const t = translations[language];
 
   const [whatsappNumber, setWhatsappNumber] = useState("");
@@ -47,6 +48,13 @@ const AuthScreen = () => {
   const [checkingLogin, setCheckingLogin] = useState(true); // ✅ check token on startup
   const [errors, setErrors] = useState<{ whatsappNumber?: string; password?: string; country?: string }>({});
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
+  const [langOpen, setLangOpen] = useState(false);
+  const [langItems, setLangItems] = useState([
+    { label: "English", value: "en" },
+    { label: "Français", value: "fr" },
+    { label: "Kirundi", value: "rn" },
+  ]);
 
   // ✅ Check if user is already logged in
   useEffect(() => {
@@ -143,6 +151,27 @@ const AuthScreen = () => {
   return (
     <ImageBackground source={backgroundImage} style={styles.background} resizeMode="cover">
       <View style={styles.overlay} />
+
+      {/* Language Selector - Pinned to Top Right Corner */}
+      <View style={[styles.langSelectorWrapper, { top: insets.top + 10 }]}>
+        <DropDownPicker
+          open={langOpen}
+          value={language}
+          items={langItems}
+          setOpen={setLangOpen}
+          setValue={(callback) => {
+            const val = typeof callback === 'function' ? callback(language) : callback;
+            setLanguage(val as any);
+          }}
+          setItems={setLangItems}
+          placeholder={t["language"]}
+          style={styles.langDropdown}
+          dropDownContainerStyle={styles.langDropdownContainer}
+          containerStyle={styles.langContainer}
+          listMode="SCROLLVIEW"
+        />
+      </View>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -375,4 +404,19 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   hintText: { fontSize: 12, color: "black", marginTop: 4, marginLeft: 4 },
+  langSelectorWrapper: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 2000,
+  },
+  langContainer: { width: 130 },
+  langDropdown: { 
+    backgroundColor: "white", 
+    borderRadius: 25, 
+    borderWidth: 1, 
+    borderColor: "#4CAF50", 
+    minHeight: 40, 
+    paddingHorizontal: 10 
+  },
+  langDropdownContainer: { borderColor: "lightgray", borderRadius: 15 },
 });

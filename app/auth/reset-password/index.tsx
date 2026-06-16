@@ -14,12 +14,15 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { API_BASE_URL } from "@/config";
 import { Eye, EyeOff } from "lucide-react-native";
+import { useLanguageStore, translations } from "@/stores/languageStore";
 
 const backgroundImage = require("@/assets/images/login-bg.jpg");
 
 const ResetPasswordScreen = () => {
   const router = useRouter();
   const { whatsapp_number } = useLocalSearchParams<{ whatsapp_number?: string }>();
+  const language = useLanguageStore(state => state.language);
+  const t = translations[language];
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -31,14 +34,14 @@ const ResetPasswordScreen = () => {
   const validateForm = () => {
     const newErrors: { newPassword?: string; confirmNewPassword?: string } = {};
     if (!newPassword) {
-      newErrors.newPassword = "New password is required.";
+      newErrors.newPassword = t["password required"];
     } else if (newPassword.length < 8) {
-      newErrors.newPassword = "Password must be at least 8 characters.";
+      newErrors.newPassword = t["password must be at least 8 characters"];
     }
     if (!confirmNewPassword) {
-      newErrors.confirmNewPassword = "Please confirm your new password.";
+      newErrors.confirmNewPassword = t["confirm password required"];
     } else if (newPassword && newPassword !== confirmNewPassword) {
-      newErrors.confirmNewPassword = "Passwords do not match.";
+      newErrors.confirmNewPassword = t["passwords dont match"];
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -47,8 +50,8 @@ const ResetPasswordScreen = () => {
   useEffect(() => {
     if (!whatsapp_number) {
       Alert.alert(
-        "Error",
-        "WhatsApp number not provided for password reset. Please restart the process.",
+        t["error title"] || "Error",
+        t["reset password number error"],
         [{ text: "OK", onPress: () => router.replace("/auth/verify-credentials" as any) }]
       );
     }
@@ -73,15 +76,15 @@ const ResetPasswordScreen = () => {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert("Success", "Password updated successfully!", [
+        Alert.alert(t.success || "Success", t["updatePasswordSuccess"], [
           { text: "OK", onPress: () => router.replace("/auth") }, // back to login
         ]);
       } else {
-        Alert.alert("Error", data.error || "Password reset failed");
+        Alert.alert(t["error title"] || "Error", data.error || "Password reset failed");
       }
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Could not connect to server");
+      Alert.alert(t["error title"] || "Error", t["connection error"] || "Could not connect to server");
     } finally {
       setLoading(false);
     }
@@ -97,14 +100,14 @@ const ResetPasswordScreen = () => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.screen}>
           <View style={styles.card}>
-            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.title}>{t["reset password"]}</Text>
 
             {/* New Password */}
             <View>
               <View style={[styles.inputContainer, !!errors.newPassword && styles.inputError]}>
                 <TextInput
                   style={styles.input}
-                  placeholder="New Password"
+                  placeholder={t["new password"]}
                   placeholderTextColor="gray"
                   secureTextEntry={!isPasswordVisible}
                   value={newPassword}
@@ -128,7 +131,7 @@ const ResetPasswordScreen = () => {
               <View style={[styles.inputContainer, !!errors.confirmNewPassword && styles.inputError]}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Confirm Password"
+                  placeholder={t["confirm new password"]}
                   placeholderTextColor="gray"
                   secureTextEntry={!isConfirmPasswordVisible}
                   value={confirmNewPassword}
@@ -156,7 +159,7 @@ const ResetPasswordScreen = () => {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Update Password</Text>
+                <Text style={styles.buttonText}>{t["update password"]}</Text>
               )}
             </TouchableOpacity>
 
@@ -165,7 +168,7 @@ const ResetPasswordScreen = () => {
               style={styles.cancelButton}
               onPress={() => router.replace("/auth")}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t.cancel}</Text>
             </TouchableOpacity>
           </View>
         </View>
