@@ -272,8 +272,16 @@ export default function PharmacyDetailScreen() {
     };
   }, [id, navigation]);
 
-  const handleContactPress = () => {
-    Alert.alert('Alert', 'I may the app');
+  const handleContactPress = (url: string, message: string, platformName: string) => {
+    Alert.alert(
+      t["leave app"] || "Leave App",
+      message || (t["you are about to leave the app to open"] || "") + ` ${platformName}. ` + (t["do you want to continue?"] || ""),
+      [
+        { text: t.cancel || "Cancel", style: "cancel" },
+        { text: t["continue"] || "Continue", onPress: () => Linking.openURL(url) },
+      ],
+      { cancelable: false }
+    );
   };
 
   const openMap = (loc: Location) => {
@@ -281,8 +289,18 @@ export default function PharmacyDetailScreen() {
       ? `${loc.latitude},${loc.longitude}`
       : `${loc.address || ''} ${loc.city || ''}`;
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-    Linking.openURL(url);
+
+    Alert.alert(
+      t["leave app"] || "Leave App",
+      t["you are about to leave the app to open Google Maps. do you want to continue?"] || "You are about to leave the app to open Google Maps. Do you want to continue?",
+      [
+        { text: t.cancel || "Cancel", style: "cancel" },
+        { text: t["open google maps"] || "Open Google Maps", onPress: () => Linking.openURL(url) },
+      ],
+      { cancelable: false }
+    );
   };
+
 
   if (loading || (error && !pharmacy)) {
     return (
@@ -421,14 +439,14 @@ export default function PharmacyDetailScreen() {
                   </View>
                   <View style={{ marginLeft: 30 }}>
                     {pharmacy.contact_email ? (
-                      <TouchableOpacity onPress={handleContactPress}>
+                      <TouchableOpacity onPress={() => handleContactPress(`mailto:${pharmacy.contact_email}`, t["leave app email message"] || "", "Email")}>
                         <Text style={styles.contactText}>
                           Email: <Text style={{ color: 'blue', textDecorationLine: 'underline' }}>{pharmacy.contact_email}</Text>
                         </Text>
                       </TouchableOpacity>
                     ) : null}
                     {pharmacy.contact_phone ? (
-                      <TouchableOpacity onPress={handleContactPress}>
+                      <TouchableOpacity onPress={() => handleContactPress(`tel:${pharmacy.contact_phone}`, t["leave app phone message"] || "", "Phone")}>
                         <Text style={styles.contactText}>
                           Phone: <Text style={{ color: 'blue', textDecorationLine: 'underline' }}>{pharmacy.contact_phone}</Text>
                         </Text>
@@ -436,7 +454,7 @@ export default function PharmacyDetailScreen() {
                     ) : null}
                     {pharmacy.contact_office ? <Text style={styles.contactText}>Office: {pharmacy.contact_office}</Text> : null}
                     {pharmacy.contact_website ? (
-                      <TouchableOpacity onPress={handleContactPress}>
+                      <TouchableOpacity onPress={() => handleContactPress(pharmacy.contact_website || "", t["leave app website message"] || "", "Website")}>
                         <Text style={styles.contactText}>
                           Website: <Text style={{ color: 'blue', textDecorationLine: 'underline' }}>{pharmacy.contact_website}</Text>
                         </Text>

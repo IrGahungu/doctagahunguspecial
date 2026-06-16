@@ -4,6 +4,7 @@ import { X, Bell, MessageCircle, AtSign } from 'lucide-react-native';
 import { useLanguageStore, translations } from '@/stores/languageStore';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '@/config';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 
 interface Notification {
@@ -26,9 +27,10 @@ interface NotificationsModalProps {
   userId: string | null;
   t: any; // Translations object
   onNotificationsRead: () => void; // Callback to update parent's unread count
+  onNotificationPress?: (postId: string, commentId: string) => void;
 }
 
-const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onClose, userId, t, onNotificationsRead }) => {
+const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onClose, userId, t, onNotificationsRead, onNotificationPress }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +38,9 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onCl
 
   const pan = useRef(new Animated.ValueXY()).current;
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (showLoading = true) => {
     if (!userId) return;
-    setLoading(true);
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const token = await SecureStore.getItemAsync('token');
@@ -62,7 +64,7 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onCl
       console.error('Error fetching notifications:', err);
       setError('Connection error. Please try again.');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [userId, router]);
 
@@ -84,13 +86,40 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onCl
   }, [notifications, onNotificationsRead]);
 
   useEffect(() => {
+    if (!isVisible || !userId) return;
+
+    const channel = supabase
+      .channel(`modal-notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          fetchNotifications(false);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isVisible, userId, fetchNotifications]);
+
+  useEffect(() => {
     if (isVisible) {
       fetchNotifications();
-    } else {
-      // When modal closes, mark all currently displayed notifications as read
+    }
+  }, [isVisible, fetchNotifications]);
+
+  useEffect(() => {
+    if (!isVisible) {
       markNotificationsAsRead();
     }
-  }, [isVisible, fetchNotifications, markNotificationsAsRead]);
+  }, [isVisible, markNotificationsAsRead]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -128,12 +157,13 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onCl
     <TouchableOpacity
       style={[styles.notificationItem, !item.is_read && styles.unreadNotification]}
       onPress={() => {
-        // Navigate to the post and potentially scroll to the comment
-        onClose();
-        router.push({
-          pathname: '/post/[id]', // Assuming you have a post detail screen
-          params: { id: item.post_id, highlightCommentId: item.comment_id },
-        });
+        if (onNotificationPress) {
+          onNotificationPress(item.post_id, item.comment_id);
+        } else {
+          onClose();
+          // Fallback if no handler is provided
+          console.warn('No onNotificationPress handler provided');
+        }
       }}
     >
       <View style={styles.notificationIcon}>
@@ -184,12 +214,12 @@ const NotificationsModal: React.FC<NotificationsModalProps> = ({ isVisible, onCl
             </View>
           </View>
 
-          {loading ? (
+          {loading && notifications.length === 0 ? (
             <ActivityIndicator size="large" color="#4CAF50" style={styles.loadingIndicator} />
           ) : error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity onPress={fetchNotifications} style={styles.retryButton}>
+              <TouchableOpacity onPress={() => fetchNotifications()} style={styles.retryButton}>
                 <Text style={styles.retryButtonText}>{t.retry || "Retry"}</Text>
               </TouchableOpacity>
             </View>

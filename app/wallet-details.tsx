@@ -158,8 +158,8 @@ export default function WalletDetailsScreen() {
         ) : (
           <>
             <View style={styles.monetizationGoalCard}>
-              <Text style={styles.progressTitle}>Monetization Goal</Text>
-              <Text style={styles.summaryItem}>Threshold: {monetizationGoal.toLocaleString()} EP</Text>
+              <Text style={styles.progressTitle}>{t["monetization goal"]}</Text>
+              <Text style={styles.summaryItem}>{t.threshold} {monetizationGoal.toLocaleString()} {t.ep}</Text>
             </View>
 
         <View style={styles.progressBarContainer}>
@@ -179,11 +179,11 @@ export default function WalletDetailsScreen() {
           </Text>
           <Text style={styles.motivationText}>
             {pointsToReachGoal > 0
-              ? `Just ${pointsToReachGoal.toLocaleString()} ${t["points to reach goal"]}`
+              ? `${pointsToReachGoal.toLocaleString()} ${t["points to reach goal"]}`
               : t["goal reached"]}
           </Text>
           <Text style={styles.monetizationInfo}>
-            Note: After reaching {monetizationGoal.toLocaleString()} {t.ep}, you will be able to turn your points into money and withdraw it.
+            {t["monetization info"].replace('{monetizationGoal.toLocaleString()}', monetizationGoal.toLocaleString())}
           </Text>
         </View>
           </>
@@ -191,12 +191,8 @@ export default function WalletDetailsScreen() {
 
         {/* Daily Summary Card */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryCardTitle}>Daily Summary</Text>
-          <Text style={styles.summaryItem}>• Posts Liked Today: {postsLikedToday}</Text>
-          <Text style={styles.summaryItem}>• Stories Viewed Today: {storiesViewedToday}</Text>
-          <Text style={styles.summaryItem}>• Points Earned Today: {epEarnedToday.toLocaleString()} EP</Text>
           <Text style={styles.summaryMessage}>
-            Keep it up dear,our Team loves you!!
+            {t["keep it up message"]}
           </Text>
         </View>
       </ScrollView>
@@ -314,7 +310,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: '#2e7d32',
-    marginTop: 15,
     textAlign: 'center',
     lineHeight: 22,
   },

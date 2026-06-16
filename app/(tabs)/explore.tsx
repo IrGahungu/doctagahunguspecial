@@ -493,9 +493,10 @@ interface ViewAllCommentsModalProps {
   onUpdate: (commentId: string, text: string) => Promise<void>;
   typingUsers: string[];
   onTyping: (isTyping: boolean) => void;
+  highlightCommentId?: string | null;
 }
 
-const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, onClose, comments, postTitle, t, userUsername, currentUserId, onSubmit, onDelete, onUpdate, typingUsers, onTyping }) => {
+const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, onClose, comments, postTitle, t, userUsername, currentUserId, onSubmit, onDelete, onUpdate, typingUsers, onTyping, highlightCommentId }) => {
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
@@ -504,8 +505,30 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   const pan = useRef(new Animated.ValueXY()).current;
+
+  // Logic to expand thread and scroll to highlighted comment
+  useEffect(() => {
+    if (isVisible && highlightCommentId && comments.length > 0) {
+      const targetComment = comments.find(c => c.id === highlightCommentId);
+      if (targetComment) {
+        // 1. Expand parent thread if it's a reply
+        if (targetComment.parent_id) {
+          setExpandedThreads(prev => new Set(prev).add(targetComment.parent_id!));
+        }
+        
+        // 2. Scroll to index after layout expansion
+        setTimeout(() => {
+          const index = visibleComments.findIndex(c => c.id === highlightCommentId);
+          if (index !== -1) {
+            flatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+          }
+        }, 400);
+      }
+    }
+  }, [isVisible, highlightCommentId, comments.length]);
 
   const handleReply = (targetUsername: string) => {
     // Find the comment ID for the target username to help with positioning
@@ -679,6 +702,7 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
             </View>
           
           <FlatList
+            ref={flatListRef}
             style={{ flex: 1 }}
             data={visibleComments}
             keyExtractor={(item) => item.id.toString()}
@@ -688,11 +712,13 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
               const hasReplies = !item.parent_id && comments.some(c => c.parent_id === item.id);
               const isExpanded = expandedThreads.has(item.id);
               const replyCount = comments.filter(c => c.parent_id === item.id).length;
+              const isHighlighted = item.id === highlightCommentId;
 
               return (
               <View style={[
                 styles.fullCommentItem,
-                isReply && styles.replyCommentItem
+                isReply && styles.replyCommentItem,
+                isHighlighted && { backgroundColor: '#FFF9C4', borderLeftColor: '#FBC02D', borderLeftWidth: 4 }
               ]}>
                 <View style={styles.fullCommentHeader}>
                   <View style={styles.fullCommentUserRow}>
@@ -744,6 +770,12 @@ const ViewAllCommentsModal: React.FC<ViewAllCommentsModalProps> = ({ isVisible, 
               </View>
             )}
             contentContainerStyle={{ paddingBottom: 60 }}
+            onScrollToIndexFailed={(info) => {
+              flatListRef.current?.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true,
+              });
+            }}
           />
 
           <View style={styles.modalInputSection}>
@@ -814,6 +846,7 @@ export default function ExploreScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const { engagementPoints, postsLikedToday, storiesViewedToday, epEarnedToday, addPoints, syncFromDatabase, initializeStats } = useAuthStore();
   const [commentRefreshKeys, setCommentRefreshKeys] = useState<Record<string, number>>({});
+  const [highlightCommentId, setHighlightCommentId] = useState<string | null>(null);
 
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [viewedPostImages, setViewedPostImages] = useState<Record<string, boolean>>({});
@@ -877,6 +910,31 @@ export default function ExploreScreen() {
       console.error('Error fetching notifications:', error);
     }
   }, []);
+
+  // Real-time subscription for notifications badge
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel('realtime-notifications-badge')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, fetchNotifications]);
 
   // Effect to load/save daily stats and reset if new day
   useFocusEffect(
@@ -1099,6 +1157,24 @@ export default function ExploreScreen() {
       supabase.removeChannel(settingsChannel);
     };
   }, []);
+
+  const handleNotificationPress = useCallback(async (postId: string, commentId: string) => {
+    setIsNotificationsModalVisible(false);
+    const post = posts.find(p => p.id === postId);
+    if (post) {
+      setSelectedPostForComment(post);
+      setHighlightCommentId(commentId);
+      // Fetch fresh comments for this post
+      try {
+        const response = await fetch(`${API_BASE_URL}/posts/${postId}/comments`);
+        if (response.ok) {
+          const data = await response.json();
+          setActivePostComments(data);
+          setIsViewAllCommentsVisible(true);
+        }
+      } catch (e) { console.error(e); }
+    }
+  }, [posts]);
 
   const triggerWalletGraffiti = useCallback(() => {
     // Reset animations
@@ -1385,6 +1461,7 @@ export default function ExploreScreen() {
   };
 
   const handleViewComments = (post: any, comments: any[]) => {
+    setHighlightCommentId(null);
     setSelectedPostForComment(post);
     setActivePostComments(comments);
     setIsViewAllCommentsVisible(true);
@@ -1501,7 +1578,7 @@ export default function ExploreScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -1518,48 +1595,49 @@ export default function ExploreScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity 
-          style={styles.walletContainer} 
-          onPress={() => router.push({
-            pathname: '/wallet-details',
-            params: { 
-              engagementPoints: (engagementPoints || 0).toString(), 
-              postsLikedToday: (postsLikedToday || 0).toString(), 
-              storiesViewedToday: (storiesViewedToday || 0).toString(), 
-              epEarnedToday: (epEarnedToday || 0).toString() 
-            }
-          })}
-        >{/* Multi-graffiti burst behind wallet */}{walletGraffitiAnimations.map((anim, i) => {
-            const angle = (i / 6) * 2 * Math.PI;
-            const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * 45] });
-            const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * 35] });
-            const opacity = anim.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0, 1, 0] });
-            const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1.5] });
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.walletContainer} 
+            onPress={() => router.push({
+              pathname: '/wallet-details',
+              params: { 
+                engagementPoints: (engagementPoints || 0).toString(), 
+                postsLikedToday: (postsLikedToday || 0).toString(), 
+                storiesViewedToday: (storiesViewedToday || 0).toString(), 
+                epEarnedToday: (epEarnedToday || 0).toString() 
+              }
+            })}
+          >{/* Multi-graffiti burst behind wallet */}{walletGraffitiAnimations.map((anim, i) => {
+              const angle = (i / 6) * 2 * Math.PI;
+              const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * 45] });
+              const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * 35] });
+              const opacity = anim.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0, 1, 0] });
+              const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1.5] });
 
-            return (
-              <Animated.View
-                key={i}
-                style={[styles.walletGraffitiMini, { opacity, transform: [{ translateX }, { translateY }, { scale }] }]}
-              />
-            );
-          })}
-          <Wallet size={18} color="#fff" />
-          <Text style={styles.walletText}>{engagementPoints} EP</Text>
-        </TouchableOpacity>
+              return (
+                <Animated.View
+                  key={i}
+                  style={[styles.walletGraffitiMini, { opacity, transform: [{ translateX }, { translateY }, { scale }] }]}
+                />
+              );
+            })}
+            <Wallet size={18} color="#fff" />
+            <Text style={styles.walletText}>{engagementPoints} EP</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.notificationIconContainer} 
+            onPress={() => setIsNotificationsModalVisible(true)}
+          >
+            <Bell size={24} color="#212121" />
+            {unreadNotificationsCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{unreadNotificationsCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
-
-      {/* Notification Icon */}
-      <TouchableOpacity 
-        style={styles.notificationIconContainer} 
-        onPress={() => setIsNotificationsModalVisible(true)}
-      >
-        <Bell size={24} color="#212121" />
-        {unreadNotificationsCount > 0 && (
-          <View style={styles.notificationBadge}>
-            <Text style={styles.notificationBadgeText}>{unreadNotificationsCount}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
 
       {!!rewardText && (
         <Animated.Text
@@ -1797,6 +1875,7 @@ export default function ExploreScreen() {
         onUpdate={handleUpdateComment}
         typingUsers={Object.keys(typingUsers)}
         onTyping={broadcastTypingStatus}
+        highlightCommentId={highlightCommentId}
       />
 
       <NotificationsModal
@@ -1805,6 +1884,7 @@ export default function ExploreScreen() {
         userId={userId}
         t={t}
         onNotificationsRead={fetchNotifications} // Callback to refresh count
+        onNotificationPress={handleNotificationPress}
       />
     </SafeAreaView>
   );
@@ -1814,23 +1894,22 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#E0F7FA' },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 12, // Adjust to move content down from top edge
-    paddingVertical: 12,
-    paddingBottom: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    position: 'relative', // For absolute positioning of notification icon
   },
   headerTitle: { fontSize: 24, fontFamily: 'Roboto-Bold', color: '#212121' },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   notificationIconContainer: {
-    position: 'absolute',
-    right: 16,
-    top: 12, // Adjust based on header padding
     zIndex: 10,
-    padding: 8,
+    padding: 6,
     borderRadius: 20,
     backgroundColor: '#fff',
     borderWidth: 1,
