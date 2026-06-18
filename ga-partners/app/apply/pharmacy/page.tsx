@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast, Toaster } from "react-hot-toast";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -31,6 +31,10 @@ type PharmacyForm = {
   payment_id: string;
 };
 
+type PharmacyPageProps = {
+  editingPharmacy: Pharmacy | null;
+};
+
 type FormErrors = Partial<Record<keyof Omit<PharmacyForm, 'id'> | 'confirmPassword', string>>;
 
 const supportedCountries = [
@@ -43,10 +47,10 @@ const supportedCountries = [
   //"Somalia",
 ];
 
-export default function PharmacyPage() {
+function PharmacyPageContent({ editingPharmacy: initialPharmacy }: PharmacyPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [editingPharmacy, setEditingPharmacy] = useState<Pharmacy | null>(null);
+  const [editingPharmacy, setEditingPharmacy] = useState<Pharmacy | null>(initialPharmacy);
   const [pharmacyForm, setPharmacyForm] = useState<PharmacyForm>({
     name: "",
     email: "",
@@ -570,5 +574,13 @@ export default function PharmacyPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function PharmacyPage(props: PharmacyPageProps) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PharmacyPageContent {...props} />
+    </Suspense>
   );
 }

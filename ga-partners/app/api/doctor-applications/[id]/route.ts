@@ -30,7 +30,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const formData = await req.formData();
+    const formData: any = await req.formData();
  
     // Extract form data
     const name = formData.get("name")?.toString();

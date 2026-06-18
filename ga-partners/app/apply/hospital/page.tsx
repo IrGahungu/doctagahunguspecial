@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
@@ -31,6 +32,10 @@ type HospitalForm = {
   payment_id: string;
 };
 
+type HospitalPageProps = {
+  editingHospital: Hospital | null;
+};
+
 type FormErrors = Partial<Record<keyof Omit<HospitalForm, 'id'> | 'confirmPassword', string>>
 
 const supportedCountries = [
@@ -49,11 +54,11 @@ const getImageUrl = (path: string | null | undefined) => {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/hospital-images/${path}`;
 };
 
-export default function HospitalPage() {
+function HospitalPageContent({ editingHospital: initialHospital }: HospitalPageProps) {
   const router = useRouter();
   const { t } = useLanguage();
   const searchParams = useSearchParams();
-  const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
+  const [editingHospital, setEditingHospital] = useState<Hospital | null>(initialHospital);
   const [hospitalForm, setHospitalForm] = useState<HospitalForm>({
     name: "",
     image: "",
@@ -608,5 +613,12 @@ export default function HospitalPage() {
         )}
       </div>
     </div>
+  );
+}
+export default function HospitalPage(props: HospitalPageProps) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HospitalPageContent {...props} />
+    </Suspense>
   );
 }

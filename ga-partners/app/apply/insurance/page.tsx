@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
 import { useLanguage } from "../../../context/LanguageContext";
@@ -31,6 +31,10 @@ type InsuranceForm = {
   payment_id: string;
 };
 
+type InsurancePageProps = {
+  editingInsurance: Insurance | null;
+};
+
 type FormErrors = Partial<Record<keyof Omit<InsuranceForm, 'id'> | 'confirmPassword', string>>
 
 const supportedCountries = [
@@ -49,10 +53,10 @@ const getImageUrl = (path: string | null | undefined) => {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/insurance-images/${path}`;
 };
 
-export default function InsurancePage() {
+function InsurancePageContent({ editingInsurance: initialInsurance }: InsurancePageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [editingInsurance, setEditingInsurance] = useState<Insurance | null>(null);
+  const [editingInsurance, setEditingInsurance] = useState<Insurance | null>(initialInsurance);
   const [insuranceForm, setInsuranceForm] = useState<InsuranceForm>({
     name: "",
     image: "",
@@ -605,5 +609,13 @@ export default function InsurancePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function InsurancePage(props: InsurancePageProps) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <InsurancePageContent {...props} />
+    </Suspense>
   );
 }
