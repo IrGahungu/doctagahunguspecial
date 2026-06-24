@@ -17,7 +17,7 @@
     "bcryptjs": "^3.0.3",
     "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
-    "next": "16.0.5",
+    "next": "16.0.10",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hot-toast": "^2.6.0",
